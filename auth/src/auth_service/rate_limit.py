@@ -1,16 +1,15 @@
-import hashlib
-
 from fastapi import HTTPException, status
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 from auth_service.config import get_settings
+from auth_service.identity import fingerprint_identity
 from auth_service.observability import RATE_LIMIT_REJECTIONS
 
 
 def _rate_limit_key(scope: str, identity: str) -> str:
     """Build the Redis key for one rate-limit scope and identity."""
-    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+    digest = fingerprint_identity(identity)
     return f"auth:rate:{scope}:{digest}"
 
 

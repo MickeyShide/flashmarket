@@ -158,7 +158,7 @@ class SessionRepository(Protocol):
         ...
 
     async def list_for_user(self, user_id: uuid.UUID) -> list[LoginSession]:
-        """List non-revoked sessions belonging to a user."""
+        """List all sessions belonging to a user."""
         ...
 
     async def revoke(self, login_session: LoginSession, *, reason: str) -> None:

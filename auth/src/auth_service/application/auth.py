@@ -28,7 +28,9 @@ from auth_service.application.errors import (
 )
 from auth_service.config import get_settings
 from auth_service.domain.events import DomainEvent, EventType
+from auth_service.identity import fingerprint_identity, normalize_email
 from auth_service.models import LoginSession, RefreshToken, User, UserRole
+from auth_service.privacy import anonymize_ip
 from auth_service.security import (
     AccessTokenClaims,
     burn_password_check,
@@ -79,7 +81,7 @@ def _issue_session(
         id=uuid.uuid7(),
         user_id=user.id,
         user_agent=user_agent[:512] if user_agent else None,
-        ip_address=ip_address[:45] if ip_address else None,
+        ip_address=anonymize_ip(ip_address),
         created_at=now,
         last_seen_at=now,
         expires_at=now + timedelta(days=settings.session_ttl_days),
@@ -129,7 +131,7 @@ class RegisterUser:
         password_hash = await to_thread.run_sync(hash_password, command.password)
         user = User(
             id=uuid.uuid7(),
-            email=command.email.lower(),
+            email=normalize_email(command.email),
             password_hash=password_hash,
             full_name=command.full_name,
             role=UserRole.CUSTOMER,
@@ -188,14 +190,17 @@ class LoginUser:
         session_store: SessionStore,
     ) -> AuthenticationResult:
         """Verify credentials, persist a session, and issue tokens."""
-        email = command.email.lower()
+        email = normalize_email(command.email)
         user = await uow.users.get_by_email(email)
         if user is None:
             await to_thread.run_sync(burn_password_check, command.password)
             uow.audit.add(
                 command.context,
                 event_type="login_failed",
-                event_data={"email": email, "reason": "invalid_credentials"},
+                event_data={
+                    "email_fingerprint": fingerprint_identity(email),
+                    "reason": "invalid_credentials",
+                },
             )
             await uow.commit()
             raise InvalidCredentials

@@ -54,8 +54,9 @@ class Settings(BaseSettings):
     refresh_cookie_samesite: Literal["strict", "lax"] = "strict"
 
     rate_limit_enabled: bool = True
-    login_rate_limit: int = Field(default=10, ge=1, le=1000)
-    login_rate_window_seconds: int = Field(default=300, ge=1, le=86400)
+    login_ip_rate_limit: int = Field(default=20, ge=1, le=1000)
+    login_account_rate_limit: int = Field(default=5, ge=1, le=1000)
+    login_rate_window_seconds: int = Field(default=60, ge=1, le=86400)
     register_rate_limit: int = Field(default=5, ge=1, le=1000)
     register_rate_window_seconds: int = Field(default=3600, ge=1, le=86400)
     refresh_rate_limit: int = Field(default=30, ge=1, le=1000)

@@ -36,6 +36,17 @@ async def test_access_token_uses_ed25519_and_public_jwks(
     )
     assert payload["sub"] == registered["user"]["id"]
     assert payload["type"] == "access"
+    assert set(payload) == {
+        "sub",
+        "sid",
+        "role",
+        "type",
+        "jti",
+        "iat",
+        "exp",
+        "iss",
+        "aud",
+    }
 
     response = await client.get("/.well-known/jwks.json")
     assert response.status_code == 200

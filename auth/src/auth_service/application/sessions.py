@@ -20,7 +20,7 @@ class ListSessions:
         *,
         uow: UnitOfWork,
     ) -> list[LoginSession]:
-        """Return the current user’s active sessions."""
+        """Return the current user’s session history."""
         return await uow.sessions.list_for_user(user_id)
 
 

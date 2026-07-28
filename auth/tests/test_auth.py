@@ -1,8 +1,13 @@
+import json
+
+from argon2 import PasswordHasher
+from argon2.low_level import Type
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from auth_service.models import User
+from auth_service.models import AuditEvent, RefreshToken, User
+from auth_service.security import digest_refresh_token, verify_password
 
 
 async def register_user(
@@ -44,6 +49,21 @@ async def test_register_profile_sessions_and_logout(
         assert user is not None
         assert user.password_hash.startswith("$argon2id$")
         assert "correct-horse" not in user.password_hash
+        refresh_token = await db.scalar(select(RefreshToken))
+        assert refresh_token is not None
+        assert refresh_token.token_hash == digest_refresh_token(
+            registered["tokens"]["refresh_token"]
+        )
+        assert refresh_token.token_hash != registered["tokens"]["refresh_token"]
+
+        audit_events = (await db.scalars(select(AuditEvent))).all()
+        audit_payload = json.dumps(
+            [event.event_data for event in audit_events],
+            sort_keys=True,
+        )
+        assert "correct-horse-battery-staple" not in audit_payload
+        assert registered["tokens"]["access_token"] not in audit_payload
+        assert registered["tokens"]["refresh_token"] not in audit_payload
 
     profile = await client.get("/users/me", headers=headers)
     assert profile.status_code == 200
@@ -130,6 +150,49 @@ async def test_duplicate_email_and_weak_password_are_rejected(
     assert weak.status_code == 422
 
 
+async def test_login_does_not_reveal_whether_account_exists(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await register_user(client, email="enumeration@example.com")
+    wrong_password = await client.post(
+        "/auth/login",
+        json={
+            "email": "enumeration@example.com",
+            "password": "definitely-the-wrong-password",
+        },
+    )
+    unknown_account = await client.post(
+        "/auth/login",
+        json={
+            "email": "unknown@example.com",
+            "password": "definitely-the-wrong-password",
+        },
+    )
+
+    assert wrong_password.status_code == unknown_account.status_code == 401
+    wrong_error = wrong_password.json()["error"]
+    unknown_error = unknown_account.json()["error"]
+    assert {
+        "code": wrong_error["code"],
+        "message": wrong_error["message"],
+    } == {
+        "code": unknown_error["code"],
+        "message": unknown_error["message"],
+    }
+    async with session_factory() as db:
+        failed_logins = (
+            await db.scalars(select(AuditEvent).where(AuditEvent.event_type == "login_failed"))
+        ).all()
+        assert len(failed_logins) == 2
+        serialized_events = json.dumps(
+            [event.event_data for event in failed_logins],
+            sort_keys=True,
+        )
+        assert "unknown@example.com" not in serialized_events
+        assert "email_fingerprint" in serialized_events
+
+
 async def test_refresh_rotation_and_reuse_detection(client: AsyncClient) -> None:
     registered = await register_user(client)
     original_refresh = registered["tokens"]["refresh_token"]
@@ -190,6 +253,59 @@ async def test_user_can_close_another_session(client: AsyncClient) -> None:
     assert rejected.status_code == 401
 
 
+async def test_user_cannot_close_another_users_session(client: AsyncClient) -> None:
+    first_user = await register_user(client, email="owner@example.com")
+    second_user = await register_user(client, email="attacker@example.com")
+
+    sessions = await client.get(
+        "/sessions",
+        headers=bearer(first_user["tokens"]["access_token"]),
+    )
+    target_session_id = sessions.json()[0]["id"]
+    forbidden = await client.delete(
+        f"/sessions/{target_session_id}",
+        headers=bearer(second_user["tokens"]["access_token"]),
+    )
+
+    assert forbidden.status_code == 404
+    still_active = await client.get(
+        "/users/me",
+        headers=bearer(first_user["tokens"]["access_token"]),
+    )
+    assert still_active.status_code == 200
+
+
+async def test_logout_all_revokes_every_session(client: AsyncClient) -> None:
+    first = await register_user(client, email="logout-all@example.com")
+    second_response = await client.post(
+        "/auth/login",
+        json={
+            "email": "logout-all@example.com",
+            "password": "correct-horse-battery-staple",
+        },
+    )
+    assert second_response.status_code == 200
+    second = second_response.json()
+
+    closed = await client.delete(
+        "/sessions",
+        headers=bearer(first["tokens"]["access_token"]),
+    )
+    assert closed.status_code == 200
+
+    for tokens in (first["tokens"], second["tokens"]):
+        access_rejected = await client.get(
+            "/users/me",
+            headers=bearer(tokens["access_token"]),
+        )
+        refresh_rejected = await client.post(
+            "/auth/refresh",
+            json={"refresh_token": tokens["refresh_token"]},
+        )
+        assert access_rejected.status_code == 401
+        assert refresh_rejected.status_code == 401
+
+
 async def test_password_change_revokes_sessions(client: AsyncClient) -> None:
     registered = await register_user(client, email="password@example.com")
     access_token = registered["tokens"]["access_token"]
@@ -224,3 +340,38 @@ async def test_password_change_revokes_sessions(client: AsyncClient) -> None:
         },
     )
     assert new_login.status_code == 200
+
+
+async def test_login_upgrades_outdated_argon2_hash(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    password = "rehash-password-is-long-enough"
+    outdated_hash = PasswordHasher(
+        time_cost=1,
+        memory_cost=8_192,
+        parallelism=1,
+        hash_len=16,
+        salt_len=8,
+        type=Type.ID,
+    ).hash(password)
+    async with session_factory() as db:
+        db.add(
+            User(
+                email="rehash@example.com",
+                password_hash=outdated_hash,
+            )
+        )
+        await db.commit()
+
+    logged_in = await client.post(
+        "/auth/login",
+        json={"email": "rehash@example.com", "password": password},
+    )
+    assert logged_in.status_code == 200
+
+    async with session_factory() as db:
+        user = await db.scalar(select(User).where(User.email == "rehash@example.com"))
+        assert user is not None
+        assert user.password_hash != outdated_hash
+        assert verify_password(password, user.password_hash)

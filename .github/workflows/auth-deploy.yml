@@ -318,6 +318,7 @@ jobs:
           cors_origins="${AUTH_CORS_ORIGINS:-[\"https://${AUTH_DOMAIN}\"]}"
           umask 077
           {
+            printf 'AUTH_IMAGE=%s\n' "$AUTH_IMAGE"
             printf 'AUTH_ENVIRONMENT=production\n'
             printf 'AUTH_DOMAIN=%s\n' "$AUTH_DOMAIN"
             printf 'AUTH_DATABASE_URL=postgresql+asyncpg://flashmarket_auth:%s@db:5432/auth\n' "$DEPLOY_POSTGRES_PASSWORD"
@@ -429,15 +430,28 @@ jobs:
       - name: Verify public HTTPS endpoint
         shell: bash
         run: |
+          last_error=""
           for _ in $(seq 1 30); do
-            if curl --fail --silent --show-error \
-              "https://${AUTH_DOMAIN}/health/ready"; then
+            if response="$(
+              curl --fail --silent --show-error \
+                "https://${AUTH_DOMAIN}/health/ready" 2>&1
+            )"; then
+              printf '%s\n' "$response"
               exit 0
             fi
+            last_error="$response"
             sleep 2
           done
 
+          echo "::error title=Public HTTPS check failed::Auth API is not reachable through Nginx Proxy Manager at https://${AUTH_DOMAIN}/health/ready"
+          printf 'Last curl error: %s\n' "$last_error"
+
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          if ssh -p "$DEPLOY_PORT" "$target" \
+            "curl --fail --silent --show-error http://127.0.0.1:8000/health/ready"; then
+            echo
+            echo "::notice title=Auth API is healthy::Configure the Nginx Proxy Manager host, upstream port 8000, and SSL certificate for ${AUTH_DOMAIN}"
+          fi
           ssh -p "$DEPLOY_PORT" "$target" \
             "cd '$DEPLOY_PATH' && docker compose --env-file .env logs --tail 100 api"
           exit 1

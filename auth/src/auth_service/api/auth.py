@@ -22,6 +22,7 @@ from auth_service.application.contracts import AuthenticatedIdentity
 from auth_service.application.errors import InvalidRefreshToken
 from auth_service.cache import Cache
 from auth_service.config import get_settings
+from auth_service.identity import normalize_email
 from auth_service.rate_limit import enforce_rate_limit
 from auth_service.schemas import (
     AuthResponse,
@@ -94,19 +95,19 @@ async def login(
     """Authenticate a customer and issue a new token pair."""
     settings = get_settings()
     _, ip_address = request_metadata(request)
-    email = str(payload.email).lower()
+    email = normalize_email(str(payload.email))
     await enforce_rate_limit(
         cache,
         scope="login-ip",
         identity=ip_address or "unknown",
-        limit=settings.login_rate_limit,
+        limit=settings.login_ip_rate_limit,
         window_seconds=settings.login_rate_window_seconds,
     )
     await enforce_rate_limit(
         cache,
         scope="login-account",
         identity=email,
-        limit=settings.login_rate_limit,
+        limit=settings.login_account_rate_limit,
         window_seconds=settings.login_rate_window_seconds,
     )
     result = await login_user.execute(

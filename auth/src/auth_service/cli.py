@@ -11,6 +11,7 @@ from auth_service.cache import redis_client
 from auth_service.config import get_settings
 from auth_service.database import SessionFactory, engine
 from auth_service.domain.events import DomainEvent, EventType
+from auth_service.identity import normalize_email
 from auth_service.infrastructure.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from auth_service.infrastructure.redis_session_store import RedisSessionStore
 from auth_service.models import (
@@ -37,7 +38,8 @@ async def create_admin(
         normalized_email = validate_email(
             email,
             check_deliverability=False,
-        ).normalized.lower()
+        ).normalized
+        normalized_email = normalize_email(normalized_email)
     except EmailNotValidError as exc:
         raise ValueError("A valid admin email is required") from exc
     if len(password) < 12:

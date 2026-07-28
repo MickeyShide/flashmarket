@@ -27,7 +27,9 @@ class UserRole(StrEnum):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("email = lower(email)", name="ck_users_email_normalized"),)
+    __table_args__ = (
+        CheckConstraint("email = lower(trim(email))", name="ck_users_email_normalized"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)

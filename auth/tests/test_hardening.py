@@ -9,10 +9,19 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from auth_service.config import Settings, get_settings
+from auth_service.identity import normalize_email
 from auth_service.models import AuditEvent, OutboxEvent, User
+from auth_service.privacy import anonymize_ip
 from auth_service.rate_limit import enforce_rate_limit
 from auth_service.security import hash_password
 from tests.test_auth import register_user
+
+
+def test_identity_data_is_normalized_before_persistence() -> None:
+    assert normalize_email("  Customer@Example.COM ") == "customer@example.com"
+    assert anonymize_ip("203.0.113.42") == "203.0.113.0/24"
+    assert anonymize_ip("2001:db8:1234:5678::42") == "2001:db8:1234:5678::/64"
+    assert anonymize_ip("not-an-ip") is None
 
 
 async def test_distributed_rate_limit_returns_retry_after(
@@ -37,6 +46,44 @@ async def test_distributed_rate_limit_returns_retry_after(
         )
     assert exc_info.value.status_code == 429
     assert int(exc_info.value.headers["Retry-After"]) > 0
+
+
+async def test_login_has_separate_account_throttling(client: AsyncClient) -> None:
+    await register_user(client, email="throttled@example.com")
+    settings = get_settings()
+    previous_ip_limit = settings.login_ip_rate_limit
+    previous_account_limit = settings.login_account_rate_limit
+    settings.login_ip_rate_limit = 100
+    settings.login_account_rate_limit = 1
+    try:
+        first_attempt = await client.post(
+            "/auth/login",
+            json={
+                "email": "throttled@example.com",
+                "password": "wrong-password",
+            },
+        )
+        blocked_account = await client.post(
+            "/auth/login",
+            json={
+                "email": "throttled@example.com",
+                "password": "wrong-password",
+            },
+        )
+        different_account = await client.post(
+            "/auth/login",
+            json={
+                "email": "different@example.com",
+                "password": "wrong-password",
+            },
+        )
+    finally:
+        settings.login_ip_rate_limit = previous_ip_limit
+        settings.login_account_rate_limit = previous_account_limit
+
+    assert first_attempt.status_code == 401
+    assert blocked_account.status_code == 429
+    assert different_account.status_code == 401
 
 
 async def test_cookie_refresh_requires_csrf(
@@ -115,12 +162,11 @@ async def test_database_enforces_normalized_email_and_records_audit(
     await register_user(client, email="audit@example.com")
 
     async with session_factory() as db:
-        audit_count = await db.scalar(
-            select(func.count())
-            .select_from(AuditEvent)
-            .where(AuditEvent.event_type == "user_registered")
+        audit_event = await db.scalar(
+            select(AuditEvent).where(AuditEvent.event_type == "user_registered")
         )
-        assert audit_count == 1
+        assert audit_event is not None
+        assert audit_event.ip_address == "127.0.0.0/24"
         outbox_count = await db.scalar(
             select(func.count())
             .select_from(OutboxEvent)

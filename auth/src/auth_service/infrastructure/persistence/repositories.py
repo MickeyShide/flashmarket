@@ -14,6 +14,7 @@ from auth_service.application.contracts import (
     UserSearch,
 )
 from auth_service.models import AuditEvent, LoginSession, RefreshToken, User
+from auth_service.privacy import anonymize_ip
 from auth_service.time import utc_now
 
 
@@ -146,7 +147,7 @@ class SqlAlchemySessionRepository:
         )
 
     async def list_for_user(self, user_id: uuid.UUID) -> list[LoginSession]:
-        """List non-revoked sessions belonging to a user."""
+        """List all sessions belonging to a user."""
         sessions = (
             await self._session.scalars(
                 select(LoginSession)
@@ -239,7 +240,7 @@ class SqlAlchemyAuditRepository:
                 event_type=event_type,
                 actor_user_id=actor_user_id,
                 subject_user_id=subject_user_id,
-                ip_address=context.ip_address[:45] if context.ip_address else None,
+                ip_address=anonymize_ip(context.ip_address),
                 user_agent=context.user_agent[:512] if context.user_agent else None,
                 request_id=context.request_id,
                 event_data=event_data,
