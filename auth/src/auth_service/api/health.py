@@ -10,11 +10,13 @@ router = APIRouter(prefix="/health", tags=["health"])
 
 @router.get("/live")
 async def liveness() -> dict[str, str]:
+    """Report that the process is running."""
     return {"status": "ok"}
 
 
 @router.get("/ready")
 async def readiness(db: DbSession, cache: Cache) -> dict[str, str]:
+    """Check that database and Redis dependencies are reachable."""
     try:
         await db.execute(text("SELECT 1"))
         await cache.ping()

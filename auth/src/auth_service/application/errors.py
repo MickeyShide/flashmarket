@@ -3,6 +3,7 @@ class ApplicationError(Exception):
     message = "The operation could not be completed"
 
     def __init__(self, message: str | None = None) -> None:
+        """Initialize ApplicationError."""
         super().__init__(message or self.message)
         self.public_message = message or self.message
 

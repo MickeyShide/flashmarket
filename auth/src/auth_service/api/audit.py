@@ -20,6 +20,7 @@ async def list_audit_events(
     event_type: str | None = Query(default=None, min_length=1, max_length=64),
     user_id: uuid.UUID | None = None,
 ) -> AuditEventListResponse:
+    """Return paginated audit events for an administrator."""
     page = await list_audit_events_use_case.execute(
         AuditEventSearch(
             limit=limit,

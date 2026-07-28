@@ -35,10 +35,12 @@ class AccessTokenClaims:
 
 
 def hash_password(password: str) -> str:
+    """Hash a password with Argon2."""
     return password_hasher.hash(password)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
+    """Verify a password against its Argon2 hash."""
     try:
         return password_hasher.verify(password_hash, password)
     except InvalidHashError, VerificationError, VerifyMismatchError:
@@ -46,6 +48,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def password_needs_rehash(password_hash: str) -> bool:
+    """Report whether an Argon2 hash needs upgrading."""
     try:
         return password_hasher.check_needs_rehash(password_hash)
     except InvalidHashError:
@@ -53,10 +56,12 @@ def password_needs_rehash(password_hash: str) -> bool:
 
 
 def burn_password_check(password: str) -> None:
+    """Perform a dummy password check to equalize timing."""
     verify_password(password, DUMMY_PASSWORD_HASH)
 
 
 def create_access_token(user: User, session_id: uuid.UUID) -> tuple[str, int]:
+    """Create a signed access token for one session."""
     settings = get_settings()
     key_ring = get_signing_key_ring()
     now = utc_now()
@@ -85,6 +90,7 @@ def create_access_token(user: User, session_id: uuid.UUID) -> tuple[str, int]:
 
 
 def decode_access_token(token: str) -> AccessTokenClaims:
+    """Validate and decode an access token."""
     settings = get_settings()
     key_ring = get_signing_key_ring()
     header = jwt.get_unverified_header(token)
@@ -116,9 +122,11 @@ def decode_access_token(token: str) -> AccessTokenClaims:
 
 
 def generate_refresh_token() -> tuple[str, str]:
+    """Create a refresh token and its stored digest."""
     raw_token = secrets.token_urlsafe(64)
     return raw_token, digest_refresh_token(raw_token)
 
 
 def digest_refresh_token(raw_token: str) -> str:
+    """Return the SHA-256 digest stored for a refresh token."""
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()

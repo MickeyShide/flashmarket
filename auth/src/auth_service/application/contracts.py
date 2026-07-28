@@ -37,18 +37,26 @@ class SessionStore(Protocol):
         session_id: uuid.UUID,
         user_id: uuid.UUID,
         expires_at: datetime,
-    ) -> None: ...
+    ) -> None:
+        """Store the active-session marker until its expiry."""
+        ...
 
     async def is_active(
         self,
         *,
         session_id: uuid.UUID,
         user_id: uuid.UUID,
-    ) -> bool: ...
+    ) -> bool:
+        """Return whether the active-session marker still exists."""
+        ...
 
-    async def deactivate(self, session_id: uuid.UUID) -> None: ...
+    async def deactivate(self, session_id: uuid.UUID) -> None:
+        """Remove one active-session marker immediately."""
+        ...
 
-    async def deactivate_many(self, session_ids: list[uuid.UUID]) -> None: ...
+    async def deactivate_many(self, session_ids: list[uuid.UUID]) -> None:
+        """Remove multiple active-session markers immediately."""
+        ...
 
 
 class UserEmailConflictError(RuntimeError):
@@ -92,19 +100,33 @@ class RefreshContext:
 
 
 class UserRepository(Protocol):
-    async def add_new(self, user: User) -> None: ...
+    async def add_new(self, user: User) -> None:
+        """Stage a newly registered user for insertion."""
+        ...
 
-    async def get_by_email(self, email: str) -> User | None: ...
+    async def get_by_email(self, email: str) -> User | None:
+        """Find a user by normalized email address."""
+        ...
 
-    async def get_by_email_for_update(self, email: str) -> User | None: ...
+    async def get_by_email_for_update(self, email: str) -> User | None:
+        """Lock a user found by normalized email address."""
+        ...
 
-    async def get_active(self, user_id: uuid.UUID) -> User | None: ...
+    async def get_active(self, user_id: uuid.UUID) -> User | None:
+        """Find an enabled user by ID."""
+        ...
 
-    async def get_active_for_update(self, user_id: uuid.UUID) -> User | None: ...
+    async def get_active_for_update(self, user_id: uuid.UUID) -> User | None:
+        """Lock an enabled user by ID."""
+        ...
 
-    async def get_for_update(self, user_id: uuid.UUID) -> User | None: ...
+    async def get_for_update(self, user_id: uuid.UUID) -> User | None:
+        """Lock a user by ID, including disabled accounts."""
+        ...
 
-    async def search(self, query: UserSearch) -> UserPage: ...
+    async def search(self, query: UserSearch) -> UserPage:
+        """Search records using the supplied filters."""
+        ...
 
 
 class SessionRepository(Protocol):
@@ -112,37 +134,53 @@ class SessionRepository(Protocol):
         self,
         login_session: LoginSession,
         refresh_token: RefreshToken,
-    ) -> None: ...
+    ) -> None:
+        """Store a new login session with its initial refresh token."""
+        ...
 
-    async def persist_replacement(self, refresh_token: RefreshToken) -> None: ...
+    async def persist_replacement(self, refresh_token: RefreshToken) -> None:
+        """Store a rotated refresh token for an existing session."""
+        ...
 
     async def get_owned_for_update(
         self,
         session_id: uuid.UUID,
         user_id: uuid.UUID,
-    ) -> LoginSession | None: ...
+    ) -> LoginSession | None:
+        """Lock a session only when it belongs to the user."""
+        ...
 
     async def get_refresh_context_for_rotation(
         self,
         token_hash: str,
-    ) -> RefreshContext | None: ...
+    ) -> RefreshContext | None:
+        """Lock and load the state needed to rotate a refresh token."""
+        ...
 
-    async def list_for_user(self, user_id: uuid.UUID) -> list[LoginSession]: ...
+    async def list_for_user(self, user_id: uuid.UUID) -> list[LoginSession]:
+        """List non-revoked sessions belonging to a user."""
+        ...
 
-    async def revoke(self, login_session: LoginSession, *, reason: str) -> None: ...
+    async def revoke(self, login_session: LoginSession, *, reason: str) -> None:
+        """Mark one login session as revoked."""
+        ...
 
     async def revoke_all_for_user(
         self,
         user_id: uuid.UUID,
         *,
         reason: str,
-    ) -> list[uuid.UUID]: ...
+    ) -> list[uuid.UUID]:
+        """Revoke all active sessions owned by a user."""
+        ...
 
     async def touch_active(
         self,
         session_id: uuid.UUID,
         user_id: uuid.UUID,
-    ) -> None: ...
+    ) -> None:
+        """Update the last-seen timestamp of an active session."""
+        ...
 
 
 class AuditRepository(Protocol):
@@ -154,9 +192,13 @@ class AuditRepository(Protocol):
         actor_user_id: uuid.UUID | None = None,
         subject_user_id: uuid.UUID | None = None,
         event_data: dict[str, object] | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Append an audit event to the current transaction."""
+        ...
 
-    async def search(self, query: AuditEventSearch) -> AuditEventPage: ...
+    async def search(self, query: AuditEventSearch) -> AuditEventPage:
+        """Search records using the supplied filters."""
+        ...
 
 
 class UnitOfWork(Protocol):
@@ -164,8 +206,14 @@ class UnitOfWork(Protocol):
     sessions: SessionRepository
     audit: AuditRepository
 
-    def add_event(self, event: DomainEvent) -> None: ...
+    def add_event(self, event: DomainEvent) -> None:
+        """Queue a domain event for transactional outbox delivery."""
+        ...
 
-    async def commit(self) -> None: ...
+    async def commit(self) -> None:
+        """Commit database changes and persist queued outbox events."""
+        ...
 
-    async def rollback(self) -> None: ...
+    async def rollback(self) -> None:
+        """Discard uncommitted database changes."""
+        ...

@@ -11,6 +11,7 @@ from auth_service.models import OutboxEvent
 
 class SqlAlchemyUnitOfWork:
     def __init__(self, session: AsyncSession) -> None:
+        """Initialize SqlAlchemyUnitOfWork."""
         self._session = session
         self.users = SqlAlchemyUserRepository(session)
         self.sessions = SqlAlchemySessionRepository(session)
@@ -18,9 +19,11 @@ class SqlAlchemyUnitOfWork:
         self._events: list[DomainEvent] = []
 
     def add_event(self, event: DomainEvent) -> None:
+        """Queue a domain event for transactional outbox delivery."""
         self._events.append(event)
 
     async def commit(self) -> None:
+        """Commit database changes and persist queued outbox events."""
         for event in self._events:
             self._session.add(
                 OutboxEvent(
@@ -36,5 +39,6 @@ class SqlAlchemyUnitOfWork:
         self._events.clear()
 
     async def rollback(self) -> None:
+        """Discard uncommitted database changes."""
         self._events.clear()
         await self._session.rollback()

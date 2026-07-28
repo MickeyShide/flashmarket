@@ -22,24 +22,28 @@ class SigningKeyRing:
     verification_keys: dict[str, Ed25519PublicKey]
 
     def verification_key(self, key_id: str) -> Ed25519PublicKey:
+        """Return the public key that verifies a JWT key ID."""
         try:
             return self.verification_keys[key_id]
         except KeyError as exc:
             raise jwt.InvalidTokenError("Unknown JWT signing key") from exc
 
     def public_jwks(self) -> list[dict[str, str]]:
+        """Convert all public keys into JWKS entries."""
         return [
             public_key_to_jwk(key_id, key) for key_id, key in sorted(self.verification_keys.items())
         ]
 
 
 def _write_new_file(path: Path, content: bytes, mode: int) -> None:
+    """Write a new file atomically without replacing an existing one."""
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
     with os.fdopen(descriptor, "wb") as file:
         file.write(content)
 
 
 def _migrate_legacy_key_pair(output_directory: Path, key_id: str) -> tuple[Path, Path] | None:
+    """Move a legacy key pair into the keyed layout."""
     legacy_private = output_directory / "jwt_private.pem"
     legacy_public = output_directory / "jwt_public.pem"
     if not legacy_private.exists() and not legacy_public.exists():
@@ -70,6 +74,7 @@ def generate_jwt_key_pair(
     key_id: str | None = None,
     force: bool = False,
 ) -> tuple[Path, Path]:
+    """Create a new JWT key pair without overwriting keys."""
     resolved_key_id = key_id or get_settings().jwt_key_id
     allowed_characters = frozenset(
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-"
@@ -127,6 +132,7 @@ def generate_jwt_key_pair(
 
 @lru_cache
 def load_private_key(path: Path) -> Ed25519PrivateKey:
+    """Load an Ed25519 private key from PEM."""
     try:
         key = serialization.load_pem_private_key(path.read_bytes(), password=None)
     except (OSError, ValueError) as exc:
@@ -138,6 +144,7 @@ def load_private_key(path: Path) -> Ed25519PrivateKey:
 
 @lru_cache
 def load_public_key(path: Path) -> Ed25519PublicKey:
+    """Load an Ed25519 public key from PEM."""
     try:
         key = serialization.load_pem_public_key(path.read_bytes())
     except (OSError, ValueError) as exc:
@@ -148,6 +155,7 @@ def load_public_key(path: Path) -> Ed25519PublicKey:
 
 
 def validate_key_pair(private_path: Path, public_path: Path) -> None:
+    """Ensure private and public key files form a pair."""
     private_public_key = load_private_key(private_path).public_key()
     configured_public_key = load_public_key(public_path)
     private_public_bytes = private_public_key.public_bytes(
@@ -164,6 +172,7 @@ def validate_key_pair(private_path: Path, public_path: Path) -> None:
 
 @lru_cache
 def load_signing_key_ring(keys_directory: Path, active_key_id: str) -> SigningKeyRing:
+    """Load and validate every configured JWT key."""
     private_path = keys_directory / "private" / f"{active_key_id}.pem"
     public_directory = keys_directory / "public"
     signing_key = load_private_key(private_path)
@@ -183,24 +192,29 @@ def load_signing_key_ring(keys_directory: Path, active_key_id: str) -> SigningKe
 
 
 def get_signing_key_ring() -> SigningKeyRing:
+    """Return the cached JWT signing key ring."""
     settings = get_settings()
     return load_signing_key_ring(settings.jwt_keys_directory, settings.jwt_key_id)
 
 
 def validate_configured_key_pair() -> None:
+    """Validate the configured JWT key pair at startup."""
     get_signing_key_ring()
 
 
 def get_private_signing_key() -> Ed25519PrivateKey:
+    """Return the active private JWT signing key."""
     return get_signing_key_ring().signing_key
 
 
 def get_public_verification_key(key_id: str | None = None) -> Ed25519PublicKey:
+    """Return a public key by key identifier."""
     key_ring = get_signing_key_ring()
     return key_ring.verification_key(key_id or key_ring.active_key_id)
 
 
 def public_key_to_jwk(key_id: str, public_key: Ed25519PublicKey) -> dict[str, str]:
+    """Encode an Ed25519 public key as JWK."""
     settings = get_settings()
     public_bytes = public_key.public_bytes(
         encoding=serialization.Encoding.Raw,
@@ -218,8 +232,10 @@ def public_key_to_jwk(key_id: str, public_key: Ed25519PublicKey) -> dict[str, st
 
 
 def get_public_jwks() -> list[dict[str, str]]:
+    """Return all public JWT keys as JWKS entries."""
     return get_signing_key_ring().public_jwks()
 
 
 def get_public_jwk() -> dict[str, str]:
+    """Return the active public JWT key as JWK."""
     return public_key_to_jwk(get_signing_key_ring().active_key_id, get_public_verification_key())

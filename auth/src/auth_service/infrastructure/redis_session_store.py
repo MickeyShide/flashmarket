@@ -15,6 +15,7 @@ from auth_service.cache import (
 
 class RedisSessionStore(SessionStore):
     def __init__(self, client: Redis) -> None:
+        """Initialize RedisSessionStore."""
         self._client = client
 
     async def activate(
@@ -24,6 +25,7 @@ class RedisSessionStore(SessionStore):
         user_id: uuid.UUID,
         expires_at: datetime,
     ) -> None:
+        """Store the active-session marker until its expiry."""
         try:
             await activate_session(
                 self._client,
@@ -40,6 +42,7 @@ class RedisSessionStore(SessionStore):
         session_id: uuid.UUID,
         user_id: uuid.UUID,
     ) -> bool:
+        """Return whether the active-session marker still exists."""
         try:
             return await is_session_active(
                 self._client,
@@ -50,12 +53,14 @@ class RedisSessionStore(SessionStore):
             raise SessionStoreError from exc
 
     async def deactivate(self, session_id: uuid.UUID) -> None:
+        """Remove one active-session marker immediately."""
         try:
             await deactivate_session(self._client, session_id)
         except CacheUnavailableError as exc:
             raise SessionStoreError from exc
 
     async def deactivate_many(self, session_ids: list[uuid.UUID]) -> None:
+        """Remove multiple active-session markers immediately."""
         try:
             await deactivate_sessions(self._client, session_ids)
         except CacheUnavailableError as exc:

@@ -32,6 +32,7 @@ async def create_admin(
     *,
     promote_existing: bool,
 ) -> None:
+    """Create an administrator account from CLI input."""
     try:
         normalized_email = validate_email(
             email,
@@ -111,6 +112,7 @@ async def create_admin(
 
 
 async def cleanup_expired_data() -> None:
+    """Remove expired refresh tokens and audit records."""
     settings = get_settings()
     now = utc_now()
     expired_cutoff = now - timedelta(days=settings.expired_data_retention_days)
@@ -146,6 +148,7 @@ async def cleanup_expired_data() -> None:
 
 
 def main() -> None:
+    """Run this module as a command-line entry point."""
     parser = argparse.ArgumentParser(description="FlashMarket auth administration")
     subparsers = parser.add_subparsers(dest="command", required=True)
     create_admin_parser = subparsers.add_parser("create-admin")

@@ -17,6 +17,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Apply this revision’s schema changes."""
     op.create_table(
         "outbox_events",
         sa.Column("id", sa.Uuid(), nullable=False),
@@ -39,5 +40,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Revert this revision’s schema changes."""
     op.drop_index("ix_outbox_events_pending", table_name="outbox_events")
     op.drop_table("outbox_events")

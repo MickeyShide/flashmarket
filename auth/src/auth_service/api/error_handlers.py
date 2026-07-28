@@ -37,6 +37,7 @@ async def application_error_handler(
     request: Request,
     exc: ApplicationError,
 ) -> JSONResponse:
+    """Translate domain errors into API responses."""
     status_code = next(
         (
             error_status

@@ -7,6 +7,7 @@ from auth_service.config import get_settings
 
 
 def request_metadata(request: Request) -> tuple[str | None, str | None]:
+    """Extract client IP and user agent from a request."""
     user_agent = request.headers.get("user-agent")
     ip_address = request.client.host if request.client else None
     if ip_address in get_settings().trusted_proxy_ips:
@@ -21,6 +22,7 @@ def request_metadata(request: Request) -> tuple[str | None, str | None]:
 
 
 def request_context(request: Request) -> RequestContext:
+    """Build audit context from the current request."""
     user_agent, ip_address = request_metadata(request)
     return RequestContext(
         request_id=getattr(request.state, "request_id", None),

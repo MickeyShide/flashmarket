@@ -9,12 +9,14 @@ from auth_service.schemas import RefreshRequest, TokenPair
 
 
 def clear_refresh_cookies(response: Response) -> None:
+    """Remove the refresh and CSRF cookies."""
     settings = get_settings()
     response.delete_cookie(settings.refresh_cookie_name, path="/")
     response.delete_cookie(settings.csrf_cookie_name, path="/")
 
 
 def deliver_tokens(response: Response, tokens: IssuedTokens) -> TokenPair:
+    """Return tokens and set secure refresh cookies when enabled."""
     settings = get_settings()
     response_tokens = TokenPair(
         access_token=tokens.access_token,
@@ -53,6 +55,7 @@ def deliver_tokens(response: Response, tokens: IssuedTokens) -> TokenPair:
 
 
 def resolve_refresh_token(payload: RefreshRequest, request: Request) -> str:
+    """Read the refresh token from the selected transport."""
     settings = get_settings()
     if settings.refresh_token_transport == "body":
         if payload.refresh_token is None:

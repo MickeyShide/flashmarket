@@ -6,6 +6,7 @@ router = APIRouter(tags=["metrics"])
 
 @router.get("/metrics", include_in_schema=False)
 async def metrics() -> Response:
+    """Expose Prometheus metrics."""
     return Response(
         content=generate_latest(),
         media_type=CONTENT_TYPE_LATEST,

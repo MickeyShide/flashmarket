@@ -18,6 +18,7 @@ class CacheUnavailableError(RuntimeError):
 
 
 def get_cache() -> Redis:
+    """Return the shared Redis client."""
     return redis_client
 
 
@@ -25,10 +26,12 @@ Cache = Annotated[Redis, Depends(get_cache)]
 
 
 def session_cache_key(session_id: uuid.UUID) -> str:
+    """Build the Redis key that marks a session as active."""
     return f"auth:session:{session_id}"
 
 
 def session_touch_key(session_id: uuid.UUID) -> str:
+    """Build the Redis key used to throttle session touch updates."""
     return f"auth:session-touch:{session_id}"
 
 
@@ -39,6 +42,7 @@ async def activate_session(
     user_id: uuid.UUID,
     expires_at: datetime,
 ) -> None:
+    """Mark a session as active in Redis until its expiry."""
     ttl = max(1, int((as_utc(expires_at) - utc_now()).total_seconds()))
     try:
         await cache.set(
@@ -56,6 +60,7 @@ async def is_session_active(
     session_id: uuid.UUID,
     user_id: uuid.UUID,
 ) -> bool:
+    """Check whether Redis still marks a session as active."""
     try:
         cached_user_id = await cache.get(session_cache_key(session_id))
     except RedisError as exc:
@@ -64,6 +69,7 @@ async def is_session_active(
 
 
 async def deactivate_session(cache: Redis, session_id: uuid.UUID) -> None:
+    """Remove one session from Redis immediately."""
     try:
         await cache.delete(
             session_cache_key(session_id),
@@ -74,6 +80,7 @@ async def deactivate_session(cache: Redis, session_id: uuid.UUID) -> None:
 
 
 async def deactivate_sessions(cache: Redis, session_ids: list[uuid.UUID]) -> None:
+    """Remove several sessions from Redis immediately."""
     if not session_ids:
         return
     try:
@@ -93,6 +100,7 @@ async def should_touch_session(
     session_id: uuid.UUID,
     interval_seconds: int,
 ) -> bool:
+    """Decide whether a session last-seen timestamp should be updated."""
     try:
         created = await cache.set(
             session_touch_key(session_id),

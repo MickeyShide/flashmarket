@@ -18,6 +18,7 @@ class RegisterRequest(StrictSchema):
     @field_validator("password")
     @classmethod
     def validate_password(cls, value: str) -> str:
+        """Validate password."""
         if value.isspace():
             raise ValueError("Password cannot contain only whitespace")
         return value
@@ -25,6 +26,7 @@ class RegisterRequest(StrictSchema):
     @field_validator("full_name")
     @classmethod
     def normalize_full_name(cls, value: str | None) -> str | None:
+        """Normalize full name."""
         if value is None:
             return None
         normalized = " ".join(value.split())
@@ -95,6 +97,7 @@ class ProfileUpdateRequest(StrictSchema):
     @field_validator("full_name")
     @classmethod
     def normalize_full_name(cls, value: str | None) -> str | None:
+        """Normalize full name."""
         if value is None:
             return None
         normalized = " ".join(value.split())
@@ -110,6 +113,7 @@ class PasswordChangeRequest(StrictSchema):
     @field_validator("new_password")
     @classmethod
     def validate_new_password(cls, value: str) -> str:
+        """Validate new password."""
         if value.isspace():
             raise ValueError("Password cannot contain only whitespace")
         return value

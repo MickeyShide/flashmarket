@@ -29,6 +29,7 @@ async def get_profile(
     principal: CurrentPrincipal,
     uow: Uow,
 ) -> UserResponse:
+    """Return the current user’s public profile."""
     user = await get_profile_use_case.execute(principal.user_id, uow=uow)
     return UserResponse.model_validate(user)
 
@@ -40,6 +41,7 @@ async def update_profile(
     principal: CurrentPrincipal,
     uow: Uow,
 ) -> UserResponse:
+    """Update the current user’s profile fields."""
     user = await update_profile_use_case.execute(
         UpdateProfileCommand(
             identity=AuthenticatedIdentity(
@@ -64,6 +66,7 @@ async def change_password(
     uow: Uow,
     session_store: SessionStoreDep,
 ) -> MessageResponse:
+    """Change the current password and revoke old sessions."""
     await change_password_use_case.execute(
         ChangePasswordCommand(
             identity=AuthenticatedIdentity(

@@ -68,6 +68,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> Settings:
+        """Validate production settings."""
         if self.environment != "production":
             return self
 
@@ -112,4 +113,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Return the cached application settings."""
     return Settings()  # type: ignore[call-arg]

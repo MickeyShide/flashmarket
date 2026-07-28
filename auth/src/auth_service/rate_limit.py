@@ -9,6 +9,7 @@ from auth_service.observability import RATE_LIMIT_REJECTIONS
 
 
 def _rate_limit_key(scope: str, identity: str) -> str:
+    """Build the Redis key for one rate-limit scope and identity."""
     digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
     return f"auth:rate:{scope}:{digest}"
 
@@ -21,6 +22,7 @@ async def enforce_rate_limit(
     limit: int,
     window_seconds: int,
 ) -> None:
+    """Reject requests that exceed their distributed rate limit."""
     if not get_settings().rate_limit_enabled:
         return
 

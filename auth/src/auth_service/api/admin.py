@@ -36,6 +36,7 @@ async def list_users(
     role: UserRole | None = None,
     is_active: bool | None = None,
 ) -> UserListResponse:
+    """Return a paginated user list for an administrator."""
     page = await list_users_use_case.execute(
         UserSearch(
             limit=limit,
@@ -63,6 +64,7 @@ async def update_user_role(
     uow: Uow,
     session_store: SessionStoreDep,
 ) -> UserResponse:
+    """Change a user role after administrator authorization."""
     user = await update_user_role_use_case.execute(
         UpdateUserRoleCommand(
             user_id=user_id,
@@ -85,6 +87,7 @@ async def update_user_status(
     uow: Uow,
     session_store: SessionStoreDep,
 ) -> UserResponse:
+    """Enable or disable a user account."""
     user = await update_user_status_use_case.execute(
         UpdateUserStatusCommand(
             user_id=user_id,

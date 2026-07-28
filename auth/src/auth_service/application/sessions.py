@@ -20,6 +20,7 @@ class ListSessions:
         *,
         uow: UnitOfWork,
     ) -> list[LoginSession]:
+        """Return the current user’s active sessions."""
         return await uow.sessions.list_for_user(user_id)
 
 
@@ -38,6 +39,7 @@ class RevokeSession:
         uow: UnitOfWork,
         session_store: SessionStore,
     ) -> None:
+        """Revoke one session owned by the current user."""
         login_session = await uow.sessions.get_owned_for_update(
             command.session_id,
             command.identity.user_id,
@@ -84,6 +86,7 @@ class RevokeAllSessions:
         uow: UnitOfWork,
         session_store: SessionStore,
     ) -> int:
+        """Revoke every active session for the current user."""
         session_ids = await uow.sessions.revoke_all_for_user(
             command.identity.user_id,
             reason="logout_all",

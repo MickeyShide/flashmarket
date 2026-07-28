@@ -17,6 +17,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Apply this revision’s schema changes."""
     op.create_table(
         "users",
         sa.Column("id", sa.Uuid(), nullable=False),
@@ -96,6 +97,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Revert this revision’s schema changes."""
     op.drop_index("ix_refresh_tokens_session_created", table_name="refresh_tokens")
     op.drop_index("ix_refresh_tokens_session_id", table_name="refresh_tokens")
     op.drop_table("refresh_tokens")

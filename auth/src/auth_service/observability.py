@@ -36,6 +36,7 @@ RATE_LIMIT_REJECTIONS = Counter(
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
+        """Format a log record as a JSON line."""
         payload: dict[str, object] = {
             "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
@@ -58,6 +59,7 @@ class JsonFormatter(logging.Formatter):
 
 
 def configure_logging() -> logging.Logger:
+    """Configure structured application logging."""
     logger = logging.getLogger("auth.http")
     logger.setLevel(logging.INFO)
     logger.propagate = False
@@ -75,6 +77,7 @@ async def request_observability_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
+    """Record request timing, status, and correlation ID."""
     supplied_request_id = request.headers.get("x-request-id", "")
     request_id = (
         supplied_request_id

@@ -28,6 +28,7 @@ class ListUsers:
         *,
         uow: UnitOfWork,
     ) -> UserPage:
+        """Return the requested administrator user page."""
         return await uow.users.search(query)
 
 
@@ -38,6 +39,7 @@ class ListAuditEvents:
         *,
         uow: UnitOfWork,
     ) -> AuditEventPage:
+        """Return the requested administrator audit-event page."""
         return await uow.audit.search(query)
 
 
@@ -45,6 +47,7 @@ async def _load_user_for_update(
     uow: UnitOfWork,
     user_id: uuid.UUID,
 ) -> User:
+    """Lock a user row before an administrator changes it."""
     user = await uow.users.get_for_update(user_id)
     if user is None:
         raise UserNotFound
@@ -58,6 +61,7 @@ async def _revoke_sessions(
     *,
     reason: str,
 ) -> list[uuid.UUID]:
+    """Revoke a user’s sessions in SQL and Redis."""
     session_ids = await uow.sessions.revoke_all_for_user(user_id, reason=reason)
     try:
         await session_store.deactivate_many(session_ids)
@@ -82,6 +86,7 @@ class UpdateUserRole:
         uow: UnitOfWork,
         session_store: SessionStore,
     ) -> User:
+        """Change a role and revoke sessions when privileges change."""
         user = await _load_user_for_update(uow, command.user_id)
         if user.id == command.actor_user_id and user.role != command.role:
             raise OwnRoleChangeForbidden
@@ -136,6 +141,7 @@ class UpdateUserStatus:
         uow: UnitOfWork,
         session_store: SessionStore,
     ) -> User:
+        """Change account status and revoke sessions when disabling."""
         user = await _load_user_for_update(uow, command.user_id)
         if user.id == command.actor_user_id and not command.is_active:
             raise OwnAccountDisableForbidden

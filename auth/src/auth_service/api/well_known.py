@@ -7,4 +7,5 @@ router = APIRouter(tags=["well-known"])
 
 @router.get("/.well-known/jwks.json")
 async def json_web_key_set() -> dict[str, list[dict[str, str]]]:
+    """Expose public JWT verification keys as JWKS."""
     return {"keys": get_public_jwks()}

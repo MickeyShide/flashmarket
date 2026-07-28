@@ -26,12 +26,14 @@ from auth_service.observability import request_observability_middleware
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Manage application resources for its lifetime."""
     yield
     await redis_client.aclose()
     await engine.dispose()
 
 
 def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
     settings = get_settings()
     validate_configured_key_pair()
     app = FastAPI(

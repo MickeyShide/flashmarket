@@ -47,6 +47,7 @@ def _issue_tokens(
     user: User,
     login_session: LoginSession,
 ) -> tuple[IssuedTokens, RefreshToken]:
+    """Create access and refresh tokens for one persisted session."""
     raw_refresh_token, token_hash = generate_refresh_token()
     refresh_token = RefreshToken(
         id=uuid.uuid7(),
@@ -71,6 +72,7 @@ def _issue_session(
     user_agent: str | None,
     ip_address: str | None,
 ) -> tuple[LoginSession, RefreshToken, IssuedTokens]:
+    """Create the database record for a new login session."""
     now = utc_now()
     settings = get_settings()
     login_session = LoginSession(
@@ -91,6 +93,7 @@ async def _activate_persisted_session(
     session_store: SessionStore,
     login_session: LoginSession,
 ) -> None:
+    """Activate a committed session in Redis."""
     try:
         await session_store.activate(
             session_id=login_session.id,
@@ -122,6 +125,7 @@ class RegisterUser:
         uow: UnitOfWork,
         session_store: SessionStore,
     ) -> AuthenticationResult:
+        """Register a customer, persist a session, and issue tokens."""
         password_hash = await to_thread.run_sync(hash_password, command.password)
         user = User(
             id=uuid.uuid7(),
@@ -183,6 +187,7 @@ class LoginUser:
         uow: UnitOfWork,
         session_store: SessionStore,
     ) -> AuthenticationResult:
+        """Verify credentials, persist a session, and issue tokens."""
         email = command.email.lower()
         user = await uow.users.get_by_email(email)
         if user is None:
@@ -272,6 +277,7 @@ class RefreshAccess:
         uow: UnitOfWork,
         session_store: SessionStore,
     ) -> RefreshResult:
+        """Rotate a refresh token while detecting token replay."""
         token_hash = digest_refresh_token(command.refresh_token)
         refresh_context = await uow.sessions.get_refresh_context_for_rotation(token_hash)
         if refresh_context is None:
@@ -362,6 +368,7 @@ class LogoutUser:
         uow: UnitOfWork,
         session_store: SessionStore,
     ) -> None:
+        """Revoke the current session and invalidate its cache entry."""
         login_session = await uow.sessions.get_owned_for_update(
             command.identity.session_id,
             command.identity.user_id,
@@ -398,6 +405,7 @@ class IntrospectAccessToken:
         *,
         session_store: SessionStore,
     ) -> AccessTokenClaims | None:
+        """Check JWT claims and immediate session revocation state."""
         try:
             claims = decode_access_token(token)
             active = await session_store.is_active(

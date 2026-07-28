@@ -1,0 +1,8 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/auth/.venv/Scripts/python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/auth/src"
+  ],
+  "python.analysis.autoImportCompletions": true,
+  "python.terminal.activateEnvironment": false
+}

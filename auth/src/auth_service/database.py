@@ -23,6 +23,7 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
+    """Yield a database session for one request."""
     async with SessionFactory() as session:
         try:
             yield session

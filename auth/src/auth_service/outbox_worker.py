@@ -22,6 +22,7 @@ async def publish_outbox_batch(
     *,
     session_factory: async_sessionmaker[AsyncSession] = SessionFactory,
 ) -> int:
+    """Publish one batch of pending outbox events."""
     settings = get_settings()
     now = utc_now()
     async with session_factory() as db, db.begin():
@@ -76,6 +77,7 @@ async def publish_outbox_batch(
 
 
 async def run_connected_worker() -> None:
+    """Keep publishing events while the broker connection is open."""
     settings = get_settings()
     connection = await aio_pika.connect_robust(settings.rabbitmq_url)
     async with connection:
@@ -104,6 +106,7 @@ async def run_connected_worker() -> None:
 
 
 async def run_worker() -> None:
+    """Reconnect the outbox worker after broker failures."""
     settings = get_settings()
     retry_delay = settings.outbox_poll_interval_seconds
     while True:
@@ -120,6 +123,7 @@ async def run_worker() -> None:
 
 
 async def run() -> None:
+    """Start the worker coroutine."""
     try:
         await run_worker()
     finally:
@@ -127,6 +131,7 @@ async def run() -> None:
 
 
 def main() -> None:
+    """Run this module as a command-line entry point."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",

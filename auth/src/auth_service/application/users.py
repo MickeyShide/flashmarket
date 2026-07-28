@@ -27,6 +27,7 @@ async def _load_active_user(
     *,
     for_update: bool = False,
 ) -> User:
+    """Load an enabled user or raise a not-found error."""
     user = (
         await uow.users.get_active_for_update(user_id)
         if for_update
@@ -44,6 +45,7 @@ class GetProfile:
         *,
         uow: UnitOfWork,
     ) -> User:
+        """Return the current user’s profile."""
         return await _load_active_user(uow, user_id)
 
 
@@ -62,6 +64,7 @@ class UpdateProfile:
         *,
         uow: UnitOfWork,
     ) -> User:
+        """Update the current user’s profile."""
         user = await _load_active_user(uow, command.identity.user_id)
         if not command.update_full_name:
             return user
@@ -103,6 +106,7 @@ class ChangePassword:
         uow: UnitOfWork,
         session_store: SessionStore,
     ) -> int:
+        """Replace the password and revoke all user sessions."""
         user = await _load_active_user(
             uow,
             command.identity.user_id,

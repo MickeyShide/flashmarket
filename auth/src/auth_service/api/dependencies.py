@@ -29,6 +29,7 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
 def get_uow(db: DbSession) -> SqlAlchemyUnitOfWork:
+    """Build a unit of work for the current database session."""
     return SqlAlchemyUnitOfWork(db)
 
 
@@ -37,6 +38,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_session_store(cache: Cache) -> SessionStore:
+    """Build the Redis-backed session store."""
     return RedisSessionStore(cache)
 
 
@@ -58,6 +60,7 @@ async def get_current_principal(
     session_store: SessionStoreDep,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> Principal:
+    """Authenticate the bearer token and load its principal."""
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired access token",
@@ -113,6 +116,7 @@ CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]
 
 
 async def require_admin(principal: CurrentPrincipal) -> Principal:
+    """Reject a request unless its principal is an administrator."""
     if principal.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

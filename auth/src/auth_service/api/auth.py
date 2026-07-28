@@ -56,6 +56,7 @@ async def register(
     cache: Cache,
     session_store: SessionStoreDep,
 ) -> AuthResponse:
+    """Register a customer and issue the first token pair."""
     settings = get_settings()
     _, ip_address = request_metadata(request)
     await enforce_rate_limit(
@@ -90,6 +91,7 @@ async def login(
     cache: Cache,
     session_store: SessionStoreDep,
 ) -> AuthResponse:
+    """Authenticate a customer and issue a new token pair."""
     settings = get_settings()
     _, ip_address = request_metadata(request)
     email = str(payload.email).lower()
@@ -131,6 +133,7 @@ async def refresh(
     cache: Cache,
     session_store: SessionStoreDep,
 ) -> TokenRefreshResponse:
+    """Rotate a refresh token and issue a replacement pair."""
     settings = get_settings()
     _, ip_address = request_metadata(request)
     await enforce_rate_limit(
@@ -163,6 +166,7 @@ async def introspect(
     cache: Cache,
     session_store: SessionStoreDep,
 ) -> IntrospectionResponse:
+    """Report whether the presented access token is active."""
     settings = get_settings()
     _, ip_address = request_metadata(request)
     await enforce_rate_limit(
@@ -197,6 +201,7 @@ async def logout(
     uow: Uow,
     session_store: SessionStoreDep,
 ) -> MessageResponse:
+    """Revoke the current session and clear its cookies."""
     await logout_user.execute(
         LogoutCommand(
             identity=AuthenticatedIdentity(

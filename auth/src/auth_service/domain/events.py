@@ -34,9 +34,11 @@ class DomainEvent:
     occurred_at: datetime = field(default_factory=utc_now)
 
     def __post_init__(self) -> None:
+        """Validate and normalize the newly created value object."""
         object.__setattr__(self, "payload", MappingProxyType(dict(self.payload)))
 
     def message_payload(self) -> dict[str, JsonValue]:
+        """Build the JSON payload sent through the transactional outbox."""
         return {
             "schema_version": 1,
             "event_id": str(self.event_id),

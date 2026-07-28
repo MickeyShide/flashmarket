@@ -19,9 +19,11 @@ from auth_service.time import utc_now
 
 class SqlAlchemyUserRepository:
     def __init__(self, session: AsyncSession) -> None:
+        """Initialize SqlAlchemyUserRepository."""
         self._session = session
 
     async def add_new(self, user: User) -> None:
+        """Stage a newly registered user for insertion."""
         self._session.add(user)
         try:
             await self._session.flush()
@@ -29,12 +31,15 @@ class SqlAlchemyUserRepository:
             raise UserEmailConflictError from exc
 
     async def get_by_email(self, email: str) -> User | None:
+        """Find a user by normalized email address."""
         return await self._session.scalar(select(User).where(User.email == email))
 
     async def get_by_email_for_update(self, email: str) -> User | None:
+        """Lock a user found by normalized email address."""
         return await self._session.scalar(select(User).where(User.email == email).with_for_update())
 
     async def get_active(self, user_id: uuid.UUID) -> User | None:
+        """Find an enabled user by ID."""
         return await self._session.scalar(
             select(User).where(
                 User.id == user_id,
@@ -43,6 +48,7 @@ class SqlAlchemyUserRepository:
         )
 
     async def get_active_for_update(self, user_id: uuid.UUID) -> User | None:
+        """Lock an enabled user by ID."""
         return await self._session.scalar(
             select(User)
             .where(
@@ -53,9 +59,11 @@ class SqlAlchemyUserRepository:
         )
 
     async def get_for_update(self, user_id: uuid.UUID) -> User | None:
+        """Lock a user by ID, including disabled accounts."""
         return await self._session.scalar(select(User).where(User.id == user_id).with_for_update())
 
     async def search(self, query: UserSearch) -> UserPage:
+        """Search records using the supplied filters."""
         filters = []
         if query.search:
             pattern = f"%{query.search.lower()}%"
@@ -82,6 +90,7 @@ class SqlAlchemyUserRepository:
 
 class SqlAlchemySessionRepository:
     def __init__(self, session: AsyncSession) -> None:
+        """Initialize SqlAlchemySessionRepository."""
         self._session = session
 
     async def persist_new(
@@ -89,10 +98,12 @@ class SqlAlchemySessionRepository:
         login_session: LoginSession,
         refresh_token: RefreshToken,
     ) -> None:
+        """Store a new login session with its initial refresh token."""
         self._session.add_all([login_session, refresh_token])
         await self._session.flush()
 
     async def persist_replacement(self, refresh_token: RefreshToken) -> None:
+        """Store a rotated refresh token for an existing session."""
         self._session.add(refresh_token)
         await self._session.flush()
 
@@ -101,6 +112,7 @@ class SqlAlchemySessionRepository:
         session_id: uuid.UUID,
         user_id: uuid.UUID,
     ) -> LoginSession | None:
+        """Lock a session only when it belongs to the user."""
         return await self._session.scalar(
             select(LoginSession)
             .where(
@@ -114,6 +126,7 @@ class SqlAlchemySessionRepository:
         self,
         token_hash: str,
     ) -> RefreshContext | None:
+        """Lock and load the state needed to rotate a refresh token."""
         row = (
             await self._session.execute(
                 select(RefreshToken, LoginSession, User)
@@ -133,6 +146,7 @@ class SqlAlchemySessionRepository:
         )
 
     async def list_for_user(self, user_id: uuid.UUID) -> list[LoginSession]:
+        """List non-revoked sessions belonging to a user."""
         sessions = (
             await self._session.scalars(
                 select(LoginSession)
@@ -143,6 +157,7 @@ class SqlAlchemySessionRepository:
         return list(sessions)
 
     async def revoke(self, login_session: LoginSession, *, reason: str) -> None:
+        """Mark one login session as revoked."""
         if login_session.revoked_at is not None:
             return
         now = utc_now()
@@ -163,6 +178,7 @@ class SqlAlchemySessionRepository:
         *,
         reason: str,
     ) -> list[uuid.UUID]:
+        """Revoke all active sessions owned by a user."""
         now = utc_now()
         session_ids = (
             await self._session.scalars(
@@ -191,6 +207,7 @@ class SqlAlchemySessionRepository:
         session_id: uuid.UUID,
         user_id: uuid.UUID,
     ) -> None:
+        """Update the last-seen timestamp of an active session."""
         await self._session.execute(
             update(LoginSession)
             .where(
@@ -204,6 +221,7 @@ class SqlAlchemySessionRepository:
 
 class SqlAlchemyAuditRepository:
     def __init__(self, session: AsyncSession) -> None:
+        """Initialize SqlAlchemyAuditRepository."""
         self._session = session
 
     def add(
@@ -215,6 +233,7 @@ class SqlAlchemyAuditRepository:
         subject_user_id: uuid.UUID | None = None,
         event_data: dict[str, object] | None = None,
     ) -> None:
+        """Append an audit event to the current transaction."""
         self._session.add(
             AuditEvent(
                 event_type=event_type,
@@ -228,6 +247,7 @@ class SqlAlchemyAuditRepository:
         )
 
     async def search(self, query: AuditEventSearch) -> AuditEventPage:
+        """Search records using the supplied filters."""
         filters = []
         if query.event_type is not None:
             filters.append(AuditEvent.event_type == query.event_type)

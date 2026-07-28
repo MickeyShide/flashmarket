@@ -27,6 +27,7 @@ def serialize_session(
     *,
     current_session_id: uuid.UUID,
 ) -> SessionResponse:
+    """Convert a login session to its API representation."""
     active = login_session.revoked_at is None and as_utc(login_session.expires_at) > utc_now()
     return SessionResponse(
         id=login_session.id,
@@ -46,6 +47,7 @@ async def list_sessions(
     principal: CurrentPrincipal,
     uow: Uow,
 ) -> list[SessionResponse]:
+    """Return every active session owned by the current user."""
     sessions = await list_sessions_use_case.execute(principal.user_id, uow=uow)
     return [serialize_session(item, current_session_id=principal.session_id) for item in sessions]
 
@@ -58,6 +60,7 @@ async def close_session(
     uow: Uow,
     session_store: SessionStoreDep,
 ) -> MessageResponse:
+    """Revoke one of the current user’s sessions."""
     await revoke_session_use_case.execute(
         RevokeSessionCommand(
             identity=AuthenticatedIdentity(
@@ -80,6 +83,7 @@ async def close_all_sessions(
     uow: Uow,
     session_store: SessionStoreDep,
 ) -> MessageResponse:
+    """Revoke every session except the current one."""
     session_count = await revoke_all_sessions_use_case.execute(
         RevokeAllSessionsCommand(
             identity=AuthenticatedIdentity(

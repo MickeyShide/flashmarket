@@ -17,6 +17,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Apply this revision’s schema changes."""
     op.execute("UPDATE users SET email = lower(email)")
     op.create_check_constraint(
         "ck_users_email_normalized",
@@ -66,6 +67,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Revert this revision’s schema changes."""
     op.drop_index("ix_audit_events_subject_created", table_name="audit_events")
     op.drop_index("ix_audit_events_actor_created", table_name="audit_events")
     op.drop_index("ix_audit_events_type_created", table_name="audit_events")
