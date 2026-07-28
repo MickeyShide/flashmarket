@@ -418,18 +418,29 @@ jobs:
           wait_for_healthy redis
           wait_for_healthy rabbitmq
 
-          docker compose --env-file .env run --rm --no-deps keygen
-          docker compose --env-file .env run --rm --no-deps migrate
+          echo 'Generating or validating JWT keys...'
+          timeout 60 docker compose --env-file .env run --rm --no-deps keygen </dev/null
+          echo 'JWT key generation complete.'
+
+          echo 'Applying database migrations...'
+          timeout 120 docker compose --env-file .env run --rm --no-deps migrate </dev/null
+          echo 'Database migrations complete.'
+
+          echo 'Starting Auth runtime containers...'
           docker compose --env-file .env up \
             -d \
             --no-build \
             --no-deps \
             --force-recreate \
             api outbox cleanup nginx
+          echo 'Auth runtime containers started.'
 
+          echo 'Waiting for Auth API...'
           wait_for_healthy api
+          echo 'Waiting for internal Nginx...'
           wait_for_healthy nginx
           docker compose --env-file .env ps -a
+          echo 'Checking internal Nginx endpoint...'
           curl --fail --silent --show-error \
             -H "Host: ${AUTH_DOMAIN}" \
             http://127.0.0.1:4918/health/ready
