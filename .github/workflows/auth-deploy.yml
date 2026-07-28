@@ -378,7 +378,7 @@ jobs:
         run: |
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
           ssh -p "$DEPLOY_PORT" "$target" \
-            "DEPLOY_PATH='$DEPLOY_PATH' AUTH_IMAGE='$AUTH_IMAGE' bash -s" <<'REMOTE'
+            "DEPLOY_PATH='$DEPLOY_PATH' AUTH_IMAGE='$AUTH_IMAGE' AUTH_DOMAIN='$AUTH_DOMAIN' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           cd "$DEPLOY_PATH"
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
@@ -424,13 +424,15 @@ jobs:
             -d \
             --no-build \
             --no-deps \
-            --remove-orphans \
             --force-recreate \
             api outbox cleanup nginx
 
           wait_for_healthy api
           wait_for_healthy nginx
           docker compose --env-file .env ps -a
+          curl --fail --silent --show-error \
+            -H "Host: ${AUTH_DOMAIN}" \
+            http://127.0.0.1:4918/health/ready
           REMOTE
 
       - name: Verify public HTTPS endpoint
