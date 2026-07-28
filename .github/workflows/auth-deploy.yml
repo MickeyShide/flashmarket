@@ -1,0 +1,446 @@
+name: Auth CI / Deploy
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - auth/**
+      - .github/workflows/auth-deploy.yml
+  push:
+    branches:
+      - develop
+      - main
+    tags:
+      - auth-v*
+    paths:
+      - auth/**
+      - .github/workflows/auth-deploy.yml
+  workflow_dispatch:
+
+concurrency:
+  group: auth-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.11.32"
+  IMAGE_NAME: ghcr.io/mickeyshide/flashmarket-auth
+
+jobs:
+  ruff:
+    name: Ruff warnings
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: auth
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: auth/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Run Ruff as warnings
+        shell: bash
+        run: |
+          set +e
+          lint_report="$(uv run ruff check . --output-format=concise 2>&1)"
+          lint_status=$?
+          format_report="$(uv run ruff format --check . 2>&1)"
+          format_status=$?
+          report="$(printf 'ruff check:\n%s\n\nruff format --check:\n%s\n' "$lint_report" "$format_report")"
+          printf '%s\n' "$report"
+
+          if (( lint_status != 0 || format_status != 0 )); then
+            echo "::warning title=Ruff::Ruff found code-style issues. This check does not block deploy."
+            {
+              echo "### ⚠️ Ruff"
+              echo
+              echo '```text'
+              printf '%s\n' "$report"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ✅ Ruff: no issues" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          exit 0
+
+  mypy:
+    name: mypy warnings
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: auth
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: auth/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Run mypy as warnings
+        shell: bash
+        run: |
+          set +e
+          report="$(uv run mypy 2>&1)"
+          status=$?
+          printf '%s\n' "$report"
+
+          if (( status != 0 )); then
+            echo "::warning title=mypy::mypy found type issues. This check does not block deploy."
+            {
+              echo "### ⚠️ mypy"
+              echo
+              echo '```text'
+              printf '%s\n' "$report"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ✅ mypy: no issues" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          exit 0
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: auth
+          POSTGRES_USER: flashmarket
+          POSTGRES_PASSWORD: flashmarket
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flashmarket -d auth"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: auth
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: auth/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Run tests
+        env:
+          AUTH_TEST_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@localhost:5432/auth
+        run: uv run pytest
+
+  image:
+    name: Build image
+    needs:
+      - tests
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=tag
+            type=ref,event=pr
+            type=sha,prefix=sha-
+
+      - name: Build and publish image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ./auth
+          file: ./auth/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=flashmarket-auth
+          cache-to: type=gha,mode=max,scope=flashmarket-auth
+
+  deploy:
+    name: Deploy production
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/auth-v')
+    needs:
+      - image
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GHCR_USERNAME: ${{ github.actor }}
+      AUTH_IMAGE: ghcr.io/mickeyshide/flashmarket-auth@${{ needs.image.outputs.digest }}
+      AUTH_DOMAIN: ${{ vars.AUTH_DOMAIN }}
+      AUTH_CORS_ORIGINS: ${{ vars.AUTH_CORS_ORIGINS }}
+      AUTH_JWT_KEY_ID: ${{ vars.AUTH_JWT_KEY_ID || 'flashmarket-auth-ed25519-v1' }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.AUTH_POSTGRES_PASSWORD }}
+      DEPLOY_REDIS_PASSWORD: ${{ secrets.AUTH_REDIS_PASSWORD }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.AUTH_RABBITMQ_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          : "${DEPLOY_HOST:?Set the DEPLOY_HOST variable in the production environment}"
+          : "${DEPLOY_USER:?Set the DEPLOY_USER variable in the production environment}"
+          : "${SSH_PRIVATE_KEY:?Set the DEPLOY_SSH_KEY secret in the production environment}"
+          : "${AUTH_DOMAIN:?Set the AUTH_DOMAIN variable in the production environment}"
+          : "${DEPLOY_POSTGRES_PASSWORD:?Set the AUTH_POSTGRES_PASSWORD secret}"
+          : "${DEPLOY_REDIS_PASSWORD:?Set the AUTH_REDIS_PASSWORD secret}"
+          : "${DEPLOY_RABBITMQ_PASSWORD:?Set the AUTH_RABBITMQ_PASSWORD secret}"
+
+          if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::DEPLOY_HOST must be a hostname or IPv4 address"
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            echo "::error::DEPLOY_USER is invalid"
+            exit 1
+          fi
+          if [[ -z "$DEPLOY_PATH" ]]; then
+            DEPLOY_PATH="/home/${DEPLOY_USER}/flashmarket-auth"
+            echo "DEPLOY_PATH=$DEPLOY_PATH" >> "$GITHUB_ENV"
+          fi
+          : "${DEPLOY_PATH:?DEPLOY_PATH could not be derived}"
+          if [[ ! "$DEPLOY_PORT" =~ ^[0-9]+$ ]] ||
+            (( DEPLOY_PORT < 1 || DEPLOY_PORT > 65535 )); then
+            echo "::error::DEPLOY_PORT must be between 1 and 65535"
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::DEPLOY_PATH must be an absolute Unix path"
+            exit 1
+          fi
+          if [[ ! "$AUTH_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::AUTH_DOMAIN must contain only a DNS hostname"
+            exit 1
+          fi
+          for password in \
+            "$DEPLOY_POSTGRES_PASSWORD" \
+            "$DEPLOY_REDIS_PASSWORD" \
+            "$DEPLOY_RABBITMQ_PASSWORD"; do
+            if [[ ! "$password" =~ ^[A-Za-z0-9._~-]{32,128}$ ]]; then
+              echo "::error::Database passwords must be 32-128 URL-safe characters"
+              exit 1
+            fi
+          done
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          cat > "$HOME/.ssh/config" <<'EOF'
+          Host *
+              StrictHostKeyChecking no
+              UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 "$HOME/.ssh/config"
+
+      - name: Render production environment
+        shell: bash
+        run: |
+          environment_file="$RUNNER_TEMP/flashmarket-auth.env"
+          cors_origins="${AUTH_CORS_ORIGINS:-[\"https://${AUTH_DOMAIN}\"]}"
+          umask 077
+          {
+            printf 'AUTH_ENVIRONMENT=production\n'
+            printf 'AUTH_DOMAIN=%s\n' "$AUTH_DOMAIN"
+            printf 'AUTH_DATABASE_URL=postgresql+asyncpg://flashmarket_auth:%s@db:5432/auth\n' "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'AUTH_REDIS_URL=redis://:%s@redis:6379/0\n' "$DEPLOY_REDIS_PASSWORD"
+            printf 'AUTH_RABBITMQ_URL=amqp://flashmarket_auth:%s@rabbitmq:5672/\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'AUTH_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
+            printf 'AUTH_JWT_KEYS_DIRECTORY=/var/lib/flashmarket-auth/keys\n'
+            printf 'AUTH_JWT_KEY_ID=%s\n' "$AUTH_JWT_KEY_ID"
+            printf 'AUTH_JWT_ISSUER=flashmarket-auth\n'
+            printf 'AUTH_JWT_AUDIENCE=flashmarket-api\n'
+            printf 'AUTH_DEBUG=false\n'
+            printf 'AUTH_DOCS_ENABLED=false\n'
+            printf 'AUTH_RATE_LIMIT_ENABLED=true\n'
+            printf 'AUTH_CORS_ORIGINS=%s\n' "$cors_origins"
+            printf 'AUTH_TRUSTED_HOSTS=["%s","localhost"]\n' "$AUTH_DOMAIN"
+            printf 'AUTH_TRUSTED_PROXY_IPS=["172.30.0.2"]\n'
+            printf 'AUTH_REFRESH_TOKEN_TRANSPORT=cookie\n'
+            printf 'AUTH_REFRESH_COOKIE_SECURE=true\n'
+            printf 'AUTH_REFRESH_COOKIE_NAME=__Host-flashmarket-refresh\n'
+            printf 'AUTH_CSRF_COOKIE_NAME=__Host-flashmarket-csrf\n'
+            printf 'AUTH_REFRESH_COOKIE_SAMESITE=strict\n'
+            printf 'POSTGRES_DB=auth\n'
+            printf 'POSTGRES_USER=flashmarket_auth\n'
+            printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'REDIS_PASSWORD=%s\n' "$DEPLOY_REDIS_PASSWORD"
+            printf 'RABBITMQ_DEFAULT_USER=flashmarket_auth\n'
+            printf 'RABBITMQ_DEFAULT_PASS=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
+          } > "$environment_file"
+          chmod 600 "$environment_file"
+
+      - name: Upload deployment files
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" "mkdir -p '$DEPLOY_PATH'"
+          scp -P "$DEPLOY_PORT" \
+            auth/docker-compose.deploy.yml \
+            "$target:$DEPLOY_PATH/docker-compose.yml"
+          scp -P "$DEPLOY_PORT" \
+            auth/Caddyfile.deploy \
+            "$target:$DEPLOY_PATH/Caddyfile"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "umask 077; cat > '$DEPLOY_PATH/.env.next' && mv '$DEPLOY_PATH/.env.next' '$DEPLOY_PATH/.env'" \
+            < "$RUNNER_TEMP/flashmarket-auth.env"
+
+      - name: Log server in to GHCR
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          printf '%s' "$GHCR_TOKEN" |
+            ssh -p "$DEPLOY_PORT" "$target" \
+              "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
+
+      - name: Deploy exact image digest
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "DEPLOY_PATH='$DEPLOY_PATH' AUTH_IMAGE='$AUTH_IMAGE' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$DEPLOY_PATH"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+
+          if [[ ! -f .env ]]; then
+            echo "Missing $DEPLOY_PATH/.env"
+            exit 1
+          fi
+
+          export AUTH_IMAGE
+          docker compose --env-file .env config --quiet
+          docker compose --env-file .env pull
+          docker compose --env-file .env up -d --no-build db redis rabbitmq
+
+          wait_for_healthy() {
+            service="$1"
+            container="$(docker compose --env-file .env ps -q "$service")"
+            for attempt in $(seq 1 60); do
+              health="$(
+                docker inspect \
+                  --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+                  "$container"
+              )"
+              if [[ "$health" == "healthy" ]]; then
+                return 0
+              fi
+              if [[ "$health" == "unhealthy" || "$health" == "exited" ]]; then
+                break
+              fi
+              sleep 2
+            done
+            docker compose --env-file .env logs --tail 100 "$service"
+            return 1
+          }
+
+          wait_for_healthy db
+          wait_for_healthy redis
+          wait_for_healthy rabbitmq
+
+          docker compose --env-file .env run --rm --no-deps keygen
+          docker compose --env-file .env run --rm --no-deps migrate
+          docker compose --env-file .env up \
+            -d \
+            --no-build \
+            --no-deps \
+            --remove-orphans \
+            api outbox cleanup caddy
+
+          wait_for_healthy api
+          docker compose --env-file .env ps
+          REMOTE
+
+      - name: Verify public HTTPS endpoint
+        shell: bash
+        run: |
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              "https://${AUTH_DOMAIN}/health/ready"; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "cd '$DEPLOY_PATH' && docker compose --env-file .env logs --tail 100 api caddy"
+          exit 1

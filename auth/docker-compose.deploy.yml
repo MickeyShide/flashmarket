@@ -1,0 +1,169 @@
+name: flashmarket-auth
+
+x-auth-runtime: &auth-runtime
+  image: ${AUTH_IMAGE:?AUTH_IMAGE must contain the image digest}
+  pull_policy: always
+  env_file:
+    - ${AUTH_ENV_FILE:-.env}
+  networks:
+    - backend
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-auth}
+      POSTGRES_USER: ${POSTGRES_USER:-flashmarket_auth}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - auth-postgres-data:/var/lib/postgresql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    command:
+      - sh
+      - -ec
+      - exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
+    volumes:
+      - auth-redis-data:/data
+    networks:
+      - backend
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-flashmarket_auth}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS must be set}
+    volumes:
+      - auth-rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  keygen:
+    <<: *auth-runtime
+    command:
+      - .venv/bin/python
+      - scripts/generate_jwt_keys.py
+      - --output-dir
+      - /var/lib/flashmarket-auth/keys
+      - --key-id
+      - ${AUTH_JWT_KEY_ID:?AUTH_JWT_KEY_ID must be set}
+    volumes:
+      - auth-jwt-keys:/var/lib/flashmarket-auth/keys
+    restart: "no"
+
+  migrate:
+    <<: *auth-runtime
+    command: [".venv/bin/alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *auth-runtime
+    volumes:
+      - auth-jwt-keys:/var/lib/flashmarket-auth/keys:ro
+    depends_on:
+      keygen:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  outbox:
+    <<: *auth-runtime
+    command: [".venv/bin/python", "-m", "auth_service.outbox_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  cleanup:
+    <<: *auth-runtime
+    command:
+      - sh
+      - -c
+      - while true; do .venv/bin/python -m auth_service.cli cleanup-expired; sleep 3600; done
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    env_file:
+      - ${AUTH_ENV_FILE:-.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - auth-caddy-data:/data
+      - auth-caddy-config:/config
+    networks:
+      frontend:
+      backend:
+        ipv4_address: 172.30.0.2
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  frontend:
+  backend:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  auth-jwt-keys:
+  auth-postgres-data:
+  auth-redis-data:
+  auth-rabbitmq-data:
+  auth-caddy-data:
+  auth-caddy-config:
