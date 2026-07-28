@@ -89,6 +89,8 @@ services:
 
   api:
     <<: *auth-runtime
+    ports:
+      - "${AUTH_PORT:-8000}:8000"
     volumes:
       - auth-jwt-keys:/var/lib/flashmarket-auth/keys:ro
     depends_on:
@@ -131,39 +133,12 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  caddy:
-    image: caddy:2-alpine
-    env_file:
-      - ${AUTH_ENV_FILE:-.env}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - auth-caddy-data:/data
-      - auth-caddy-config:/config
-    networks:
-      frontend:
-      backend:
-        ipv4_address: 172.30.0.2
-    depends_on:
-      api:
-        condition: service_healthy
-    restart: unless-stopped
-
 networks:
-  frontend:
   backend:
     internal: true
-    ipam:
-      config:
-        - subnet: 172.30.0.0/24
 
 volumes:
   auth-jwt-keys:
   auth-postgres-data:
   auth-redis-data:
   auth-rabbitmq-data:
-  auth-caddy-data:
-  auth-caddy-config:

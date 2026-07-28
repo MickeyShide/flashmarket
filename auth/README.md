@@ -267,12 +267,12 @@ Push в `main`, тег `auth-v*` или ручной запуск после п�
 production deploy по SSH:
 
 1. формирует production `.env` только из GitHub Variables и Secrets;
-2. копирует на сервер Compose, Caddyfile и `.env`;
+2. копирует на сервер Compose и `.env`;
 3. авторизует сервер в GHCR временным `GITHUB_TOKEN`;
 4. скачивает образ по точному digest, а не по изменяемому тегу;
 5. поднимает PostgreSQL, Redis и RabbitMQ с постоянными Docker volumes;
 6. запускает идемпотентный keygen и Alembic migrations;
-7. перезапускает API, outbox, cleanup и Caddy;
+7. перезапускает API, outbox и cleanup;
 8. ждёт healthy-состояния API и проверяет публичный HTTPS endpoint.
 
 В GitHub нужно создать Environment `production` и добавить Variables:
@@ -302,8 +302,9 @@ SSH deploy выполняется без проверки host key (`StrictHostK
 
 Сервер может быть пустым: нужны только SSH, Docker с Compose plugin и доступ
 deploy-пользователя к Docker. Workflow сам создаёт deploy-каталог и `.env`.
-Порты `80` и `443` должны быть открыты, а DNS `AUTH_DOMAIN` заранее направлен на
-сервер — Caddy автоматически получает и сохраняет TLS-сертификат.
+API публикуется на порту `8000`; в Nginx Proxy Manager создай Proxy Host для
+`AUTH_DOMAIN` на `http://<IP_сервера>:8000` и включи SSL там. DNS `AUTH_DOMAIN`
+должен заранее указывать на сервер.
 
 Файл `.env.deploy.example` показывает итоговый формат, но на сервер вручную не
 копируется. PostgreSQL, Redis, RabbitMQ, JWT-ключи и сертификаты сохраняются в

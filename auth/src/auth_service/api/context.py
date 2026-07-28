@@ -6,11 +6,28 @@ from auth_service.application.contracts import RequestContext
 from auth_service.config import get_settings
 
 
+def _is_trusted_proxy(ip_address: str | None) -> bool:
+    """Check whether an address belongs to a configured proxy network."""
+    if ip_address is None:
+        return False
+    try:
+        client_address = ipaddress.ip_address(ip_address)
+    except ValueError:
+        return False
+    for proxy in get_settings().trusted_proxy_ips:
+        try:
+            if client_address in ipaddress.ip_network(proxy, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def request_metadata(request: Request) -> tuple[str | None, str | None]:
     """Extract client IP and user agent from a request."""
     user_agent = request.headers.get("user-agent")
     ip_address = request.client.host if request.client else None
-    if ip_address in get_settings().trusted_proxy_ips:
+    if _is_trusted_proxy(ip_address):
         forwarded_for = request.headers.get("x-forwarded-for")
         if forwarded_for:
             candidate = forwarded_for.split(",", maxsplit=1)[0].strip()

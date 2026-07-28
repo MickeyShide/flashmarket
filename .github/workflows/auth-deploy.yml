@@ -333,7 +333,7 @@ jobs:
             printf 'AUTH_RATE_LIMIT_ENABLED=true\n'
             printf 'AUTH_CORS_ORIGINS=%s\n' "$cors_origins"
             printf 'AUTH_TRUSTED_HOSTS=["%s","localhost"]\n' "$AUTH_DOMAIN"
-            printf 'AUTH_TRUSTED_PROXY_IPS=["172.30.0.2"]\n'
+            printf 'AUTH_TRUSTED_PROXY_IPS=["172.16.0.0/12"]\n'
             printf 'AUTH_REFRESH_TOKEN_TRANSPORT=cookie\n'
             printf 'AUTH_REFRESH_COOKIE_SECURE=true\n'
             printf 'AUTH_REFRESH_COOKIE_NAME=__Host-flashmarket-refresh\n'
@@ -356,9 +356,6 @@ jobs:
           scp -P "$DEPLOY_PORT" \
             auth/docker-compose.deploy.yml \
             "$target:$DEPLOY_PATH/docker-compose.yml"
-          scp -P "$DEPLOY_PORT" \
-            auth/Caddyfile.deploy \
-            "$target:$DEPLOY_PATH/Caddyfile"
           ssh -p "$DEPLOY_PORT" "$target" \
             "umask 077; cat > '$DEPLOY_PATH/.env.next' && mv '$DEPLOY_PATH/.env.next' '$DEPLOY_PATH/.env'" \
             < "$RUNNER_TEMP/flashmarket-auth.env"
@@ -423,7 +420,7 @@ jobs:
             --no-build \
             --no-deps \
             --remove-orphans \
-            api outbox cleanup caddy
+            api outbox cleanup
 
           wait_for_healthy api
           docker compose --env-file .env ps
@@ -442,5 +439,5 @@ jobs:
 
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
           ssh -p "$DEPLOY_PORT" "$target" \
-            "cd '$DEPLOY_PATH' && docker compose --env-file .env logs --tail 100 api caddy"
+            "cd '$DEPLOY_PATH' && docker compose --env-file .env logs --tail 100 api"
           exit 1
