@@ -425,11 +425,12 @@ jobs:
             --no-build \
             --no-deps \
             --remove-orphans \
+            --force-recreate \
             api outbox cleanup nginx
 
           wait_for_healthy api
           wait_for_healthy nginx
-          docker compose --env-file .env ps
+          docker compose --env-file .env ps -a
           REMOTE
 
       - name: Verify public HTTPS endpoint
@@ -458,5 +459,5 @@ jobs:
             echo "::notice title=Auth nginx is healthy::Configure Nginx Proxy Manager for ${AUTH_DOMAIN} with upstream ${DEPLOY_HOST}:4918 and enable SSL"
           fi
           ssh -p "$DEPLOY_PORT" "$target" \
-            "cd '$DEPLOY_PATH' && docker compose --env-file .env logs --tail 100 api nginx"
+            "cd '$DEPLOY_PATH' && docker compose --env-file .env ps -a && ss -ltn '( sport = :4918 )' || true; docker compose --env-file .env logs --tail 100 api nginx"
           exit 1
