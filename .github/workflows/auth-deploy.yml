@@ -319,6 +319,7 @@ jobs:
           umask 077
           {
             printf 'AUTH_IMAGE=%s\n' "$AUTH_IMAGE"
+            printf 'AUTH_PROXY_PORT=4918\n'
             printf 'AUTH_ENVIRONMENT=production\n'
             printf 'AUTH_DOMAIN=%s\n' "$AUTH_DOMAIN"
             printf 'AUTH_DATABASE_URL=postgresql+asyncpg://flashmarket_auth:%s@db:5432/auth\n' "$DEPLOY_POSTGRES_PASSWORD"
@@ -357,6 +358,9 @@ jobs:
           scp -P "$DEPLOY_PORT" \
             auth/docker-compose.deploy.yml \
             "$target:$DEPLOY_PATH/docker-compose.yml"
+          scp -P "$DEPLOY_PORT" \
+            auth/nginx.conf.template \
+            "$target:$DEPLOY_PATH/nginx.conf.template"
           ssh -p "$DEPLOY_PORT" "$target" \
             "umask 077; cat > '$DEPLOY_PATH/.env.next' && mv '$DEPLOY_PATH/.env.next' '$DEPLOY_PATH/.env'" \
             < "$RUNNER_TEMP/flashmarket-auth.env"
@@ -421,9 +425,10 @@ jobs:
             --no-build \
             --no-deps \
             --remove-orphans \
-            api outbox cleanup
+            api outbox cleanup nginx
 
           wait_for_healthy api
+          wait_for_healthy nginx
           docker compose --env-file .env ps
           REMOTE
 
@@ -448,10 +453,10 @@ jobs:
 
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
           if ssh -p "$DEPLOY_PORT" "$target" \
-            "curl --fail --silent --show-error http://127.0.0.1:8000/health/ready"; then
+            "curl --fail --silent --show-error -H 'Host: ${AUTH_DOMAIN}' http://127.0.0.1:4918/health/ready"; then
             echo
-            echo "::notice title=Auth API is healthy::Configure the Nginx Proxy Manager host, upstream port 8000, and SSL certificate for ${AUTH_DOMAIN}"
+            echo "::notice title=Auth nginx is healthy::Configure Nginx Proxy Manager for ${AUTH_DOMAIN} with upstream ${DEPLOY_HOST}:4918 and enable SSL"
           fi
           ssh -p "$DEPLOY_PORT" "$target" \
-            "cd '$DEPLOY_PATH' && docker compose --env-file .env logs --tail 100 api"
+            "cd '$DEPLOY_PATH' && docker compose --env-file .env logs --tail 100 api nginx"
           exit 1

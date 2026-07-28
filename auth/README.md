@@ -298,7 +298,7 @@ production deploy по SSH:
 4. скачивает образ по точному digest, а не по изменяемому тегу;
 5. поднимает PostgreSQL, Redis и RabbitMQ с постоянными Docker volumes;
 6. запускает идемпотентный keygen и Alembic migrations;
-7. перезапускает API, outbox и cleanup;
+7. перезапускает API, внутренний nginx, outbox и cleanup;
 8. ждёт healthy-состояния API и проверяет публичный HTTPS endpoint.
 
 В GitHub нужно создать Environment `production` и добавить Variables:
@@ -328,9 +328,11 @@ SSH deploy выполняется без проверки host key (`StrictHostK
 
 Сервер может быть пустым: нужны только SSH, Docker с Compose plugin и доступ
 deploy-пользователя к Docker. Workflow сам создаёт deploy-каталог и `.env`.
-API публикуется на порту `8000`; в Nginx Proxy Manager создай Proxy Host для
-`AUTH_DOMAIN` на `http://<IP_сервера>:8000` и включи SSL там. DNS `AUTH_DOMAIN`
-должен заранее указывать на сервер.
+Production API не публикуется на хосте напрямую. Отдельный nginx-контейнер
+слушает свободный host-порт `4918` и проксирует запросы во внутренний `api:8000`.
+В Nginx Proxy Manager создай Proxy Host для `AUTH_DOMAIN` на
+`http://<IP_сервера>:4918` и включи SSL там. DNS `AUTH_DOMAIN` должен заранее
+указывать на сервер.
 
 Файл `.env.deploy.example` показывает итоговый формат, но на сервер вручную не
 копируется. PostgreSQL, Redis, RabbitMQ, JWT-ключи и сертификаты сохраняются в
