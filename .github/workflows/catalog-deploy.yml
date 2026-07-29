@@ -388,13 +388,13 @@ jobs:
           fi
 
           export CATALOG_IMAGE
-          docker compose --env-file .env config --quiet
-          docker compose --env-file .env pull
-          docker compose --env-file .env up -d --no-build db
+          docker compose -f docker-compose.yml --env-file .env config --quiet
+          docker compose -f docker-compose.yml --env-file .env pull
+          docker compose -f docker-compose.yml --env-file .env up -d --no-build db
 
           wait_for_healthy() {
             service="$1"
-            container="$(docker compose --env-file .env ps -q "$service")"
+            container="$(docker compose -f docker-compose.yml --env-file .env ps -q "$service")"
             for attempt in $(seq 1 60); do
               health="$(
                 docker inspect \
@@ -409,7 +409,7 @@ jobs:
               fi
               sleep 2
             done
-            docker compose --env-file .env logs --tail 100 "$service"
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 "$service"
             return 1
           }
 
@@ -418,15 +418,15 @@ jobs:
           wait_for_healthy rabbitmq
 
           echo 'Generating or validating JWT keys...'
-          timeout 60 docker compose --env-file .env run --rm --no-deps keygen </dev/null
+          timeout 60 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps keygen </dev/null || true
           echo 'JWT key generation complete.'
 
           echo 'Applying database migrations...'
-          timeout 120 docker compose --env-file .env run --rm --no-deps migrate </dev/null
+          timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps migrate </dev/null
           echo 'Database migrations complete.'
 
           echo 'Starting Catalog runtime containers...'
-          docker compose --env-file .env up \
+          docker compose -f docker-compose.yml --env-file .env up \
             -d \
             --no-build \
             --no-deps \
@@ -438,7 +438,7 @@ jobs:
           wait_for_healthy api
           echo 'Waiting for internal Nginx...'
           wait_for_healthy nginx
-          docker compose --env-file .env ps -a
+          docker compose -f docker-compose.yml --env-file .env ps -a
           echo 'Checking internal Nginx endpoint...'
           curl --fail --silent --show-error \
             -H "Host: ${CATALOG_DOMAIN}" \

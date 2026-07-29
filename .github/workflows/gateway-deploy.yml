@@ -173,8 +173,10 @@ jobs:
           ssh -p "$DEPLOY_PORT" "$target" "mkdir -p '$DEPLOY_PATH'"
           scp -P "$DEPLOY_PORT" \
             docker-compose.prod.yml \
+            "$target:$DEPLOY_PATH/docker-compose.yml"
+          scp -P "$DEPLOY_PORT" \
             gateway/nginx.conf \
-            "$target:$DEPLOY_PATH/"
+            "$target:$DEPLOY_PATH/nginx.conf"
           ssh -p "$DEPLOY_PORT" "$target" \
             "umask 077; cat > '$DEPLOY_PATH/.env.next' && mv '$DEPLOY_PATH/.env.next' '$DEPLOY_PATH/.env'" \
             < "$RUNNER_TEMP/flashmarket-gateway.env"
@@ -203,20 +205,20 @@ jobs:
           fi
 
           export FRONTEND_IMAGE
-          docker compose --env-file .env config --quiet
-          docker compose --env-file .env pull
-          docker compose --env-file .env up -d --no-build --force-recreate gateway frontend
+          docker compose -f docker-compose.yml --env-file .env config --quiet
+          docker compose -f docker-compose.yml --env-file .env pull
+          docker compose -f docker-compose.yml --env-file .env up -d --no-build --force-recreate gateway frontend
 
           echo 'Waiting for gateway...'
           for attempt in $(seq 1 30); do
-            if docker compose --env-file .env exec -T gateway wget -q -O /dev/null http://localhost/health; then
+            if docker compose -f docker-compose.yml --env-file .env exec -T gateway wget -q -O /dev/null http://localhost/health; then
               echo 'Gateway is healthy'
               break
             fi
             sleep 2
           done
 
-          docker compose --env-file .env ps -a
+          docker compose -f docker-compose.yml --env-file .env ps -a
           echo 'Checking gateway upstream...'
           curl --fail --silent --show-error \
             -H "Host: ${GATEWAY_DOMAIN}" \
