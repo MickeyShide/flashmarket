@@ -1,12 +1,6 @@
 server {
     listen 80 default_server;
-    server_name _;
-    return 444;
-}
-
-server {
-    listen 80;
-    server_name ${AUTH_DOMAIN};
+    server_name auth.localhost auth.${GATEWAY_DOMAIN} ${AUTH_DOMAIN} _;
     server_tokens off;
 
     client_max_body_size 16k;

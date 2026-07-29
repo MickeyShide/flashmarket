@@ -241,7 +241,7 @@ jobs:
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GHCR_USERNAME: ${{ github.actor }}
       ORDERS_IMAGE: ghcr.io/mickeyshide/flashmarket-orders@${{ needs.image.outputs.digest }}
-      ORDERS_DOMAIN: ${{ vars.ORDERS_DOMAIN }}
+      ORDERS_DOMAIN: ${{ vars.ORDERS_DOMAIN || vars.GATEWAY_DOMAIN || 'orders.localhost' }}
       ORDERS_CORS_ORIGINS: ${{ vars.ORDERS_CORS_ORIGINS }}
       DEPLOY_POSTGRES_PASSWORD: ${{ secrets.ORDERS_POSTGRES_PASSWORD }}
       DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.ORDERS_RABBITMQ_PASSWORD }}
@@ -255,7 +255,7 @@ jobs:
           : "${DEPLOY_HOST:?Set the DEPLOY_HOST variable in the production environment}"
           : "${DEPLOY_USER:?Set the DEPLOY_USER variable in the production environment}"
           : "${SSH_PRIVATE_KEY:?Set the DEPLOY_SSH_KEY secret in the production environment}"
-          : "${ORDERS_DOMAIN:?Set the ORDERS_DOMAIN variable in the production environment}"
+          ORDERS_DOMAIN="${ORDERS_DOMAIN:-orders.localhost}"
           : "${DEPLOY_POSTGRES_PASSWORD:?Set the ORDERS_POSTGRES_PASSWORD secret}"
           : "${DEPLOY_RABBITMQ_PASSWORD:?Set the ORDERS_RABBITMQ_PASSWORD secret}"
 
