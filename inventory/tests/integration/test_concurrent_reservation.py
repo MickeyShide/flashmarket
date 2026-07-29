@@ -41,7 +41,7 @@ def postgres_url() -> str | None:
     return url if url.startswith("postgresql+asyncpg://") else None
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(loop_scope="module", scope="module")
 async def session_factory(
     postgres_url: str | None,
 ) -> AsyncIterator[async_sessionmaker[AsyncSession] | None]:
@@ -64,6 +64,7 @@ async def session_factory(
     or "INVENTORY_DATABASE_URL" not in os.environ,
     reason="Requires a real PostgreSQL database",
 )
+@pytest.mark.asyncio(loop_scope="module")
 async def test_concurrent_reservations_no_oversell(
     session_factory: async_sessionmaker[AsyncSession] | None,
 ) -> None:
@@ -80,22 +81,25 @@ async def test_concurrent_reservations_no_oversell(
         )
         await service.create_stock(type("Data", (), {"product_id": product_id, "total": 100})())
 
+    semaphore = asyncio.Semaphore(20)
+
     async def reserve_one() -> int:
-        async with session_factory() as db:
-            service = InventoryService(
-                session=db,
-                stock_repo=StockRepository(db),
-                reservation_repo=ReservationRepository(db),
-                outbox_repo=OutboxRepository(db),
-            )
-            try:
-                await service.reserve(
-                    product_id,
-                    ReserveRequest(user_id=uuid.uuid7(), quantity=1),
+        async with semaphore:
+            async with session_factory() as db:
+                service = InventoryService(
+                    session=db,
+                    stock_repo=StockRepository(db),
+                    reservation_repo=ReservationRepository(db),
+                    outbox_repo=OutboxRepository(db),
                 )
-            except Exception:
-                return 0
-            return 1
+                try:
+                    await service.reserve(
+                        product_id,
+                        ReserveRequest(user_id=uuid.uuid7(), quantity=1),
+                    )
+                except Exception:
+                    return 0
+                return 1
 
     results = await asyncio.gather(*[reserve_one() for _ in range(2000)])
     reserved = sum(results)
