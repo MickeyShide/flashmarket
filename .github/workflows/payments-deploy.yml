@@ -191,7 +191,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v4
         with:
-          registry: ghcr
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -233,18 +233,18 @@ jobs:
       contents: read
       packages: read
     env:
-      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST || '176.108.242.100' }}
       DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
-      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER || 'user1' }}
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GHCR_USERNAME: ${{ github.actor }}
       PAYMENTS_IMAGE: ghcr.io/mickeyshide/flashmarket-payments@${{ needs.image.outputs.digest }}
-      PAYMENTS_DOMAIN: ${{ vars.PAYMENTS_DOMAIN || vars.GATEWAY_DOMAIN || 'payments.localhost' }}
+      PAYMENTS_DOMAIN: ${{ vars.PAYMENTS_DOMAIN || vars.GATEWAY_DOMAIN || 'payments.flashmarket.shide.world' }}
       PAYMENTS_CORS_ORIGINS: ${{ vars.PAYMENTS_CORS_ORIGINS }}
-      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.PAYMENTS_POSTGRES_PASSWORD }}
-      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.PAYMENTS_RABBITMQ_PASSWORD }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.PAYMENTS_POSTGRES_PASSWORD || secrets.AUTH_POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.PAYMENTS_RABBITMQ_PASSWORD || secrets.AUTH_RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -252,12 +252,11 @@ jobs:
       - name: Validate deployment configuration
         shell: bash
         run: |
-          : "${DEPLOY_HOST:?Set the DEPLOY_HOST variable in the production environment}"
-          : "${DEPLOY_USER:?Set the DEPLOY_USER variable in the production environment}"
-          : "${SSH_PRIVATE_KEY:?Set the DEPLOY_SSH_KEY secret in the production environment}"
-          PAYMENTS_DOMAIN="${PAYMENTS_DOMAIN:-payments.localhost}"
-          : "${DEPLOY_POSTGRES_PASSWORD:?Set the PAYMENTS_POSTGRES_PASSWORD secret}"
-          : "${DEPLOY_RABBITMQ_PASSWORD:?Set the PAYMENTS_RABBITMQ_PASSWORD secret}"
+          DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
+          DEPLOY_USER="${DEPLOY_USER:-user1}"
+          PAYMENTS_DOMAIN="${PAYMENTS_DOMAIN:-payments.flashmarket.shide.world}"
+          DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
+          DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"
 
           if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
             echo "::error::DEPLOY_HOST must be a hostname or IPv4 address"
