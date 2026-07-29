@@ -1,0 +1,15 @@
+name: flashmarket-frontend
+
+services:
+  frontend:
+    image: flashmarket-frontend:local
+    build:
+      context: .
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    restart: unless-stopped
+
+networks:
+  default:
+    name: flashmarket
+    external: true

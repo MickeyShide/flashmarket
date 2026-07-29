@@ -1,0 +1,160 @@
+"""Inbound RabbitMQ consumer for orders service."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import uuid
+from collections.abc import Awaitable, Callable
+from typing import Any
+
+import aio_pika
+from aio_pika import ExchangeType
+from aio_pika.abc import AbstractIncomingMessage
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from orders.config import get_settings
+from orders.infrastructure.database import SessionFactory, engine
+from orders.infrastructure.repositories.order import OrderRepository
+
+logger = logging.getLogger(__name__)
+
+Handler = Callable[[AsyncSession, dict[str, Any]], Awaitable[None]]
+
+
+async def handle_payment_succeeded(
+    session: AsyncSession,
+    payload: dict[str, Any],
+) -> None:
+    """Confirm order after successful payment."""
+    order_id = uuid.UUID(str(payload["order_id"]))
+    payment_id = uuid.UUID(str(payload["payment_id"]))
+
+    order_repo = OrderRepository(session)
+    order = await order_repo.get_by_id(order_id)
+    if order is None:
+        logger.warning("Order %s not found for payment success", order_id)
+        return
+    if order.payment_id == payment_id:
+        logger.info("Order %s already confirmed with payment %s", order_id, payment_id)
+        return
+
+    order.payment_id = payment_id
+    await order_repo.update(order)
+    logger.info("Confirmed order %s with payment %s", order_id, payment_id)
+
+
+async def handle_payment_failed(
+    session: AsyncSession,
+    payload: dict[str, Any],
+) -> None:
+    """Cancel order after failed payment."""
+    order_id = uuid.UUID(str(payload["order_id"]))
+    payment_id = uuid.UUID(str(payload["payment_id"]))
+
+    order_repo = OrderRepository(session)
+    order = await order_repo.get_by_id(order_id)
+    if order is None:
+        logger.warning("Order %s not found for payment failure", order_id)
+        return
+    if order.payment_id == payment_id:
+        logger.info("Order %s already failed with payment %s", order_id, payment_id)
+        return
+
+    order.payment_id = payment_id
+    await order_repo.update(order)
+    logger.info("Cancelled order %s after failed payment %s", order_id, payment_id)
+
+
+async def handle_reservation_released(
+    session: AsyncSession,
+    payload: dict[str, Any],
+) -> None:
+    """Cancel order when its reservation was released."""
+    order_id = payload.get("order_id")
+    if order_id is None:
+        return
+    order_id = uuid.UUID(str(order_id))
+
+    order_repo = OrderRepository(session)
+    order = await order_repo.get_by_id(order_id)
+    if order is None:
+        return
+
+    logger.info("Cancelling order %s due to reservation release", order_id)
+
+
+HANDLERS: dict[str, Handler] = {
+    "payments.PaymentSucceeded": handle_payment_succeeded,
+    "payments.PaymentFailed": handle_payment_failed,
+    "inventory.ReservationReleased": handle_reservation_released,
+}
+
+
+async def process_message(
+    message: AbstractIncomingMessage,
+    *,
+    session_factory: async_sessionmaker[AsyncSession] = SessionFactory,
+) -> None:
+    """Route an incoming message to its handler."""
+    async with message.process(reject_on_redelivered=False):
+        body = json.loads(message.body.decode("utf-8"))
+        routing_key = message.routing_key or ""
+        handler = HANDLERS.get(routing_key)
+        if handler is None:
+            logger.warning("No handler for routing key %s", routing_key)
+            return
+
+        async with session_factory() as session, session.begin():
+            await handler(session, body)
+
+
+async def run_consumer() -> None:
+    """Connect to RabbitMQ and consume saga events."""
+    settings = get_settings()
+    connection = await aio_pika.connect_robust(settings.rabbitmq_url)
+    async with connection:
+        channel = await connection.channel()
+        await channel.set_qos(prefetch_count=10)
+        exchange = await channel.declare_exchange(
+            settings.rabbitmq_exchange,
+            ExchangeType.TOPIC,
+            durable=True,
+        )
+        queue = await channel.declare_queue(
+            "orders.events",
+            durable=True,
+        )
+        for routing_key in HANDLERS:
+            await queue.bind(exchange, routing_key=routing_key)
+
+        async with queue.iterator() as iterator:
+            async for message in iterator:
+                try:
+                    await process_message(message)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception("Failed to process message")
+
+
+async def run() -> None:
+    """Start the consumer coroutine."""
+    try:
+        await run_consumer()
+    finally:
+        await engine.dispose()
+
+
+def main() -> None:
+    """Run this module as a command-line entry point."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+    asyncio.run(run())
+
+
+if __name__ == "__main__":
+    main()

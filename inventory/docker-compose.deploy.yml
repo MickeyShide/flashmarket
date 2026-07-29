@@ -1,0 +1,59 @@
+name: flashmarket-inventory
+
+services:
+  api:
+    image: ${INVENTORY_IMAGE:-flashmarket-inventory-api:local}
+    environment:
+      INVENTORY_ENVIRONMENT: ${INVENTORY_ENVIRONMENT:-production}
+      INVENTORY_DATABASE_URL: ${INVENTORY_DATABASE_URL}
+      INVENTORY_RABBITMQ_URL: ${INVENTORY_RABBITMQ_URL}
+      INVENTORY_RESERVATION_TTL_SECONDS: ${INVENTORY_RESERVATION_TTL_SECONDS:-300}
+      INVENTORY_CORS_ORIGINS: ${INVENTORY_CORS_ORIGINS:-[]}
+      INVENTORY_TRUSTED_HOSTS: ${INVENTORY_TRUSTED_HOSTS}
+      INVENTORY_DOCS_ENABLED: ${INVENTORY_DOCS_ENABLED:-false}
+      INVENTORY_DEBUG: ${INVENTORY_DEBUG:-false}
+    ports:
+      - "127.0.0.1:${INVENTORY_PROXY_PORT:-4919}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  migrate:
+    image: ${INVENTORY_IMAGE:-flashmarket-inventory-api:local}
+    environment:
+      INVENTORY_ENVIRONMENT: development
+      INVENTORY_DATABASE_URL: ${INVENTORY_DATABASE_URL}
+    command: [".venv/bin/alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-inventory}
+      POSTGRES_USER: ${POSTGRES_USER:-flashmarket_inventory}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - inventory-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:${INVENTORY_PROXY_PORT:-4919}:8000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  inventory-postgres-data:

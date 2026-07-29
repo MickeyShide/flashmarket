@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>FLASHMARKET — Brand Drops Catalog Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ==========================================
+       DESIGN SYSTEM & RESET
+       ========================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-primary: #FFFFFF;
+      --bg-card: #FFFFFF;
+      --text-main: #000000;
+      --text-muted: #888888;
+      --accent-red: #E53935;
+      --accent-lime: #BFF532;
+      --border-color: #EEEEEE;
+      --font-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Space Grotesk', monospace;
+    }
+
+    html, body {
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+
+    /* ==========================================
+       TOP ANNOUNCEMENT BAR
+       ========================================== */
+    .top-announcement {
+      background: #000000;
+      color: #FFFFFF;
+      text-align: center;
+      padding: 8px 12px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ==========================================
+       HEADER & NAVIGATION
+       ========================================== */
+    header {
+      background: #FFFFFF;
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      width: 100%;
+    }
+
+    .header-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-center {
+      text-align: center;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 14px;
+    }
+
+    .brand-title {
+      font-family: var(--font-sans);
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .brand-sub {
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 3px;
+      white-space: nowrap;
+    }
+
+    .icon-btn {
+      position: relative;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--text-main);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .cart-badge {
+      position: absolute;
+      top: -3px;
+      right: -5px;
+      background: var(--text-main);
+      color: #FFFFFF;
+      font-size: 9px;
+      font-weight: 900;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .menu-toggle-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+    }
+
+    /* Category Navigation Bar */
+    .nav-bar {
+      border-top: 1px solid var(--border-color);
+      background: #FFFFFF;
+      width: 100%;
+    }
+
+    .nav-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      padding: 12px 24px;
+      white-space: nowrap;
+    }
+
+    .nav-link {
+      font-size: 11.5px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-main);
+      padding: 4px 0;
+      position: relative;
+    }
+
+    .nav-link.active {
+      color: var(--accent-red);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent-red);
+    }
+
+    /* MOBILE RESPONSIVE MEDIA QUERIES */
+    @media (max-width: 768px) {
+      .header-inner {
+        padding: 12px 14px;
+        gap: 8px;
+      }
+
+      .menu-toggle-btn {
+        display: flex;
+      }
+
+      .brand-title {
+        font-size: 14px;
+        letter-spacing: 1px;
+      }
+
+      .brand-sub {
+        font-size: 7.5px;
+        letter-spacing: 1px;
+      }
+
+      .header-left, .header-right {
+        gap: 8px;
+      }
+
+      .icon-btn svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .nav-bar {
+        max-height: 0;
+        overflow: hidden;
+        border-top: none;
+        transition: max-height 0.25s ease;
+      }
+
+      .nav-bar.mobile-open {
+        max-height: 320px;
+        border-top: 1px solid var(--border-color);
+      }
+
+      .nav-inner {
+        flex-direction: column;
+        gap: 14px;
+        padding: 14px 16px;
+        align-items: flex-start;
+      }
+
+      .nav-link {
+        font-size: 12px;
+        width: 100%;
+        display: block;
+      }
+    }
+
+    /* ==========================================
+       BRAND DROPS BANNER (MINIMALIST BLACK HERO)
+       ========================================== */
+    .brand-drop-banner {
+      width: 100%;
+      background: #000000;
+      color: #FFFFFF;
+      padding: 32px 24px;
+      margin-bottom: 24px;
+    }
+
+    .drop-banner-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .drop-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--accent-lime);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .drop-brand-name {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      line-height: 1.1;
+    }
+
+    .drop-description {
+      font-size: 12px;
+      color: #AAAAAA;
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .drop-selector-bar {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .drop-btn {
+      background: #1A1A1A;
+      color: #FFFFFF;
+      border: 1px solid #333333;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .drop-btn.active {
+      background: #FFFFFF;
+      color: #000000;
+      border-color: #FFFFFF;
+    }
+
+    /* ==========================================
+       FILTER & SEARCH CONTROL BAR
+       ========================================== */
+    .catalog-controls {
+      max-width: 1280px;
+      margin: 0 auto 16px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .catalog-controls {
+        padding: 0 14px;
+        margin: 0 auto 12px;
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+
+    .filter-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #F4F4F4;
+      color: #000000;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 10.5px;
+      font-weight: 900;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .tag-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 2px 0;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .tag-chips::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chip {
+      padding: 7px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border-color);
+      background: #FFFFFF;
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .chip.active {
+      background: #000000;
+      color: #FFFFFF;
+      border-color: #000000;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: #F9F9F9;
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 7px 14px;
+      width: 240px;
+    }
+
+    @media (max-width: 768px) {
+      .search-box {
+        width: 100%;
+      }
+    }
+
+    .search-box input {
+      border: none;
+      outline: none;
+      background: transparent;
+      width: 100%;
+      font-size: 11.5px;
+      font-family: inherit;
+    }
+
+    /* ==========================================
+       PRODUCT GRID & BLACK CARDS
+       ========================================== */
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px 64px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 0 14px 40px;
+      }
+    }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 28px 18px;
+    }
+
+    @media (max-width: 1024px) {
+      .product-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px 10px;
+      }
+    }
+
+    .product-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .card-black-box {
+      width: 100%;
+      aspect-ratio: 3/4;
+      max-height: 320px;
+      background: #000000;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .black-box-brand-tag {
+      position: absolute;
+      bottom: 10px;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 1.5px;
+      color: #666666;
+      text-transform: uppercase;
+    }
+
+    .black-box-icon {
+      width: 48px;
+      height: 48px;
+      stroke: #FFFFFF;
+      stroke-width: 1.2;
+      fill: none;
+      opacity: 0.9;
+      margin-bottom: 6px;
+    }
+
+    @media (max-width: 768px) {
+      .black-box-icon {
+        width: 36px;
+        height: 36px;
+      }
+    }
+
+    .card-badge {
+      position: absolute;
+      top: 10px;
+      left: 8px;
+      right: 8px;
+      display: flex;
+      justify-content: center;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .badge-red {
+      color: var(--accent-red);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .badge-grey {
+      background: #333333;
+      color: #FFFFFF;
+      font-size: 8.5px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      border-radius: 3px;
+    }
+
+    .badge-lime {
+      background: var(--accent-lime);
+      color: #000000;
+      font-size: 8.5px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      border-radius: 3px;
+    }
+
+    .product-brand-title {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .product-title {
+      font-size: 11.5px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--text-main);
+      margin-bottom: 4px;
+      line-height: 1.25;
+    }
+
+    .product-price {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #000000;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .old-price {
+      text-decoration: line-through;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 10.5px;
+    }
+
+    /* ==========================================
+       VIEW SWITCHING
+       ========================================== */
+    .page-view {
+      display: none;
+    }
+
+    .page-view.active-view {
+      display: block;
+    }
+
+    /* ==========================================
+       PRODUCT DETAIL VIEW
+       ========================================== */
+    .detail-container {
+      max-width: 1040px;
+      margin: 28px auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+    }
+
+    @media (max-width: 768px) {
+      .detail-container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        margin: 14px auto;
+        padding: 0 14px;
+      }
+    }
+
+    .detail-black-box {
+      width: 100%;
+      height: 380px;
+      background: #000000;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 768px) {
+      .detail-black-box {
+        height: 240px;
+      }
+    }
+
+    .detail-info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .detail-category {
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .detail-title {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .detail-price {
+      font-size: 19px;
+      font-weight: 800;
+      margin-bottom: 18px;
+    }
+
+    .size-selector {
+      margin-bottom: 18px;
+    }
+
+    .size-label {
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .size-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .size-btn {
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .size-btn.active {
+      background: #000000;
+      color: #FFFFFF;
+      border-color: #000000;
+    }
+
+    .add-to-cart-btn {
+      background: #000000;
+      color: #FFFFFF;
+      padding: 16px 24px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      border-radius: 4px;
+      width: 100%;
+    }
+
+    .detail-description {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border-color);
+      font-size: 12.5px;
+      color: #555555;
+      line-height: 1.5;
+    }
+
+    /* ==========================================
+       CART VIEW
+       ========================================== */
+    .cart-container {
+      max-width: 760px;
+      margin: 28px auto;
+      padding: 20px;
+      background: #FFFFFF;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .cart-header {
+      font-size: 16px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .cart-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .cart-item-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cart-black-box {
+      width: 48px;
+      height: 48px;
+      background: #000000;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cart-black-box svg {
+      width: 20px;
+      height: 20px;
+      stroke: #FFFFFF;
+      stroke-width: 1.5;
+      fill: none;
+    }
+
+    .cart-total {
+      display: flex;
+      justify-content: space-between;
+      font-size: 15px;
+      font-weight: 900;
+      margin-top: 18px;
+      padding-top: 12px;
+    }
+
+    /* ==========================================
+       REST API DEMO VIEW
+       ========================================== */
+    .admin-container {
+      max-width: 960px;
+      margin: 28px auto;
+      padding: 18px;
+      background: #FFFFFF;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      font-family: var(--font-mono);
+    }
+
+    .api-badge {
+      background: #000000;
+      color: var(--accent-lime);
+      padding: 4px 8px;
+      font-size: 10.5px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .code-block {
+      background: #0D0D0D;
+      color: #00FF66;
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      overflow-x: auto;
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+
+    /* ==========================================
+       TOAST NOTIFICATION
+       ========================================== */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #000000;
+      color: #FFFFFF;
+      padding: 12px 18px;
+      border-radius: 30px;
+      font-size: 11.5px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.25s ease;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* ==========================================
+       FOOTER
+       ========================================== */
+    footer {
+      background: #FFFFFF;
+      border-top: 1px solid var(--border-color);
+      padding: 28px 16px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Announcement Bar -->
+  <div class="top-announcement">
+    ⚡ FLASHMARKET DROPS — EXCLUSIVE BRAND RELEASES
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="header-inner">
+      
+      <!-- Left Controls (Mobile Menu Toggle + Search Icon) -->
+      <div class="header-left">
+        <button class="menu-toggle-btn" onclick="toggleMobileNav()" title="Меню">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+
+        <button class="icon-btn" title="Поиск">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
+      </div>
+
+      <!-- Center Logo -->
+      <div class="header-center">
+        <a href="#" onclick="showView('catalog'); return false;">
+          <div class="brand-title">FLASHMARKET</div>
+          <div class="brand-sub">BRAND DROPS SERVICE</div>
+        </a>
+      </div>
+
+      <!-- Right Action Icons -->
+      <div class="header-right">
+        <button class="icon-btn" title="REST API Docs" onclick="showView('admin')">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+        </button>
+
+        <button class="icon-btn" title="Корзина" onclick="showView('cart')">
+          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+          <span class="cart-badge" id="cart-count">2</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Category Nav Bar (Collapsible on Mobile) -->
+    <nav class="nav-bar" id="mobile-nav">
+      <div class="nav-inner">
+        <a href="#" class="nav-link active" onclick="filterCategory('ALL', this); closeMobileNav(); return false;">ВСЕ ДРОПЫ</a>
+        <a href="#" class="nav-link" onclick="filterCategory('CLOTHES', this); closeMobileNav(); return false;">ВЕРХНЯЯ ОДЕЖДА</a>
+        <a href="#" class="nav-link" onclick="filterCategory('HOODIES', this); closeMobileNav(); return false;">ХУДИ И СВИТЕРЫ</a>
+        <a href="#" class="nav-link" onclick="filterCategory('BAGS', this); closeMobileNav(); return false;">СУМКИ</a>
+        <a href="#" class="nav-link" onclick="filterCategory('ACCESSORIES', this); closeMobileNav(); return false;">АКСЕССУАРЫ</a>
+        <a href="#" class="nav-link" onclick="showView('admin'); closeMobileNav(); return false;">REST API</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main>
+
+    <!-- VIEW 1: CATALOG GRID & BRAND DROPS -->
+    <div id="view-catalog" class="page-view active-view">
+
+      <!-- BRAND DROP BLACK HERO BANNER -->
+      <div class="brand-drop-banner">
+        <div class="drop-banner-inner">
+          <div>
+            <div class="drop-tag" id="drop-active-tag">DROP 01 // LIMITED RELEASE</div>
+            <div class="drop-brand-name" id="drop-active-name">MARCELO MIRACLES</div>
+            <div class="drop-description" id="drop-active-desc">Капсульная коллекция "REVERSIBLE CAPSULE '26". Ограниченный тираж.</div>
+          </div>
+
+          <div class="drop-selector-bar">
+            <button class="drop-btn active" onclick="selectBrandDrop('ALL', this)">ВСЕ БРЕНДЫ</button>
+            <button class="drop-btn" onclick="selectBrandDrop('MARCELO MIRACLES', this)">MARCELO MIRACLES</button>
+            <button class="drop-btn" onclick="selectBrandDrop('ROUTINE', this)">ROUTINE</button>
+            <button class="drop-btn" onclick="selectBrandDrop('FLASH SECT', this)">FLASH SECT</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls & Filter Bar -->
+      <div class="catalog-controls">
+        <div style="display: flex; align-items: center; gap: 8px; overflow-x: auto; width: 100%;">
+          <button class="filter-btn">
+            <span>ФИЛЬТРЫ</span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+
+          <div class="tag-chips">
+            <button class="chip active" onclick="filterStatus('ALL', this)">ВСЕ ТОВАРЫ</button>
+            <button class="chip" onclick="filterStatus('SPECIAL', this)">СПЕЦИАЛЬНЫЙ</button>
+            <button class="chip" onclick="filterStatus('PREORDER', this)">ПРЕДЗАКАЗ</button>
+            <button class="chip" onclick="filterStatus('NEW', this)">НОВЫЙ</button>
+          </div>
+        </div>
+
+        <div class="search-box">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" style="margin-right: 8px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" placeholder="Поиск по названию..." id="search-input" onkeyup="handleSearch(this.value)">
+        </div>
+      </div>
+
+      <!-- Product Grid -->
+      <div class="container">
+        <div class="product-grid" id="grid">
+
+          <!-- Card 1: MARCELO MIRACLES -->
+          <div class="product-card" data-brand="MARCELO MIRACLES" data-category="HOODIES" data-status="PREORDER" onclick="openProduct(1)">
+            <div class="card-black-box">
+              <div class="card-badge">
+                <span class="badge-grey">ПРЕДЗАКАЗ</span>
+              </div>
+              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10a2 2 0 002 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
+              <span class="black-box-brand-tag">MARCELO MIRACLES</span>
+            </div>
+            <div class="product-brand-title">MARCELO MIRACLES</div>
+            <div class="product-title">REVERSIBLE FUR ZIP HOODIE IN GREY</div>
+            <div class="product-price">12 900 руб.</div>
+          </div>
+
+          <!-- Card 2: MARCELO MIRACLES -->
+          <div class="product-card" data-brand="MARCELO MIRACLES" data-category="HOODIES" data-status="PREORDER" onclick="openProduct(2)">
+            <div class="card-black-box">
+              <div class="card-badge">
+                <span class="badge-grey">ПРЕДЗАКАЗ</span>
+              </div>
+              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10a2 2 0 002 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
+              <span class="black-box-brand-tag">MARCELO MIRACLES</span>
+            </div>
+            <div class="product-brand-title">MARCELO MIRACLES</div>
+            <div class="product-title">REVERSIBLE FUR ZIP HOODIE IN BLACK</div>
+            <div class="product-price">12 900 руб.</div>
+          </div>
+
+          <!-- Card 3: MARCELO MIRACLES -->
+          <div class="product-card" data-brand="MARCELO MIRACLES" data-category="CLOTHES" data-status="PREORDER" onclick="openProduct(3)">
+            <div class="card-black-box">
+              <div class="card-badge">
+                <span class="badge-grey">ПРЕДЗАКАЗ</span>
+              </div>
+              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M10 2v5a2 2 0 0 0 4 0V2"></path><path d="M14 14l5-2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7l5 2"></path></svg>
+              <span class="black-box-brand-tag">MARCELO MIRACLES</span>
+            </div>
+            <div class="product-brand-title">MARCELO MIRACLES</div>
+            <div class="product-title">BOOTLEG BOOTS IN BLACK</div>
+            <div class="product-price">11 900 руб.</div>
+          </div>
+
+          <!-- Card 4: ROUTINE -->
+          <div class="product-card" data-brand="ROUTINE" data-category="BAGS" data-status="SPECIAL" onclick="openProduct(4)">
+            <div class="card-black-box">
+              <div class="card-badge">
+                <span class="badge-red">СПЕЦИАЛЬНЫЙ</span>
+              </div>
+              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+              <span class="black-box-brand-tag">ROUTINE</span>
+            </div>
+            <div class="product-brand-title">ROUTINE</div>
+            <div class="product-title">SAKURA.BAG V2.0</div>
+            <div class="product-price">7 790 p.</div>
+          </div>
+
+          <!-- Card 5: ROUTINE -->
+          <div class="product-card" data-brand="ROUTINE" data-category="BAGS" data-status="NEW" onclick="openProduct(5)">
+            <div class="card-black-box">
+              <div class="card-badge">
+                <span class="badge-red">НОВЫЙ</span>
+              </div>
+              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+              <span class="black-box-brand-tag">ROUTINE</span>
+            </div>
+            <div class="product-brand-title">ROUTINE</div>
+            <div class="product-title">DRAW.BAG V2.0</div>
+            <div class="product-price">7 790 p.</div>
+          </div>
+
+          <!-- Card 6: FLASH SECT -->
+          <div class="product-card" data-brand="FLASH SECT" data-category="CLOTHES" data-status="SPECIAL" onclick="openProduct(6)">
+            <div class="card-black-box">
+              <div class="card-badge">
+                <span class="badge-lime">⚡ ДОБРОСВЯЗЬ -10%</span>
+              </div>
+              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+              <span class="black-box-brand-tag">FLASH SECT</span>
+            </div>
+            <div class="product-brand-title">FLASH SECT</div>
+            <div class="product-title">DISTRESSED STUDDED JEANS</div>
+            <div class="product-price">4 950 ₽ <span class="old-price">5 500 ₽</span></div>
+          </div>
+
+          <!-- Card 7: FLASH SECT -->
+          <div class="product-card" data-brand="FLASH SECT" data-category="ACCESSORIES" data-status="SPECIAL" onclick="openProduct(7)">
+            <div class="card-black-box">
+              <div class="card-badge">
+                <span class="badge-lime">⚡ ДОБРОСВЯЗЬ -20%</span>
+              </div>
+              <svg class="black-box-icon" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+              <span class="black-box-brand-tag">FLASH SECT</span>
+            </div>
+            <div class="product-brand-title">FLASH SECT</div>
+            <div class="product-title">LUSTER ZIP PHONE CASE</div>
+            <div class="product-price">3 000 ₽</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: PRODUCT DETAIL -->
+    <div id="view-product" class="page-view">
+      <div style="max-width: 1040px; margin: 16px auto 0; padding: 0 16px;">
+        <button onclick="showView('catalog')" style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;">
+          ← НАЗАД В КАТАЛОГ
+        </button>
+      </div>
+
+      <div class="detail-container">
+        <div class="detail-black-box">
+          <svg id="detail-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.2"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10a2 2 0 002 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
+          <div id="detail-box-label" style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; color: #666; margin-top: 12px; text-transform: uppercase;">MARCELO MIRACLES</div>
+        </div>
+
+        <div class="detail-info">
+          <div class="detail-category" id="detail-cat">MARCELO MIRACLES / ХУДИ</div>
+          <h1 class="detail-title" id="detail-name">REVERSIBLE FUR ZIP HOODIE IN GREY</h1>
+          <div class="detail-price" id="detail-price">12 900 руб.</div>
+
+          <div class="size-selector">
+            <span class="size-label">ВЫБЕРИТЕ РАЗМЕР</span>
+            <div class="size-buttons">
+              <button class="size-btn active">S</button>
+              <button class="size-btn">M</button>
+              <button class="size-btn">L</button>
+              <button class="size-btn">XL</button>
+            </div>
+          </div>
+
+          <button class="add-to-cart-btn" onclick="addToCartCurrent()">ДОБАВИТЬ В КОРЗИНУ</button>
+
+          <div class="detail-description">
+            <p><strong>ОПИСАНИЕ:</strong></p>
+            <p id="detail-desc">Эксклюзивный дроп MARCELO MIRACLES. Двустороннее зип-худи с премиальным искусственным мехом. Качественные металлические молнии и авторский крой.</p>
+            <br>
+            <p style="font-size: 11px; color: #888;">SLUG: <span id="detail-slug" style="font-family: var(--font-mono); color: #000;">reversible-fur-zip-hoodie-grey</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: CART -->
+    <div id="view-cart" class="page-view">
+      <div class="cart-container">
+        <div class="cart-header">ВАША КОРЗИНА</div>
+        
+        <div class="cart-item">
+          <div class="cart-item-info">
+            <div class="cart-black-box">
+              <svg viewBox="0 0 24 24"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10a2 2 0 002 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
+            </div>
+            <div>
+              <div style="font-weight: 800; font-size: 12.5px;">REVERSIBLE FUR ZIP HOODIE IN GREY</div>
+              <div style="font-size: 10.5px; color: #777;">Бренд: MARCELO MIRACLES | Размер: M</div>
+            </div>
+          </div>
+          <div style="font-weight: 800; font-size: 12.5px;">12 900 ₽</div>
+        </div>
+
+        <div class="cart-item">
+          <div class="cart-item-info">
+            <div class="cart-black-box">
+              <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path></svg>
+            </div>
+            <div>
+              <div style="font-weight: 800; font-size: 12.5px;">SAKURA.BAG V2.0</div>
+              <div style="font-size: 10.5px; color: #777;">Бренд: ROUTINE | Размер: OS</div>
+            </div>
+          </div>
+          <div style="font-weight: 800; font-size: 12.5px;">7 790 ₽</div>
+        </div>
+
+        <div class="cart-total">
+          <span>ИТОГО:</span>
+          <span>20 690 ₽</span>
+        </div>
+
+        <button class="add-to-cart-btn" style="margin-top: 24px;" onclick="triggerToast('Заказ оформлен! Демо-режим.')">ОФОРМИТЬ ЗАКАЗ</button>
+      </div>
+    </div>
+
+    <!-- VIEW 4: REST API DEMO -->
+    <div id="view-admin" class="page-view">
+      <div class="admin-container">
+        <span class="api-badge">CATALOG SERVICE REST API DEMO</span>
+        <h2 style="font-size: 15px; font-weight: 900;">Эндпоинты Catalog Microservice</h2>
+        <p style="font-size: 11px; color: #666; margin-top: 4px;">Инспекция ответа FastAPI / SQLAlchemy 2 Async (Бренды + Дропы)</p>
+
+        <div style="margin-top: 18px;">
+          <h4 style="font-size: 12px;">1. GET /api/v1/categories (Иерархическое дерево)</h4>
+          <div class="code-block">
+[
+  {
+    "id": "01926c1a-7b3f-7a12-8812-99a012345678",
+    "name": "MARCELO MIRACLES",
+    "slug": "marcelo-miracles",
+    "children": [
+      { "name": "Худи и Свитеры", "slug": "marcelo-hoodies" },
+      { "name": "Обувь", "slug": "marcelo-footwear" }
+    ]
+  },
+  {
+    "id": "01926c1a-7b3f-7a12-8812-99a087654321",
+    "name": "ROUTINE",
+    "slug": "routine",
+    "children": [
+      { "name": "Сумки", "slug": "routine-bags" }
+    ]
+  }
+]
+          </div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <h4 style="font-size: 12px;">2. Auto-Slug Generation Test</h4>
+          <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <input id="slug-input" type="text" value="Marcelo Miracles Zip Hoodie" style="padding: 8px 12px; border: 1px solid #ccc; font-family: inherit; font-size: 11.5px; border-radius: 4px; width: 220px;">
+            <button onclick="testSlugGen()" style="background: #000; color: #fff; padding: 8px 14px; font-size: 10.5px; font-weight: 700; border-radius: 4px;">СГЕНЕРИРОВАТЬ SLUG</button>
+          </div>
+          <div class="code-block" id="slug-output">
+Result: marcelo-miracles-zip-hoodie
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BFF532" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    <span id="toast-msg">Товар добавлен в корзину!</span>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-text">FLASHMARKET © 2026 — BRAND DROPS CATALOG DEMO</div>
+  </footer>
+
+  <!-- JS Logic -->
+  <script>
+    const brandDropInfo = {
+      'ALL': {
+        tag: 'ALL DROPS // LIVE RELEASES',
+        name: 'ALL BRAND DROPS',
+        desc: 'Каталог эксклюзивных релизов брендов FlashMarket.'
+      },
+      'MARCELO MIRACLES': {
+        tag: 'DROP 01 // EXCLUSIVE',
+        name: 'MARCELO MIRACLES',
+        desc: 'Коллекция "REVERSIBLE CAPSULE \'26". Двусторонние меховые зип-худи и обувь.'
+      },
+      'ROUTINE': {
+        tag: 'DROP 02 // SAKURA CAPSULE',
+        name: 'ROUTINE',
+        desc: 'Лимитированные сумки кросс-боди с графическими принтами и влагозащитой.'
+      },
+      'FLASH SECT': {
+        tag: 'DROP 03 // LIMITED SECT',
+        name: 'FLASH SECT',
+        desc: 'Джинсы с металлической фурнитурой и аксесуары премиум класса.'
+      }
+    };
+
+    const productsData = {
+      1: {
+        brand: "MARCELO MIRACLES",
+        name: "REVERSIBLE FUR ZIP HOODIE IN GREY",
+        price: "12 900 руб.",
+        cat: "ХУДИ И СВИТЕРЫ",
+        slug: "reversible-fur-zip-hoodie-grey",
+        label: "MARCELO MIRACLES",
+        desc: "Эксклюзивный дроп MARCELO MIRACLES. Двустороннее зип-худи с искусственным мехом. Оверсайз крой."
+      },
+      2: {
+        brand: "MARCELO MIRACLES",
+        name: "REVERSIBLE FUR ZIP HOODIE IN BLACK",
+        price: "12 900 руб.",
+        cat: "ХУДИ И СВИТЕРЫ",
+        slug: "reversible-fur-zip-hoodie-black",
+        label: "MARCELO MIRACLES",
+        desc: "Двустороннее зип-худи с подкладкой под леопард. Металлический замок с логотипом креста."
+      },
+      3: {
+        brand: "MARCELO MIRACLES",
+        name: "BOOTLEG BOOTS IN BLACK",
+        price: "11 900 руб.",
+        cat: "ВЕРХНЯЯ ОДЕЖДА",
+        slug: "bootleg-boots-black",
+        label: "MARCELO MIRACLES",
+        desc: "Массивные ботинки из натуральной черной кожи с ремешком и металической пряжкой."
+      },
+      4: {
+        brand: "ROUTINE",
+        name: "SAKURA.BAG V2.0",
+        price: "7 790 ₽",
+        cat: "СУМКИ",
+        slug: "sakura-bag-v2",
+        label: "ROUTINE",
+        desc: "Сумка кросс-боди с графическим принтом Sakura V2. Лимитированная серия FlashMarket."
+      },
+      5: {
+        brand: "ROUTINE",
+        name: "DRAW.BAG V2.0",
+        price: "7 790 ₽",
+        cat: "СУМКИ",
+        slug: "draw-bag-v2",
+        label: "ROUTINE",
+        desc: "Компактная городская сумка с авторской иллюстрацией. Плотный хлопок с водоотталкивающим покрытием."
+      },
+      6: {
+        brand: "FLASH SECT",
+        name: "DISTRESSED STUDDED JEANS",
+        price: "4 950 ₽",
+        cat: "ОДЕЖДА",
+        slug: "distressed-studded-jeans",
+        label: "FLASH SECT",
+        desc: "Широкие джинсы с потертостями и металлическими заклепками. Винтажная варка."
+      },
+      7: {
+        brand: "FLASH SECT",
+        name: "LUSTER ZIP PHONE CASE",
+        price: "3 000 ₽",
+        cat: "АКСЕССУАРЫ",
+        slug: "luster-zip-phone-case",
+        label: "FLASH SECT",
+        desc: "Чехол для смартфона с застежкой-молнией из премиального материала."
+      }
+    };
+
+    let selectedBrand = 'ALL';
+    let cartCount = 2;
+    let currentProductId = 1;
+
+    function selectBrandDrop(brandName, element) {
+      selectedBrand = brandName;
+      document.querySelectorAll('.drop-btn').forEach(btn => btn.classList.remove('active'));
+      if (element) element.classList.add('active');
+
+      const info = brandDropInfo[brandName] || brandDropInfo['ALL'];
+      document.getElementById('drop-active-tag').innerText = info.tag;
+      document.getElementById('drop-active-name').innerText = info.name;
+      document.getElementById('drop-active-desc').innerText = info.desc;
+
+      applyFilters();
+    }
+
+    function toggleMobileNav() {
+      const nav = document.getElementById('mobile-nav');
+      nav.classList.toggle('mobile-open');
+    }
+
+    function closeMobileNav() {
+      const nav = document.getElementById('mobile-nav');
+      nav.classList.remove('mobile-open');
+    }
+
+    function showView(viewName) {
+      document.querySelectorAll('.page-view').forEach(view => {
+        view.classList.remove('active-view');
+      });
+      const target = document.getElementById(`view-${viewName}`);
+      if (target) {
+        target.classList.add('active-view');
+        window.scrollTo(0, 0);
+      }
+    }
+
+    function openProduct(id) {
+      const item = productsData[id];
+      if (!item) return;
+
+      currentProductId = id;
+      document.getElementById('detail-name').innerText = item.name;
+      document.getElementById('detail-price').innerText = item.price;
+      document.getElementById('detail-cat').innerText = `${item.brand} / ${item.cat}`;
+      document.getElementById('detail-slug').innerText = item.slug;
+      document.getElementById('detail-desc').innerText = item.desc;
+      document.getElementById('detail-box-label').innerText = item.label;
+
+      showView('product');
+    }
+
+    function addToCartCurrent() {
+      cartCount++;
+      document.getElementById('cart-count').innerText = cartCount;
+      triggerToast('Товар успешно добавлен в корзину!');
+    }
+
+    function triggerToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    let activeCategory = 'ALL';
+    let activeStatus = 'ALL';
+
+    function filterCategory(cat, element) {
+      activeCategory = cat;
+      document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+      if (element) element.classList.add('active');
+      applyFilters();
+    }
+
+    function filterStatus(status, element) {
+      activeStatus = status;
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      if (element) element.classList.add('active');
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const cards = document.querySelectorAll('.product-card');
+      cards.forEach(card => {
+        const brandMatch = (selectedBrand === 'ALL' || card.dataset.brand === selectedBrand);
+        const catMatch = (activeCategory === 'ALL' || card.dataset.category === activeCategory);
+        const statusMatch = (activeStatus === 'ALL' || card.dataset.status === activeStatus);
+
+        if (brandMatch && catMatch && statusMatch) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    function handleSearch(query) {
+      const val = query.toLowerCase().trim();
+      const cards = document.querySelectorAll('.product-card');
+      cards.forEach(card => {
+        const title = card.querySelector('.product-title').innerText.toLowerCase();
+        const brand = (card.dataset.brand || '').toLowerCase();
+        if (title.includes(val) || brand.includes(val)) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    function testSlugGen() {
+      const input = document.getElementById('slug-input').value;
+      const slug = input.toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/[\s_-]+/g, '-');
+      
+      document.getElementById('slug-output').innerText = `Input: "${input}"\nSlug: "${slug}"\nCollision Check: "${slug}-2"`;
+    }
+
+    // Size selector behavior
+    document.querySelectorAll('.size-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

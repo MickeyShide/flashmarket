@@ -1,0 +1,122 @@
+"""Stock and reservation API routes."""
+
+from uuid import UUID
+
+from fastapi import APIRouter, status
+
+from inventory.api.dependencies import InventoryServiceDep
+from inventory.application.schemas import (
+    CommitRequest,
+    ReleaseRequest,
+    ReservationResponse,
+    ReservationResult,
+    ReserveRequest,
+    StockCreateRequest,
+    StockResponse,
+    StockUpdateRequest,
+)
+from inventory.infrastructure.models import ReservationModel, StockModel
+
+router = APIRouter(prefix="/api/v1/stocks", tags=["stocks"])
+
+
+def _stock_response(stock: StockModel) -> StockResponse:
+    return StockResponse.model_validate(stock)
+
+
+def _reservation_response(reservation: ReservationModel) -> ReservationResponse:
+    return ReservationResponse.model_validate(reservation)
+
+
+@router.post(
+    "",
+    response_model=StockResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create or reset stock for a product",
+)
+async def create_stock(
+    data: StockCreateRequest,
+    service: InventoryServiceDep,
+) -> StockResponse:
+    """Initialize stock for a product."""
+    stock = await service.create_stock(data)
+    return _stock_response(stock)
+
+
+@router.get(
+    "/{product_id}",
+    response_model=StockResponse,
+    summary="Get stock for a product",
+)
+async def get_stock(
+    product_id: UUID,
+    service: InventoryServiceDep,
+) -> StockResponse:
+    """Return current stock counters for a product."""
+    stock = await service.get_stock(product_id)
+    return _stock_response(stock)
+
+
+@router.patch(
+    "/{product_id}",
+    response_model=StockResponse,
+    summary="Update total stock",
+)
+async def update_stock(
+    product_id: UUID,
+    data: StockUpdateRequest,
+    service: InventoryServiceDep,
+) -> StockResponse:
+    """Adjust the total stock of a product."""
+    stock = await service.update_total(product_id, data)
+    return _stock_response(stock)
+
+
+@router.post(
+    "/{product_id}/reserve",
+    response_model=ReservationResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Reserve stock",
+)
+async def reserve(
+    product_id: UUID,
+    data: ReserveRequest,
+    service: InventoryServiceDep,
+) -> ReservationResult:
+    """Reserve one or more units for a user."""
+    reservation = await service.reserve(product_id, data)
+    stock = await service.get_stock(product_id)
+    return ReservationResult(
+        reservation=_reservation_response(reservation),
+        stock=_stock_response(stock),
+    )
+
+
+@router.post(
+    "/{product_id}/commit",
+    response_model=ReservationResponse,
+    summary="Commit a reservation to a sale",
+)
+async def commit(
+    product_id: UUID,
+    data: CommitRequest,
+    service: InventoryServiceDep,
+) -> ReservationResponse:
+    """Convert an active reservation into a confirmed sale."""
+    reservation = await service.commit(product_id, data)
+    return _reservation_response(reservation)
+
+
+@router.post(
+    "/{product_id}/release",
+    response_model=ReservationResponse,
+    summary="Release a reservation",
+)
+async def release(
+    product_id: UUID,
+    data: ReleaseRequest,
+    service: InventoryServiceDep,
+) -> ReservationResponse:
+    """Manually release an active reservation."""
+    reservation = await service.release(product_id, data)
+    return _reservation_response(reservation)

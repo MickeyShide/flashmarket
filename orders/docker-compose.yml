@@ -1,0 +1,107 @@
+name: flashmarket-orders
+
+x-orders-runtime: &orders-runtime
+  image: flashmarket-orders-api:local
+  pull_policy: never
+
+x-orders-environment: &orders-environment
+  ORDERS_ENVIRONMENT: development
+  ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/orders
+  ORDERS_RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  ORDERS_CORS_ORIGINS: '["http://localhost:3000"]'
+
+services:
+  migrate:
+    <<: *orders-runtime
+    environment:
+      ORDERS_ENVIRONMENT: development
+      ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/orders
+    command: [".venv/bin/alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *orders-runtime
+    build:
+      context: .
+    environment: *orders-environment
+    ports:
+      - "127.0.0.1:${ORDERS_PORT:-8012}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  consumer:
+    <<: *orders-runtime
+    environment: *orders-environment
+    command: [".venv/bin/python", "-m", "orders.event_consumer"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  outbox:
+    <<: *orders-runtime
+    environment: *orders-environment
+    command: [".venv/bin/python", "-m", "orders.outbox_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: flashmarket
+      POSTGRES_PASSWORD: flashmarket
+    ports:
+      - "127.0.0.1:${ORDERS_DB_PORT:-5435}:5432"
+    volumes:
+      - orders-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flashmarket -d orders"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  orders-postgres-data:
+
+networks:
+  default:
+    name: flashmarket
+    external: true

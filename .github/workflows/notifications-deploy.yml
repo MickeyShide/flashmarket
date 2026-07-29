@@ -1,0 +1,454 @@
+name: Notifications CI / Deploy
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - notifications/**
+      - .github/workflows/notifications-deploy.yml
+  push:
+    branches:
+      - develop
+      - main
+    tags:
+      - notifications-v*
+    paths:
+      - notifications/**
+      - .github/workflows/notifications-deploy.yml
+  workflow_dispatch:
+
+concurrency:
+  group: notifications-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.11.32"
+  IMAGE_NAME: ghcr.io/mickeyshide/flashmarket-notifications
+
+jobs:
+  ruff:
+    name: Ruff warnings
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: notifications
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: notifications/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Run Ruff as warnings
+        shell: bash
+        run: |
+          set +e
+          lint_report="$(uv run ruff check . --output-format=concise 2>&1)"
+          lint_status=$?
+          format_report="$(uv run ruff format --check . 2>&1)"
+          format_status=$?
+          report="$(printf 'ruff check:\n%s\n\nruff format --check:\n%s\n' "$lint_report" "$format_report")"
+          printf '%s\n' "$report"
+
+          if (( lint_status != 0 || format_status != 0 )); then
+            echo "::warning title=Ruff::Ruff found code-style issues. This check does not block deploy."
+            {
+              echo "### ⚠️ Ruff"
+              echo
+              echo '```text'
+              printf '%s\n' "$report"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ✅ Ruff: no issues" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          exit 0
+
+  mypy:
+    name: mypy warnings
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: notifications
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: notifications/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Run mypy as warnings
+        shell: bash
+        run: |
+          set +e
+          report="$(uv run mypy 2>&1)"
+          status=$?
+          printf '%s\n' "$report"
+
+          if (( status != 0 )); then
+            echo "::warning title=mypy::mypy found type issues. This check does not block deploy."
+            {
+              echo "### ⚠️ mypy"
+              echo
+              echo '```text'
+              printf '%s\n' "$report"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ✅ mypy: no issues" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          exit 0
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: notifications
+          POSTGRES_USER: flashmarket
+          POSTGRES_PASSWORD: flashmarket
+        ports:
+          - 5437:5432
+        options: >-
+          --health-cmd "pg_isready -U flashmarket -d notifications"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: notifications
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: notifications/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Run tests
+        env:
+          NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@localhost:5437/notifications
+        run: uv run pytest
+
+  image:
+    name: Build image
+    needs:
+      - tests
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=tag
+            type=ref,event=pr
+            type=sha,prefix=sha-
+
+      - name: Build and publish image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ./notifications
+          file: ./notifications/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=flashmarket-notifications
+          cache-to: type=gha,mode=max,scope=flashmarket-notifications
+
+  deploy:
+    name: Deploy production
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/notifications-v')
+    needs:
+      - image
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GHCR_USERNAME: ${{ github.actor }}
+      NOTIFICATIONS_IMAGE: ghcr.io/mickeyshide/flashmarket-notifications@${{ needs.image.outputs.digest }}
+      NOTIFICATIONS_DOMAIN: ${{ vars.NOTIFICATIONS_DOMAIN }}
+      NOTIFICATIONS_CORS_ORIGINS: ${{ vars.NOTIFICATIONS_CORS_ORIGINS }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.NOTIFICATIONS_POSTGRES_PASSWORD }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.NOTIFICATIONS_RABBITMQ_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          : "${DEPLOY_HOST:?Set the DEPLOY_HOST variable in the production environment}"
+          : "${DEPLOY_USER:?Set the DEPLOY_USER variable in the production environment}"
+          : "${SSH_PRIVATE_KEY:?Set the DEPLOY_SSH_KEY secret in the production environment}"
+          : "${NOTIFICATIONS_DOMAIN:?Set the NOTIFICATIONS_DOMAIN variable in the production environment}"
+          : "${DEPLOY_POSTGRES_PASSWORD:?Set the NOTIFICATIONS_POSTGRES_PASSWORD secret}"
+          : "${DEPLOY_RABBITMQ_PASSWORD:?Set the NOTIFICATIONS_RABBITMQ_PASSWORD secret}"
+
+          if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::DEPLOY_HOST must be a hostname or IPv4 address"
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            echo "::error::DEPLOY_USER is invalid"
+            exit 1
+          fi
+          if [[ -z "$DEPLOY_PATH" ]]; then
+            DEPLOY_PATH="/home/${DEPLOY_USER}/flashmarket-notifications"
+            echo "DEPLOY_PATH=$DEPLOY_PATH" >> "$GITHUB_ENV"
+          fi
+          : "${DEPLOY_PATH:?DEPLOY_PATH could not be derived}"
+          if [[ ! "$DEPLOY_PORT" =~ ^[0-9]+$ ]] ||
+            (( DEPLOY_PORT < 1 || DEPLOY_PORT > 65535 )); then
+            echo "::error::DEPLOY_PORT must be between 1 and 65535"
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::DEPLOY_PATH must be an absolute Unix path"
+            exit 1
+          fi
+          if [[ ! "$NOTIFICATIONS_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::NOTIFICATIONS_DOMAIN must contain only a DNS hostname"
+            exit 1
+          fi
+          for password in \
+            "$DEPLOY_POSTGRES_PASSWORD" \
+            "$DEPLOY_RABBITMQ_PASSWORD"; do
+            if [[ ! "$password" =~ ^[A-Za-z0-9._~-]{32,128}$ ]]; then
+              echo "::error::Passwords must be 32-128 URL-safe characters"
+              exit 1
+            fi
+          done
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          cat > "$HOME/.ssh/config" <<'EOF'
+          Host *
+              StrictHostKeyChecking no
+              UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 "$HOME/.ssh/config"
+
+      - name: Render production environment
+        shell: bash
+        run: |
+          environment_file="$RUNNER_TEMP/flashmarket-notifications.env"
+          cors_origins="${NOTIFICATIONS_CORS_ORIGINS:-[\"https://${NOTIFICATIONS_DOMAIN}\"]}"
+          umask 077
+          {
+            printf 'NOTIFICATIONS_IMAGE=%s\n' "$NOTIFICATIONS_IMAGE"
+            printf 'NOTIFICATIONS_PROXY_PORT=4922\n'
+            printf 'NOTIFICATIONS_ENVIRONMENT=production\n'
+            printf 'NOTIFICATIONS_DOMAIN=%s\n' "$NOTIFICATIONS_DOMAIN"
+            printf 'NOTIFICATIONS_DATABASE_URL=postgresql+asyncpg://flashmarket_notifications:%s@db:5432/notifications\n' "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'NOTIFICATIONS_RABBITMQ_URL=amqps://flashmarket_notifications:%s@rabbitmq:5672/\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'NOTIFICATIONS_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
+            printf 'NOTIFICATIONS_DEBUG=false\n'
+            printf 'NOTIFICATIONS_DOCS_ENABLED=false\n'
+            printf 'NOTIFICATIONS_CORS_ORIGINS=%s\n' "$cors_origins"
+            printf 'NOTIFICATIONS_TRUSTED_HOSTS=["%s","localhost"]\n' "$NOTIFICATIONS_DOMAIN"
+            printf 'POSTGRES_DB=notifications\n'
+            printf 'POSTGRES_USER=flashmarket_notifications\n'
+            printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'RABBITMQ_DEFAULT_USER=flashmarket_notifications\n'
+            printf 'RABBITMQ_DEFAULT_PASS=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
+          } > "$environment_file"
+          chmod 600 "$environment_file"
+
+      - name: Upload deployment files
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" "mkdir -p '$DEPLOY_PATH'"
+          scp -P "$DEPLOY_PORT" \
+            notifications/docker-compose.deploy.yml \
+            "$target:$DEPLOY_PATH/docker-compose.yml"
+          scp -P "$DEPLOY_PORT" \
+            notifications/nginx.conf.template \
+            "$target:$DEPLOY_PATH/nginx.conf.template"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "umask 077; cat > '$DEPLOY_PATH/.env.next' && mv '$DEPLOY_PATH/.env.next' '$DEPLOY_PATH/.env'" \
+            < "$RUNNER_TEMP/flashmarket-notifications.env"
+
+      - name: Log server in to GHCR
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          printf '%s' "$GHCR_TOKEN" |
+            ssh -p "$DEPLOY_PORT" "$target" \
+              "docker login ghcr --username '$GHCR_USERNAME' --password-stdin"
+
+      - name: Deploy exact image digest
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "DEPLOY_PATH='$DEPLOY_PATH' NOTIFICATIONS_IMAGE='$NOTIFICATIONS_IMAGE' NOTIFICATIONS_DOMAIN='$NOTIFICATIONS_DOMAIN' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$DEPLOY_PATH"
+          trap 'docker logout ghcr >/dev/null 2>&1 || true' EXIT
+
+          if [[ ! -f .env ]]; then
+            echo "Missing $DEPLOY_PATH/.env"
+            exit 1
+          fi
+
+          export NOTIFICATIONS_IMAGE
+          docker compose --env-file .env config --quiet
+          docker compose --env-file .env pull
+          docker compose --env-file .env up -d --no-build db
+
+          wait_for_healthy() {
+            service="$1"
+            container="$(docker compose --env-file .env ps -q "$service")"
+            for attempt in $(seq 1 60); do
+              health="$(
+                docker inspect \
+                  --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+                  "$container"
+              )"
+              if [[ "$health" == "healthy" ]]; then
+                return 0
+              fi
+              if [[ "$health" == "unhealthy" || "$health" == "exited" ]]; then
+                break
+              fi
+              sleep 2
+            done
+            docker compose --env-file .env logs --tail 100 "$service"
+            return 1
+          }
+
+          wait_for_healthy db
+          wait_for_healthy rabbitmq
+
+          echo 'Applying database migrations...'
+          timeout 120 docker compose --env-file .env run --rm --no-deps migrate </dev/null
+          echo 'Database migrations complete.'
+
+          echo 'Starting Notifications runtime containers...'
+          docker compose --env-file .env up \
+            -d \
+            --no-build \
+            --no-deps \
+            --force-recreate \
+            api nginx
+          echo 'Notifications runtime containers started.'
+
+          echo 'Waiting for Notifications API...'
+          wait_for_healthy api
+          echo 'Waiting for internal Nginx...'
+          wait_for_healthy nginx
+          docker compose --env-file .env ps -a
+          echo 'Checking internal Nginx endpoint...'
+          curl --fail --silent --show-error \
+            -H "Host: ${NOTIFICATIONS_DOMAIN}" \
+            http://127.0.0.1:4919/health/ready
+          REMOTE
+
+      - name: Verify public HTTPS endpoint
+        shell: bash
+        run: |
+          last_error=""
+          for _ in $(seq 1 30); do
+            if response="$(
+              curl --fail --silent --show-error \
+                "https://${NOTIFICATIONS_DOMAIN}/health/ready" 2>&1
+            )"; then
+              printf '%s\n' "$response"
+              exit 0
+            fi
+            last_error="$response"
+            sleep 2
+          done
+
+          echo "::error title=Public HTTPS check failed::Notifications API is not reachable through Nginx Proxy Manager at https://${NOTIFICATIONS_DOMAIN}/health/ready"
+          printf 'Last curl error: %s\n' "$last_error"
+
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          if ssh -p "$DEPLOY_PORT" "$target" \
+            "curl --fail --silent --show-error -H 'Host: ${NOTIFICATIONS_DOMAIN}' http://127.0.0.1:4919/health/ready"; then
+            echo
+            echo "::notice title=Notifications nginx is healthy::Configure Nginx Proxy Manager for ${NOTIFICATIONS_DOMAIN} with upstream ${DEPLOY_HOST}:4919 and enable SSL"
+          fi
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "cd '$DEPLOY_PATH' && docker compose --env-file .env ps -a && ss -ltn '( sport = :4919 )' || true; docker compose --env-file .env logs --tail 100 api nginx"
+          exit 1

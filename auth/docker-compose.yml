@@ -148,3 +148,8 @@ volumes:
   auth-postgres-data:
   auth-rabbitmq-data:
   auth-redis-data:
+
+networks:
+  default:
+    name: flashmarket
+    external: true

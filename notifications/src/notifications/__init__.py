@@ -1,0 +1,1 @@
+"""FlashMarket Notifications service."""

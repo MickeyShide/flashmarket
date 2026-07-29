@@ -1,0 +1,171 @@
+"""Inbound RabbitMQ consumer for notifications service."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import uuid
+from collections.abc import Awaitable, Callable
+from typing import Any
+
+import aio_pika
+from aio_pika import ExchangeType
+from aio_pika.abc import AbstractIncomingMessage
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from notifications.config import get_settings
+from notifications.domain.entities import NotificationChannel, NotificationStatus
+from notifications.infrastructure.database import SessionFactory, engine
+from notifications.infrastructure.models import NotificationModel
+from notifications.infrastructure.repositories.notification import (
+    NotificationRepository,
+    OutboxRepository,
+)
+
+logger = logging.getLogger(__name__)
+
+Handler = Callable[[AsyncSession, dict[str, Any]], Awaitable[None]]
+
+
+async def _create_notification(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    subject: str,
+    body: str,
+    recipient: str | None = None,
+) -> None:
+    """Persist a pending notification."""
+    repo = NotificationRepository(session)
+    outbox = OutboxRepository(session)
+    notification = NotificationModel(
+        user_id=user_id,
+        channel=NotificationChannel.EMAIL,
+        subject=subject,
+        body=body,
+        recipient=recipient or f"{user_id}@example.com",
+        status=NotificationStatus.PENDING,
+    )
+    await repo.create(notification)
+    logger.info("Created notification %s for user %s", notification.id, user_id)
+
+
+async def handle_order_created(
+    session: AsyncSession,
+    payload: dict[str, Any],
+) -> None:
+    """Notify user that order was created."""
+    user_id = uuid.UUID(str(payload["user_id"]))
+    order_id = str(payload.get("order_id", ""))
+    await _create_notification(
+        session,
+        user_id,
+        subject="Order created",
+        body=f"Your order {order_id} has been created and is awaiting payment.",
+    )
+
+
+async def handle_order_confirmed(
+    session: AsyncSession,
+    payload: dict[str, Any],
+) -> None:
+    """Notify user that order was confirmed."""
+    user_id = uuid.UUID(str(payload["user_id"]))
+    order_id = str(payload.get("order_id", ""))
+    await _create_notification(
+        session,
+        user_id,
+        subject="Order confirmed",
+        body=f"Your order {order_id} has been confirmed.",
+    )
+
+
+async def handle_order_cancelled(
+    session: AsyncSession,
+    payload: dict[str, Any],
+) -> None:
+    """Notify user that order was cancelled."""
+    user_id = uuid.UUID(str(payload["user_id"]))
+    order_id = str(payload.get("order_id", ""))
+    reason = str(payload.get("reason", ""))
+    await _create_notification(
+        session,
+        user_id,
+        subject="Order cancelled",
+        body=f"Your order {order_id} was cancelled. Reason: {reason or 'unknown'}.",
+    )
+
+
+HANDLERS: dict[str, Handler] = {
+    "orders.OrderCreated": handle_order_created,
+    "orders.OrderConfirmed": handle_order_confirmed,
+    "orders.OrderCancelled": handle_order_cancelled,
+}
+
+
+async def process_message(
+    message: AbstractIncomingMessage,
+    *,
+    session_factory: async_sessionmaker[AsyncSession] = SessionFactory,
+) -> None:
+    """Route an incoming message to its handler."""
+    async with message.process(reject_on_redelivered=False):
+        body = json.loads(message.body.decode("utf-8"))
+        routing_key = message.routing_key or ""
+        handler = HANDLERS.get(routing_key)
+        if handler is None:
+            logger.warning("No handler for routing key %s", routing_key)
+            return
+
+        async with session_factory() as session, session.begin():
+            await handler(session, body)
+
+
+async def run_consumer() -> None:
+    """Connect to RabbitMQ and consume saga events."""
+    settings = get_settings()
+    connection = await aio_pika.connect_robust(settings.rabbitmq_url)
+    async with connection:
+        channel = await connection.channel()
+        await channel.set_qos(prefetch_count=10)
+        exchange = await channel.declare_exchange(
+            settings.rabbitmq_exchange,
+            ExchangeType.TOPIC,
+            durable=True,
+        )
+        queue = await channel.declare_queue(
+            "notifications.events",
+            durable=True,
+        )
+        for routing_key in HANDLERS:
+            await queue.bind(exchange, routing_key=routing_key)
+
+        async with queue.iterator() as iterator:
+            async for message in iterator:
+                try:
+                    await process_message(message)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception("Failed to process message")
+
+
+async def run() -> None:
+    """Start the consumer coroutine."""
+    try:
+        await run_consumer()
+    finally:
+        await engine.dispose()
+
+
+def main() -> None:
+    """Run this module as a command-line entry point."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+    asyncio.run(run())
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,107 @@
+name: flashmarket-notifications
+
+x-notifications-runtime: &notifications-runtime
+  image: flashmarket-notifications-api:local
+  pull_policy: never
+
+x-notifications-environment: &notifications-environment
+  NOTIFICATIONS_ENVIRONMENT: development
+  NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/notifications
+  NOTIFICATIONS_RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  NOTIFICATIONS_CORS_ORIGINS: '["http://localhost:3000"]'
+
+services:
+  migrate:
+    <<: *notifications-runtime
+    environment:
+      NOTIFICATIONS_ENVIRONMENT: development
+      NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/notifications
+    command: [".venv/bin/alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *notifications-runtime
+    build:
+      context: .
+    environment: *notifications-environment
+    ports:
+      - "127.0.0.1:${NOTIFICATIONS_PORT:-8016}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  consumer:
+    <<: *notifications-runtime
+    environment: *notifications-environment
+    command: [".venv/bin/python", "-m", "notifications.event_consumer"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  outbox:
+    <<: *notifications-runtime
+    environment: *notifications-environment
+    command: [".venv/bin/python", "-m", "notifications.outbox_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: notifications
+      POSTGRES_USER: flashmarket
+      POSTGRES_PASSWORD: flashmarket
+    ports:
+      - "127.0.0.1:${NOTIFICATIONS_DB_PORT:-5437}:5432"
+    volumes:
+      - notifications-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flashmarket -d notifications"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  notifications-postgres-data:
+
+networks:
+  default:
+    name: flashmarket
+    external: true
