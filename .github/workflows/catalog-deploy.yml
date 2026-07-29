@@ -319,7 +319,7 @@ jobs:
           umask 077
           {
             printf 'CATALOG_IMAGE=%s\n' "$CATALOG_IMAGE"
-            printf 'CATALOG_PROXY_PORT=4918\n'
+            printf 'CATALOG_PROXY_PORT=4919\n'
             printf 'CATALOG_ENVIRONMENT=production\n'
             printf 'CATALOG_DOMAIN=%s\n' "$CATALOG_DOMAIN"
             printf 'CATALOG_DATABASE_URL=postgresql+asyncpg://flashmarket_catalog:%s@db:5432/catalog\n' "$DEPLOY_POSTGRES_PASSWORD"

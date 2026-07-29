@@ -44,6 +44,17 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  consumer:
+    <<: *inventory-runtime
+    environment: *inventory-environment
+    command: [".venv/bin/python", "-m", "inventory.event_consumer"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   outbox:
     <<: *inventory-runtime
     environment: *inventory-environment
@@ -77,9 +88,8 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-    ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
+    # Internal RabbitMQ reachable only via the Docker network to avoid port
+    # conflicts with other service brokers in the root compose stack.
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 5s

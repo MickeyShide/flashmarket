@@ -1,26 +1,27 @@
 name: flashmarket-inventory
 
-services:
-  api:
-    image: ${INVENTORY_IMAGE:-flashmarket-inventory-api:local}
-    environment:
-      INVENTORY_ENVIRONMENT: ${INVENTORY_ENVIRONMENT:-production}
-      INVENTORY_DATABASE_URL: ${INVENTORY_DATABASE_URL}
-      INVENTORY_RABBITMQ_URL: ${INVENTORY_RABBITMQ_URL}
-      INVENTORY_RESERVATION_TTL_SECONDS: ${INVENTORY_RESERVATION_TTL_SECONDS:-300}
-      INVENTORY_CORS_ORIGINS: ${INVENTORY_CORS_ORIGINS:-[]}
-      INVENTORY_TRUSTED_HOSTS: ${INVENTORY_TRUSTED_HOSTS}
-      INVENTORY_DOCS_ENABLED: ${INVENTORY_DOCS_ENABLED:-false}
-      INVENTORY_DEBUG: ${INVENTORY_DEBUG:-false}
-    ports:
-      - "127.0.0.1:${INVENTORY_PROXY_PORT:-4919}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    restart: unless-stopped
+x-inventory-runtime: &inventory-runtime
+  image: ${INVENTORY_IMAGE:-flashmarket-inventory-api:local}
+  pull_policy: always
+  env_file:
+    - ${INVENTORY_ENV_FILE:-.env}
+  networks:
+    - backend
 
+x-inventory-environment: &inventory-environment
+  INVENTORY_ENVIRONMENT: ${INVENTORY_ENVIRONMENT:-production}
+  INVENTORY_DATABASE_URL: ${INVENTORY_DATABASE_URL}
+  INVENTORY_RABBITMQ_URL: ${INVENTORY_RABBITMQ_URL}
+  INVENTORY_RESERVATION_TTL_SECONDS: ${INVENTORY_RESERVATION_TTL_SECONDS:-300}
+  INVENTORY_CORS_ORIGINS: ${INVENTORY_CORS_ORIGINS:-[]}
+  INVENTORY_TRUSTED_HOSTS: ${INVENTORY_TRUSTED_HOSTS}
+  INVENTORY_DOCS_ENABLED: ${INVENTORY_DOCS_ENABLED:-false}
+  INVENTORY_DEBUG: ${INVENTORY_DEBUG:-false}
+  INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES: ${INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
+
+services:
   migrate:
-    image: ${INVENTORY_IMAGE:-flashmarket-inventory-api:local}
+    <<: *inventory-runtime
     environment:
       INVENTORY_ENVIRONMENT: development
       INVENTORY_DATABASE_URL: ${INVENTORY_DATABASE_URL}
@@ -30,6 +31,48 @@ services:
         condition: service_healthy
     restart: "no"
 
+  api:
+    <<: *inventory-runtime
+    environment: *inventory-environment
+    ports:
+      - "127.0.0.1:${INVENTORY_PROXY_PORT:-4919}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  consumer:
+    <<: *inventory-runtime
+    environment: *inventory-environment
+    command: [".venv/bin/python", "-m", "inventory.event_consumer"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  outbox:
+    <<: *inventory-runtime
+    environment: *inventory-environment
+    command: [".venv/bin/python", "-m", "inventory.outbox_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: postgres:17-alpine
     environment:
@@ -38,6 +81,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - inventory-postgres-data:/var/lib/postgresql/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -45,15 +90,55 @@ services:
       retries: 10
     restart: unless-stopped
 
-  nginx:
-    image: nginx:alpine
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-flashmarket_inventory}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     volumes:
-      - ./nginx.conf.template:/etc/nginx/conf.d/default.conf:ro
-    ports:
-      - "127.0.0.1:${INVENTORY_PROXY_PORT:-4919}:8000"
-    depends_on:
-      - api
+      - inventory-rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
     restart: unless-stopped
+
+  nginx:
+    image: nginx:1.30-alpine
+    env_file:
+      - ${INVENTORY_ENV_FILE:-.env}
+    ports:
+      - "${INVENTORY_PROXY_PORT:-4919}:80"
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          wget -q -O /dev/null
+          --header="Host: $${INVENTORY_DOMAIN}"
+          http://127.0.0.1/health/ready
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+networks:
+  frontend:
+  backend:
+    internal: true
 
 volumes:
   inventory-postgres-data:
+  inventory-rabbitmq-data:

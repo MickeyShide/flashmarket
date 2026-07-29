@@ -138,5 +138,5 @@ class OrderService:
     ) -> tuple[list[OrderModel], int]:
         """Return a paginated list of a user's orders."""
         items = await self._order_repo.list_by_user(user_id, limit=limit, offset=offset)
-        total = len(items)  # pagination requires count query in production
+        total = await self._order_repo.count_by_user(user_id)
         return list(items), total

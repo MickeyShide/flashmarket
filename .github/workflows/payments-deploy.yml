@@ -421,7 +421,7 @@ jobs:
           echo 'Checking internal Nginx endpoint...'
           curl --fail --silent --show-error \
             -H "Host: ${PAYMENTS_DOMAIN}" \
-            http://127.0.0.1:4919/health/ready
+            http://127.0.0.1:4921/health/ready
           REMOTE
 
       - name: Verify public HTTPS endpoint
@@ -445,10 +445,10 @@ jobs:
 
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
           if ssh -p "$DEPLOY_PORT" "$target" \
-            "curl --fail --silent --show-error -H 'Host: ${PAYMENTS_DOMAIN}' http://127.0.0.1:4919/health/ready"; then
+            "curl --fail --silent --show-error -H 'Host: ${PAYMENTS_DOMAIN}' http://127.0.0.1:4921/health/ready"; then
             echo
-            echo "::notice title=Payments nginx is healthy::Configure Nginx Proxy Manager for ${PAYMENTS_DOMAIN} with upstream ${DEPLOY_HOST}:4919 and enable SSL"
+            echo "::notice title=Payments nginx is healthy::Configure Nginx Proxy Manager for ${PAYMENTS_DOMAIN} with upstream ${DEPLOY_HOST}:4921 and enable SSL"
           fi
           ssh -p "$DEPLOY_PORT" "$target" \
-            "cd '$DEPLOY_PATH' && docker compose --env-file .env ps -a && ss -ltn '( sport = :4919 )' || true; docker compose --env-file .env logs --tail 100 api nginx"
+            "cd '$DEPLOY_PATH' && docker compose --env-file .env ps -a && ss -ltn '( sport = :4921 )' || true; docker compose --env-file .env logs --tail 100 api nginx"
           exit 1

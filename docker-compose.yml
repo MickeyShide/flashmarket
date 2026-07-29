@@ -94,6 +94,15 @@ services:
       file: inventory/docker-compose.yml
       service: rabbitmq
 
+  inventory-consumer:
+    extends:
+      file: inventory/docker-compose.yml
+      service: consumer
+    depends_on: !reset {}
+    environment:
+      INVENTORY_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@inventory-db:5432/inventory
+      INVENTORY_RABBITMQ_URL: amqp://guest:guest@inventory-rabbitmq:5672/
+
   inventory-outbox:
     extends:
       file: inventory/docker-compose.yml

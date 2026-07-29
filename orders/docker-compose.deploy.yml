@@ -1,26 +1,27 @@
 name: flashmarket-orders
 
-services:
-  api:
-    image: ${ORDERS_IMAGE:-flashmarket-orders-api:local}
-    environment:
-      ORDERS_ENVIRONMENT: ${ORDERS_ENVIRONMENT:-production}
-      ORDERS_DATABASE_URL: ${ORDERS_DATABASE_URL}
-      ORDERS_RABBITMQ_URL: ${ORDERS_RABBITMQ_URL}
-      ORDERS_PAYMENT_TIMEOUT_SECONDS: ${ORDERS_PAYMENT_TIMEOUT_SECONDS:-300}
-      ORDERS_CORS_ORIGINS: ${ORDERS_CORS_ORIGINS:-[]}
-      ORDERS_TRUSTED_HOSTS: ${ORDERS_TRUSTED_HOSTS}
-      ORDERS_DOCS_ENABLED: ${ORDERS_DOCS_ENABLED:-false}
-      ORDERS_DEBUG: ${ORDERS_DEBUG:-false}
-    ports:
-      - "127.0.0.1:${ORDERS_PROXY_PORT:-4920}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    restart: unless-stopped
+x-orders-runtime: &orders-runtime
+  image: ${ORDERS_IMAGE:-flashmarket-orders-api:local}
+  pull_policy: always
+  env_file:
+    - ${ORDERS_ENV_FILE:-.env}
+  networks:
+    - backend
 
+x-orders-environment: &orders-environment
+  ORDERS_ENVIRONMENT: ${ORDERS_ENVIRONMENT:-production}
+  ORDERS_DATABASE_URL: ${ORDERS_DATABASE_URL}
+  ORDERS_RABBITMQ_URL: ${ORDERS_RABBITMQ_URL}
+  ORDERS_PAYMENT_TIMEOUT_SECONDS: ${ORDERS_PAYMENT_TIMEOUT_SECONDS:-300}
+  ORDERS_CORS_ORIGINS: ${ORDERS_CORS_ORIGINS:-[]}
+  ORDERS_TRUSTED_HOSTS: ${ORDERS_TRUSTED_HOSTS}
+  ORDERS_DOCS_ENABLED: ${ORDERS_DOCS_ENABLED:-false}
+  ORDERS_DEBUG: ${ORDERS_DEBUG:-false}
+  ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES: ${ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
+
+services:
   migrate:
-    image: ${ORDERS_IMAGE:-flashmarket-orders-api:local}
+    <<: *orders-runtime
     environment:
       ORDERS_ENVIRONMENT: development
       ORDERS_DATABASE_URL: ${ORDERS_DATABASE_URL}
@@ -30,6 +31,48 @@ services:
         condition: service_healthy
     restart: "no"
 
+  api:
+    <<: *orders-runtime
+    environment: *orders-environment
+    ports:
+      - "127.0.0.1:${ORDERS_PROXY_PORT:-4920}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  consumer:
+    <<: *orders-runtime
+    environment: *orders-environment
+    command: [".venv/bin/python", "-m", "orders.event_consumer"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  outbox:
+    <<: *orders-runtime
+    environment: *orders-environment
+    command: [".venv/bin/python", "-m", "orders.outbox_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: postgres:17-alpine
     environment:
@@ -38,6 +81,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - orders-postgres-data:/var/lib/postgresql/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -45,15 +90,55 @@ services:
       retries: 10
     restart: unless-stopped
 
-  nginx:
-    image: nginx:alpine
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-flashmarket_orders}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     volumes:
-      - ./nginx.conf.template:/etc/nginx/conf.d/default.conf:ro
-    ports:
-      - "127.0.0.1:${ORDERS_PROXY_PORT:-4920}:8000"
-    depends_on:
-      - api
+      - orders-rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
     restart: unless-stopped
+
+  nginx:
+    image: nginx:1.30-alpine
+    env_file:
+      - ${ORDERS_ENV_FILE:-.env}
+    ports:
+      - "${ORDERS_PROXY_PORT:-4920}:80"
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          wget -q -O /dev/null
+          --header="Host: $${ORDERS_DOMAIN}"
+          http://127.0.0.1/health/ready
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+networks:
+  frontend:
+  backend:
+    internal: true
 
 volumes:
   orders-postgres-data:
+  orders-rabbitmq-data:

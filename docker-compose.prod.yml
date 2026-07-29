@@ -1,0 +1,43 @@
+name: flashmarket-gateway
+
+services:
+  gateway:
+    image: nginx:1.30-alpine
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    environment:
+      AUTH_PROXY_PORT: ${AUTH_PROXY_PORT:-4918}
+      CATALOG_PROXY_PORT: ${CATALOG_PROXY_PORT:-4919}
+      INVENTORY_PROXY_PORT: ${INVENTORY_PROXY_PORT:-4919}
+      ORDERS_PROXY_PORT: ${ORDERS_PROXY_PORT:-4920}
+      PAYMENTS_PROXY_PORT: ${PAYMENTS_PROXY_PORT:-4921}
+      NOTIFICATIONS_PROXY_PORT: ${NOTIFICATIONS_PROXY_PORT:-4922}
+      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN:-_}
+    command: |
+      /bin/sh -c "envsubst '\$AUTH_PROXY_PORT \$CATALOG_PROXY_PORT \$INVENTORY_PROXY_PORT \$ORDERS_PROXY_PORT \$PAYMENTS_PROXY_PORT \$NOTIFICATIONS_PROXY_PORT \$GATEWAY_DOMAIN' < /etc/nginx/conf.d/default.conf > /tmp/nginx.conf && \
+        cp /tmp/nginx.conf /etc/nginx/conf.d/default.conf && \
+        nginx -g 'daemon off;'"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - flashmarket
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-flashmarket-frontend:local}
+    pull_policy: always
+    environment:
+      - NODE_ENV=production
+    networks:
+      - flashmarket
+    restart: unless-stopped
+
+networks:
+  flashmarket:
+    external: true

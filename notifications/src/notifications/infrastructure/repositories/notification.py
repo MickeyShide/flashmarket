@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from notifications.infrastructure.database import utc_now
@@ -27,6 +27,15 @@ class NotificationRepository:
     async def get_by_id(self, notification_id: UUID) -> NotificationModel | None:
         """Fetch a notification by primary key."""
         return await self._session.get(NotificationModel, notification_id)
+
+    async def count_by_user(self, user_id: UUID) -> int:
+        """Return the total number of notifications for a user."""
+        result = await self._session.scalar(
+            select(func.count(NotificationModel.id)).where(
+                NotificationModel.user_id == user_id
+            )
+        )
+        return result or 0
 
     async def list_by_user(
         self,

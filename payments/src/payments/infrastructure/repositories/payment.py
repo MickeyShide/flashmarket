@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from payments.infrastructure.database import utc_now
@@ -36,6 +36,13 @@ class PaymentRepository:
             .order_by(PaymentModel.created_at.desc())
         )
         return result.first()
+
+    async def count_by_user(self, user_id: UUID) -> int:
+        """Return the total number of payments for a user."""
+        result = await self._session.scalar(
+            select(func.count(PaymentModel.id)).where(PaymentModel.user_id == user_id)
+        )
+        return result or 0
 
     async def list_by_user(
         self,

@@ -112,6 +112,8 @@ class NotificationService:
         offset: int,
     ) -> tuple[list[NotificationModel], int]:
         """Return a paginated list of a user's notifications."""
-        items = await self._notification_repo.list_by_user(user_id, limit=limit, offset=offset)
-        total = len(items)  # pagination requires count query in production
+        items = await self._notification_repo.list_by_user(
+            user_id, limit=limit, offset=offset
+        )
+        total = await self._notification_repo.count_by_user(user_id)
         return list(items), total

@@ -119,3 +119,4 @@ async def test_list_user_payments(client: AsyncClient) -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["items"]) == 2
+    assert data["total"] == 3

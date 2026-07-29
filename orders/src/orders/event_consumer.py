@@ -15,12 +15,26 @@ from aio_pika.abc import AbstractIncomingMessage
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from orders.config import get_settings
+from orders.domain.entities import OrderEventType, OrderStatus
 from orders.infrastructure.database import SessionFactory, engine
-from orders.infrastructure.repositories.order import OrderRepository
+from orders.infrastructure.repositories.order import OrderRepository, OutboxRepository
 
 logger = logging.getLogger(__name__)
 
 Handler = Callable[[AsyncSession, dict[str, Any]], Awaitable[None]]
+
+
+async def _emit_order_event(
+    session: AsyncSession,
+    event_type: OrderEventType,
+    payload: dict[str, Any],
+) -> None:
+    """Persist an outbox event for the order saga."""
+    outbox = OutboxRepository(session)
+    await outbox.add(
+        event_type,
+        json.dumps(payload, separators=(",", ":")),
+    )
 
 
 async def handle_payment_succeeded(
@@ -36,12 +50,31 @@ async def handle_payment_succeeded(
     if order is None:
         logger.warning("Order %s not found for payment success", order_id)
         return
-    if order.payment_id == payment_id:
-        logger.info("Order %s already confirmed with payment %s", order_id, payment_id)
+    if order.status == OrderStatus.CONFIRMED:
+        logger.info("Order %s already confirmed", order_id)
+        return
+    if order.status != OrderStatus.AWAITING_PAYMENT:
+        logger.warning(
+            "Order %s cannot be confirmed from status %s",
+            order_id,
+            order.status,
+        )
         return
 
     order.payment_id = payment_id
+    order.status = OrderStatus.CONFIRMED
     await order_repo.update(order)
+
+    await _emit_order_event(
+        session,
+        OrderEventType.ORDER_CONFIRMED,
+        {
+            "order_id": str(order.id),
+            "reservation_id": str(order.reservation_id),
+            "payment_id": str(payment_id),
+            "user_id": str(order.user_id),
+        },
+    )
     logger.info("Confirmed order %s with payment %s", order_id, payment_id)
 
 
@@ -58,12 +91,32 @@ async def handle_payment_failed(
     if order is None:
         logger.warning("Order %s not found for payment failure", order_id)
         return
-    if order.payment_id == payment_id:
-        logger.info("Order %s already failed with payment %s", order_id, payment_id)
+    if order.status == OrderStatus.CANCELLED:
+        logger.info("Order %s already cancelled", order_id)
+        return
+    if order.status != OrderStatus.AWAITING_PAYMENT:
+        logger.warning(
+            "Order %s cannot be cancelled from status %s",
+            order_id,
+            order.status,
+        )
         return
 
     order.payment_id = payment_id
+    order.status = OrderStatus.CANCELLED
     await order_repo.update(order)
+
+    await _emit_order_event(
+        session,
+        OrderEventType.ORDER_CANCELLED,
+        {
+            "order_id": str(order.id),
+            "reservation_id": str(order.reservation_id),
+            "payment_id": str(payment_id),
+            "user_id": str(order.user_id),
+            "reason": payload.get("reason", "payment_failed"),
+        },
+    )
     logger.info("Cancelled order %s after failed payment %s", order_id, payment_id)
 
 
@@ -81,8 +134,23 @@ async def handle_reservation_released(
     order = await order_repo.get_by_id(order_id)
     if order is None:
         return
+    if order.status not in (OrderStatus.AWAITING_PAYMENT, OrderStatus.PENDING):
+        return
 
-    logger.info("Cancelling order %s due to reservation release", order_id)
+    order.status = OrderStatus.CANCELLED
+    await order_repo.update(order)
+
+    await _emit_order_event(
+        session,
+        OrderEventType.ORDER_CANCELLED,
+        {
+            "order_id": str(order.id),
+            "reservation_id": str(order.reservation_id),
+            "user_id": str(order.user_id),
+            "reason": payload.get("reason", "reservation_released"),
+        },
+    )
+    logger.info("Cancelled order %s due to reservation release", order_id)
 
 
 HANDLERS: dict[str, Handler] = {

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from orders.infrastructure.database import utc_now
@@ -34,6 +34,13 @@ class OrderRepository:
             select(OrderModel).where(OrderModel.reservation_id == reservation_id)
         )
         return result.first()
+
+    async def count_by_user(self, user_id: UUID) -> int:
+        """Return the total number of orders for a user."""
+        result = await self._session.scalar(
+            select(func.count(OrderModel.id)).where(OrderModel.user_id == user_id)
+        )
+        return result or 0
 
     async def list_by_user(
         self,

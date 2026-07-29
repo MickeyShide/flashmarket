@@ -146,5 +146,5 @@ class PaymentService:
     ) -> tuple[list[PaymentModel], int]:
         """Return a paginated list of a user's payments."""
         items = await self._payment_repo.list_by_user(user_id, limit=limit, offset=offset)
-        total = len(items)  # pagination requires count query in production
+        total = await self._payment_repo.count_by_user(user_id)
         return list(items), total

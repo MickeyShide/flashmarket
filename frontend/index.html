@@ -825,6 +825,9 @@
       font-weight: 700;
     }
 
+    .status-ok { color: #00FF66; }
+    .status-err { color: #FF4444; }
+
     .code-block {
       background: #0D0D0D;
       color: #00FF66;
@@ -1183,27 +1186,9 @@
 
         <div style="margin-top: 18px;">
           <h4 style="font-size: 12px;">1. GET /api/v1/categories (Иерархическое дерево)</h4>
-          <div class="code-block">
-[
-  {
-    "id": "01926c1a-7b3f-7a12-8812-99a012345678",
-    "name": "MARCELO MIRACLES",
-    "slug": "marcelo-miracles",
-    "children": [
-      { "name": "Худи и Свитеры", "slug": "marcelo-hoodies" },
-      { "name": "Обувь", "slug": "marcelo-footwear" }
-    ]
-  },
-  {
-    "id": "01926c1a-7b3f-7a12-8812-99a087654321",
-    "name": "ROUTINE",
-    "slug": "routine",
-    "children": [
-      { "name": "Сумки", "slug": "routine-bags" }
-    ]
-  }
-]
-          </div>
+          <button onclick="loadCategories()" style="background: #000; color: #fff; padding: 8px 14px; font-size: 10.5px; font-weight: 700; border-radius: 4px; margin-top: 8px;">ЗАГРУЗИТЬ КАТЕГОРИИ</button>
+          <pre class="code-block" id="categories-output">Нажмите «Загрузить категории» для запроса к API.</pre>
+          <div id="categories-status" style="font-size: 11px; margin-top: 6px;"></div>
         </div>
 
         <div style="margin-top: 18px;">
@@ -1393,6 +1378,30 @@ Result: marcelo-miracles-zip-hoodie
 
     let activeCategory = 'ALL';
     let activeStatus = 'ALL';
+
+    async function apiGet(path) {
+      const res = await fetch(path, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      return res.json();
+    }
+
+    async function loadCategories() {
+      const out = document.getElementById('categories-output');
+      const status = document.getElementById('categories-status');
+      out.innerText = 'Загрузка...';
+      status.innerText = '';
+      status.className = '';
+      try {
+        const data = await apiGet('/api/v1/categories');
+        out.innerText = JSON.stringify(data, null, 2);
+        status.innerText = 'OK';
+        status.className = 'status-ok';
+      } catch (err) {
+        out.innerText = 'Ошибка загрузки категорий.';
+        status.innerText = err.message;
+        status.className = 'status-err';
+      }
+    }
 
     function filterCategory(cat, element) {
       activeCategory = cat;
