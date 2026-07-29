@@ -7,7 +7,7 @@ x-inventory-runtime: &inventory-runtime
 x-inventory-environment: &inventory-environment
   INVENTORY_ENVIRONMENT: development
   INVENTORY_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/inventory
-  INVENTORY_RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  INVENTORY_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
   INVENTORY_CORS_ORIGINS: '["http://localhost:3000"]'
 
 services:
@@ -28,7 +28,7 @@ services:
       context: .
     environment: *inventory-environment
     ports:
-      - "127.0.0.1:${INVENTORY_PORT:-8011}:8000"
+      - "127.0.0.1:${INVENTORY_PORT:-4919}:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully

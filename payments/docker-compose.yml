@@ -7,7 +7,7 @@ x-payments-runtime: &payments-runtime
 x-payments-environment: &payments-environment
   PAYMENTS_ENVIRONMENT: development
   PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/payments
-  PAYMENTS_RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  PAYMENTS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
   PAYMENTS_CORS_ORIGINS: '["http://localhost:3000"]'
 
 services:
@@ -28,7 +28,7 @@ services:
       context: .
     environment: *payments-environment
     ports:
-      - "127.0.0.1:${PAYMENTS_PORT:-8014}:8000"
+      - "127.0.0.1:${PAYMENTS_PORT:-4921}:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully

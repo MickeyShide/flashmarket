@@ -1,18 +1,23 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FLASHMARKET — Brand Drops Catalog Demo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-  
+  <link
+    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap"
+    rel="stylesheet">
+
   <style>
     /* ==========================================
        DESIGN SYSTEM & RESET
        ========================================== */
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
@@ -30,7 +35,8 @@
       --font-mono: 'Space Grotesk', monospace;
     }
 
-    html, body {
+    html,
+    body {
       width: 100%;
       overflow-x: hidden;
     }
@@ -238,7 +244,8 @@
         letter-spacing: 1px;
       }
 
-      .header-left, .header-right {
+      .header-left,
+      .header-right {
         gap: 8px;
       }
 
@@ -825,8 +832,13 @@
       font-weight: 700;
     }
 
-    .status-ok { color: #00FF66; }
-    .status-err { color: #FF4444; }
+    .status-ok {
+      color: #00FF66;
+    }
+
+    .status-err {
+      color: #FF4444;
+    }
 
     .code-block {
       background: #0D0D0D;
@@ -926,6 +938,118 @@
       border-top: 1px solid var(--border-color);
     }
 
+    .profile-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 20px;
+      background: #F9F9F9;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      margin-bottom: 18px;
+    }
+
+    .profile-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #000000;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 900;
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+    }
+
+    .profile-user-details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .profile-user-name {
+      font-size: 17px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .profile-user-role {
+      display: inline-flex;
+      align-items: center;
+      background: #000000;
+      color: var(--accent-lime);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      padding: 3px 8px;
+      border-radius: 3px;
+      width: fit-content;
+      text-transform: uppercase;
+    }
+
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .profile-field-card {
+      padding: 14px 16px;
+      background: #FFFFFF;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .profile-field-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .profile-field-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-main);
+      word-break: break-all;
+    }
+
+    .profile-id-code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #555555;
+      background: #F4F4F4;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 2px;
+    }
+
+    .badge-status-active {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #008800;
+      font-weight: 800;
+    }
+
+    .badge-status-active::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      background-color: #00CC44;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
     .profile-section h3 {
       font-size: 13px;
       font-weight: 900;
@@ -987,7 +1111,7 @@
       font-size: 11.5px;
       font-weight: 800;
       letter-spacing: 0.5px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
       transform: translateY(100px);
       opacity: 0;
       transition: all 0.25s ease;
@@ -1022,6 +1146,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <!-- Top Announcement Bar -->
@@ -1032,15 +1157,22 @@
   <!-- Header -->
   <header>
     <div class="header-inner">
-      
+
       <!-- Left Controls (Mobile Menu Toggle + Search Icon) -->
       <div class="header-left">
         <button class="menu-toggle-btn" onclick="toggleMobileNav()" title="Меню">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
         </button>
 
         <button class="icon-btn" title="Поиск">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
         </button>
       </div>
 
@@ -1055,15 +1187,26 @@
       <!-- Right Action Icons -->
       <div class="header-right">
         <button class="icon-btn" title="REST API Docs" onclick="showView('admin')">
-          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          <svg viewBox="0 0 24 24">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
         </button>
 
         <button class="icon-btn user-icon" id="auth-button" title="Войти" onclick="showView('auth')">
-          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
         </button>
 
         <button class="icon-btn" title="Корзина" onclick="showView('cart')">
-          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
           <span class="cart-badge" id="cart-count">2</span>
         </button>
       </div>
@@ -1072,13 +1215,18 @@
     <!-- Category Nav Bar (Collapsible on Mobile) -->
     <nav class="nav-bar" id="mobile-nav">
       <div class="nav-inner">
-        <a href="#" class="nav-link active" onclick="filterCategory('ALL', this); closeMobileNav(); return false;">ВСЕ ДРОПЫ</a>
-        <a href="#" class="nav-link" onclick="filterCategory('CLOTHES', this); closeMobileNav(); return false;">ВЕРХНЯЯ ОДЕЖДА</a>
-        <a href="#" class="nav-link" onclick="filterCategory('HOODIES', this); closeMobileNav(); return false;">ХУДИ И СВИТЕРЫ</a>
+        <a href="#" class="nav-link active" onclick="filterCategory('ALL', this); closeMobileNav(); return false;">ВСЕ
+          ДРОПЫ</a>
+        <a href="#" class="nav-link" onclick="filterCategory('CLOTHES', this); closeMobileNav(); return false;">ВЕРХНЯЯ
+          ОДЕЖДА</a>
+        <a href="#" class="nav-link" onclick="filterCategory('HOODIES', this); closeMobileNav(); return false;">ХУДИ И
+          СВИТЕРЫ</a>
         <a href="#" class="nav-link" onclick="filterCategory('BAGS', this); closeMobileNav(); return false;">СУМКИ</a>
-        <a href="#" class="nav-link" onclick="filterCategory('ACCESSORIES', this); closeMobileNav(); return false;">АКСЕССУАРЫ</a>
+        <a href="#" class="nav-link"
+          onclick="filterCategory('ACCESSORIES', this); closeMobileNav(); return false;">АКСЕССУАРЫ</a>
         <a href="#" class="nav-link" onclick="showView('admin'); closeMobileNav(); return false;">REST API</a>
-        <a href="#" class="nav-link" id="nav-auth-link" onclick="showView('auth'); closeMobileNav(); return false;">ВОЙТИ</a>
+        <a href="#" class="nav-link" id="nav-auth-link"
+          onclick="showView('auth'); closeMobileNav(); return false;">ВОЙТИ</a>
       </div>
     </nav>
   </header>
@@ -1095,7 +1243,8 @@
           <div>
             <div class="drop-tag" id="drop-active-tag">DROP 01 // LIMITED RELEASE</div>
             <div class="drop-brand-name" id="drop-active-name">MARCELO MIRACLES</div>
-            <div class="drop-description" id="drop-active-desc">Капсульная коллекция "REVERSIBLE CAPSULE '26". Ограниченный тираж.</div>
+            <div class="drop-description" id="drop-active-desc">Капсульная коллекция "REVERSIBLE CAPSULE '26".
+              Ограниченный тираж.</div>
           </div>
 
           <div class="drop-selector-bar">
@@ -1112,7 +1261,9 @@
         <div style="display: flex; align-items: center; gap: 8px; overflow-x: auto; width: 100%;">
           <button class="filter-btn">
             <span>ФИЛЬТРЫ</span>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
           </button>
 
           <div class="tag-chips">
@@ -1124,7 +1275,11 @@
         </div>
 
         <div class="search-box">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" style="margin-right: 8px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"
+            style="margin-right: 8px;">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
           <input type="text" placeholder="Поиск по названию..." id="search-input" onkeyup="handleSearch(this.value)">
         </div>
       </div>
@@ -1132,105 +1287,7 @@
       <!-- Product Grid -->
       <div class="container">
         <div class="product-grid" id="grid">
-
-          <!-- Card 1: MARCELO MIRACLES -->
-          <div class="product-card" data-brand="MARCELO MIRACLES" data-category="HOODIES" data-status="PREORDER" onclick="openProduct(1)">
-            <div class="card-black-box">
-              <div class="card-badge">
-                <span class="badge-grey">ПРЕДЗАКАЗ</span>
-              </div>
-              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10a2 2 0 002 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
-              <span class="black-box-brand-tag">MARCELO MIRACLES</span>
-            </div>
-            <div class="product-brand-title">MARCELO MIRACLES</div>
-            <div class="product-title">REVERSIBLE FUR ZIP HOODIE IN GREY</div>
-            <div class="product-price">12 900 руб.</div>
-          </div>
-
-          <!-- Card 2: MARCELO MIRACLES -->
-          <div class="product-card" data-brand="MARCELO MIRACLES" data-category="HOODIES" data-status="PREORDER" onclick="openProduct(2)">
-            <div class="card-black-box">
-              <div class="card-badge">
-                <span class="badge-grey">ПРЕДЗАКАЗ</span>
-              </div>
-              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10a2 2 0 002 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
-              <span class="black-box-brand-tag">MARCELO MIRACLES</span>
-            </div>
-            <div class="product-brand-title">MARCELO MIRACLES</div>
-            <div class="product-title">REVERSIBLE FUR ZIP HOODIE IN BLACK</div>
-            <div class="product-price">12 900 руб.</div>
-          </div>
-
-          <!-- Card 3: MARCELO MIRACLES -->
-          <div class="product-card" data-brand="MARCELO MIRACLES" data-category="CLOTHES" data-status="PREORDER" onclick="openProduct(3)">
-            <div class="card-black-box">
-              <div class="card-badge">
-                <span class="badge-grey">ПРЕДЗАКАЗ</span>
-              </div>
-              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M10 2v5a2 2 0 0 0 4 0V2"></path><path d="M14 14l5-2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7l5 2"></path></svg>
-              <span class="black-box-brand-tag">MARCELO MIRACLES</span>
-            </div>
-            <div class="product-brand-title">MARCELO MIRACLES</div>
-            <div class="product-title">BOOTLEG BOOTS IN BLACK</div>
-            <div class="product-price">11 900 руб.</div>
-          </div>
-
-          <!-- Card 4: ROUTINE -->
-          <div class="product-card" data-brand="ROUTINE" data-category="BAGS" data-status="SPECIAL" onclick="openProduct(4)">
-            <div class="card-black-box">
-              <div class="card-badge">
-                <span class="badge-red">СПЕЦИАЛЬНЫЙ</span>
-              </div>
-              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-              <span class="black-box-brand-tag">ROUTINE</span>
-            </div>
-            <div class="product-brand-title">ROUTINE</div>
-            <div class="product-title">SAKURA.BAG V2.0</div>
-            <div class="product-price">7 790 p.</div>
-          </div>
-
-          <!-- Card 5: ROUTINE -->
-          <div class="product-card" data-brand="ROUTINE" data-category="BAGS" data-status="NEW" onclick="openProduct(5)">
-            <div class="card-black-box">
-              <div class="card-badge">
-                <span class="badge-red">НОВЫЙ</span>
-              </div>
-              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-              <span class="black-box-brand-tag">ROUTINE</span>
-            </div>
-            <div class="product-brand-title">ROUTINE</div>
-            <div class="product-title">DRAW.BAG V2.0</div>
-            <div class="product-price">7 790 p.</div>
-          </div>
-
-          <!-- Card 6: FLASH SECT -->
-          <div class="product-card" data-brand="FLASH SECT" data-category="CLOTHES" data-status="SPECIAL" onclick="openProduct(6)">
-            <div class="card-black-box">
-              <div class="card-badge">
-                <span class="badge-lime">⚡ ДОБРОСВЯЗЬ -10%</span>
-              </div>
-              <svg class="black-box-icon" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
-              <span class="black-box-brand-tag">FLASH SECT</span>
-            </div>
-            <div class="product-brand-title">FLASH SECT</div>
-            <div class="product-title">DISTRESSED STUDDED JEANS</div>
-            <div class="product-price">4 950 ₽ <span class="old-price">5 500 ₽</span></div>
-          </div>
-
-          <!-- Card 7: FLASH SECT -->
-          <div class="product-card" data-brand="FLASH SECT" data-category="ACCESSORIES" data-status="SPECIAL" onclick="openProduct(7)">
-            <div class="card-black-box">
-              <div class="card-badge">
-                <span class="badge-lime">⚡ ДОБРОСВЯЗЬ -20%</span>
-              </div>
-              <svg class="black-box-icon" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-              <span class="black-box-brand-tag">FLASH SECT</span>
-            </div>
-            <div class="product-brand-title">FLASH SECT</div>
-            <div class="product-title">LUSTER ZIP PHONE CASE</div>
-            <div class="product-price">3 000 ₽</div>
-          </div>
-
+          <div id="catalog-loading" style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #888;">Загрузка каталога...</div>
         </div>
       </div>
     </div>
@@ -1238,29 +1295,34 @@
     <!-- VIEW 2: PRODUCT DETAIL -->
     <div id="view-product" class="page-view">
       <div style="max-width: 1040px; margin: 16px auto 0; padding: 0 16px;">
-        <button onclick="showView('catalog')" style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;">
+        <button onclick="showView('catalog')"
+          style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;">
           ← НАЗАД В КАТАЛОГ
         </button>
       </div>
 
       <div class="detail-container">
-        <div class="detail-black-box">
-          <svg id="detail-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.2"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10a2 2 0 002 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
-          <div id="detail-box-label" style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; color: #666; margin-top: 12px; text-transform: uppercase;">MARCELO MIRACLES</div>
+        <div class="detail-black-box" id="detail-image-box">
+          <svg id="detail-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF"
+            stroke-width="1.2">
+            <path
+              d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10a2 2 0 002 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z">
+            </path>
+          </svg>
+          <div id="detail-box-label"
+            style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; color: #666; margin-top: 12px; text-transform: uppercase;">
+            FLASH MARKET</div>
         </div>
 
         <div class="detail-info">
-          <div class="detail-category" id="detail-cat">MARCELO MIRACLES / ХУДИ</div>
-          <h1 class="detail-title" id="detail-name">REVERSIBLE FUR ZIP HOODIE IN GREY</h1>
-          <div class="detail-price" id="detail-price">12 900 руб.</div>
+          <div class="detail-category" id="detail-cat">КАТЕГОРИЯ</div>
+          <h1 class="detail-title" id="detail-name">НАЗВАНИЕ ТОВАРА</h1>
+          <div class="detail-price" id="detail-price">0 ₽</div>
 
           <div class="size-selector">
             <span class="size-label">ВЫБЕРИТЕ РАЗМЕР</span>
-            <div class="size-buttons">
-              <button class="size-btn active">S</button>
-              <button class="size-btn">M</button>
-              <button class="size-btn">L</button>
-              <button class="size-btn">XL</button>
+            <div class="size-buttons" id="detail-sizes">
+              <button class="size-btn active">OS</button>
             </div>
           </div>
 
@@ -1268,9 +1330,10 @@
 
           <div class="detail-description">
             <p><strong>ОПИСАНИЕ:</strong></p>
-            <p id="detail-desc">Эксклюзивный дроп MARCELO MIRACLES. Двустороннее зип-худи с премиальным искусственным мехом. Качественные металлические молнии и авторский крой.</p>
+            <p id="detail-desc">Описание товара.</p>
             <br>
-            <p style="font-size: 11px; color: #888;">SLUG: <span id="detail-slug" style="font-family: var(--font-mono); color: #000;">reversible-fur-zip-hoodie-grey</span></p>
+            <p style="font-size: 11px; color: #888;">SLUG: <span id="detail-slug"
+                style="font-family: var(--font-mono); color: #000;">-</span></p>
           </div>
         </div>
       </div>
@@ -1280,39 +1343,14 @@
     <div id="view-cart" class="page-view">
       <div class="cart-container">
         <div class="cart-header">ВАША КОРЗИНА</div>
-        
-        <div class="cart-item">
-          <div class="cart-item-info">
-            <div class="cart-black-box">
-              <svg viewBox="0 0 24 24"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10a2 2 0 002 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
-            </div>
-            <div>
-              <div style="font-weight: 800; font-size: 12.5px;">REVERSIBLE FUR ZIP HOODIE IN GREY</div>
-              <div style="font-size: 10.5px; color: #777;">Бренд: MARCELO MIRACLES | Размер: M</div>
-            </div>
-          </div>
-          <div style="font-weight: 800; font-size: 12.5px;">12 900 ₽</div>
+        <div id="cart-items">
+          <div style="padding: 24px 0; color: #888; text-align: center;">Корзина пуста</div>
         </div>
-
-        <div class="cart-item">
-          <div class="cart-item-info">
-            <div class="cart-black-box">
-              <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path></svg>
-            </div>
-            <div>
-              <div style="font-weight: 800; font-size: 12.5px;">SAKURA.BAG V2.0</div>
-              <div style="font-size: 10.5px; color: #777;">Бренд: ROUTINE | Размер: OS</div>
-            </div>
-          </div>
-          <div style="font-weight: 800; font-size: 12.5px;">7 790 ₽</div>
-        </div>
-
         <div class="cart-total">
           <span>ИТОГО:</span>
-          <span>20 690 ₽</span>
+          <span id="cart-total-price">0 ₽</span>
         </div>
-
-        <button class="add-to-cart-btn" style="margin-top: 24px;" onclick="triggerToast('Заказ оформлен! Демо-режим.')">ОФОРМИТЬ ЗАКАЗ</button>
+        <button class="add-to-cart-btn" style="margin-top: 24px;" onclick="checkout()">ОФОРМИТЬ ЗАКАЗ</button>
       </div>
     </div>
 
@@ -1321,11 +1359,14 @@
       <div class="admin-container">
         <span class="api-badge">CATALOG SERVICE REST API DEMO</span>
         <h2 style="font-size: 15px; font-weight: 900;">Эндпоинты Catalog Microservice</h2>
-        <p style="font-size: 11px; color: #666; margin-top: 4px;">Инспекция ответа FastAPI / SQLAlchemy 2 Async (Бренды + Дропы)</p>
+        <p style="font-size: 11px; color: #666; margin-top: 4px;">Инспекция ответа FastAPI / SQLAlchemy 2 Async (Бренды
+          + Дропы)</p>
 
         <div style="margin-top: 18px;">
           <h4 style="font-size: 12px;">1. GET /api/v1/categories (Иерархическое дерево)</h4>
-          <button onclick="loadCategories()" style="background: #000; color: #fff; padding: 8px 14px; font-size: 10.5px; font-weight: 700; border-radius: 4px; margin-top: 8px;">ЗАГРУЗИТЬ КАТЕГОРИИ</button>
+          <button onclick="loadCategories()"
+            style="background: #000; color: #fff; padding: 8px 14px; font-size: 10.5px; font-weight: 700; border-radius: 4px; margin-top: 8px;">ЗАГРУЗИТЬ
+            КАТЕГОРИИ</button>
           <pre class="code-block" id="categories-output">Нажмите «Загрузить категории» для запроса к API.</pre>
           <div id="categories-status" style="font-size: 11px; margin-top: 6px;"></div>
         </div>
@@ -1333,11 +1374,14 @@
         <div style="margin-top: 18px;">
           <h4 style="font-size: 12px;">2. Auto-Slug Generation Test</h4>
           <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
-            <input id="slug-input" type="text" value="Marcelo Miracles Zip Hoodie" style="padding: 8px 12px; border: 1px solid #ccc; font-family: inherit; font-size: 11.5px; border-radius: 4px; width: 220px;">
-            <button onclick="testSlugGen()" style="background: #000; color: #fff; padding: 8px 14px; font-size: 10.5px; font-weight: 700; border-radius: 4px;">СГЕНЕРИРОВАТЬ SLUG</button>
+            <input id="slug-input" type="text" value="Marcelo Miracles Zip Hoodie"
+              style="padding: 8px 12px; border: 1px solid #ccc; font-family: inherit; font-size: 11.5px; border-radius: 4px; width: 220px;">
+            <button onclick="testSlugGen()"
+              style="background: #000; color: #fff; padding: 8px 14px; font-size: 10.5px; font-weight: 700; border-radius: 4px;">СГЕНЕРИРОВАТЬ
+              SLUG</button>
           </div>
           <div class="code-block" id="slug-output">
-Result: marcelo-miracles-zip-hoodie
+            Result: marcelo-miracles-zip-hoodie
           </div>
         </div>
       </div>
@@ -1346,8 +1390,6 @@ Result: marcelo-miracles-zip-hoodie
     <!-- VIEW 5: AUTH -->
     <div id="view-auth" class="page-view">
       <div class="auth-container">
-        <span class="api-badge">AUTH MICROSERVICE</span>
-
         <!-- Anonymous -->
         <div id="auth-anonymous">
           <div class="auth-tabs">
@@ -1388,12 +1430,10 @@ Result: marcelo-miracles-zip-hoodie
 
         <!-- Authenticated -->
         <div id="auth-authenticated" style="display:none;">
-          <h2 style="font-size: 15px; font-weight: 900; margin-bottom: 4px;">Профиль</h2>
-          <p style="font-size: 11px; color: #666;">Данные пользователя из Auth Service</p>
+          <h2 style="font-size: 18px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 18px;">Профиль</h2>
 
-          <div class="profile-section">
-            <h3>Основное</h3>
-            <div id="profile-info" class="code-block"></div>
+          <div class="profile-section" style="margin-top: 0; padding-top: 0; border-top: none;">
+            <div id="profile-info"></div>
           </div>
 
           <div class="profile-section">
@@ -1402,7 +1442,8 @@ Result: marcelo-miracles-zip-hoodie
           </div>
 
           <div class="profile-section">
-            <button onclick="logout()" style="background: #000; color: #fff; padding: 12px 18px; font-size: 11px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; border-radius: 4px; cursor: pointer;">Выйти</button>
+            <button onclick="logout()"
+              style="background: #000; color: #fff; padding: 12px 18px; font-size: 11px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; border-radius: 4px; cursor: pointer;">Выйти</button>
           </div>
         </div>
       </div>
@@ -1412,7 +1453,9 @@ Result: marcelo-miracles-zip-hoodie
 
   <!-- Toast Notification -->
   <div class="toast" id="toast">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BFF532" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BFF532" stroke-width="3">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
     <span id="toast-msg">Товар добавлен в корзину!</span>
   </div>
 
@@ -1425,96 +1468,20 @@ Result: marcelo-miracles-zip-hoodie
   <script>
     const brandDropInfo = {
       'ALL': {
-        tag: 'ALL DROPS // LIVE RELEASES',
-        name: 'ALL BRAND DROPS',
+        tag: 'ВСЕ ДРОПЫ',
+        name: 'FLASH MARKET',
         desc: 'Каталог эксклюзивных релизов брендов FlashMarket.'
-      },
-      'MARCELO MIRACLES': {
-        tag: 'DROP 01 // EXCLUSIVE',
-        name: 'MARCELO MIRACLES',
-        desc: 'Коллекция "REVERSIBLE CAPSULE \'26". Двусторонние меховые зип-худи и обувь.'
-      },
-      'ROUTINE': {
-        tag: 'DROP 02 // SAKURA CAPSULE',
-        name: 'ROUTINE',
-        desc: 'Лимитированные сумки кросс-боди с графическими принтами и влагозащитой.'
-      },
-      'FLASH SECT': {
-        tag: 'DROP 03 // LIMITED SECT',
-        name: 'FLASH SECT',
-        desc: 'Джинсы с металлической фурнитурой и аксесуары премиум класса.'
       }
     };
 
-    const productsData = {
-      1: {
-        brand: "MARCELO MIRACLES",
-        name: "REVERSIBLE FUR ZIP HOODIE IN GREY",
-        price: "12 900 руб.",
-        cat: "ХУДИ И СВИТЕРЫ",
-        slug: "reversible-fur-zip-hoodie-grey",
-        label: "MARCELO MIRACLES",
-        desc: "Эксклюзивный дроп MARCELO MIRACLES. Двустороннее зип-худи с искусственным мехом. Оверсайз крой."
-      },
-      2: {
-        brand: "MARCELO MIRACLES",
-        name: "REVERSIBLE FUR ZIP HOODIE IN BLACK",
-        price: "12 900 руб.",
-        cat: "ХУДИ И СВИТЕРЫ",
-        slug: "reversible-fur-zip-hoodie-black",
-        label: "MARCELO MIRACLES",
-        desc: "Двустороннее зип-худи с подкладкой под леопард. Металлический замок с логотипом креста."
-      },
-      3: {
-        brand: "MARCELO MIRACLES",
-        name: "BOOTLEG BOOTS IN BLACK",
-        price: "11 900 руб.",
-        cat: "ВЕРХНЯЯ ОДЕЖДА",
-        slug: "bootleg-boots-black",
-        label: "MARCELO MIRACLES",
-        desc: "Массивные ботинки из натуральной черной кожи с ремешком и металической пряжкой."
-      },
-      4: {
-        brand: "ROUTINE",
-        name: "SAKURA.BAG V2.0",
-        price: "7 790 ₽",
-        cat: "СУМКИ",
-        slug: "sakura-bag-v2",
-        label: "ROUTINE",
-        desc: "Сумка кросс-боди с графическим принтом Sakura V2. Лимитированная серия FlashMarket."
-      },
-      5: {
-        brand: "ROUTINE",
-        name: "DRAW.BAG V2.0",
-        price: "7 790 ₽",
-        cat: "СУМКИ",
-        slug: "draw-bag-v2",
-        label: "ROUTINE",
-        desc: "Компактная городская сумка с авторской иллюстрацией. Плотный хлопок с водоотталкивающим покрытием."
-      },
-      6: {
-        brand: "FLASH SECT",
-        name: "DISTRESSED STUDDED JEANS",
-        price: "4 950 ₽",
-        cat: "ОДЕЖДА",
-        slug: "distressed-studded-jeans",
-        label: "FLASH SECT",
-        desc: "Широкие джинсы с потертостями и металлическими заклепками. Винтажная варка."
-      },
-      7: {
-        brand: "FLASH SECT",
-        name: "LUSTER ZIP PHONE CASE",
-        price: "3 000 ₽",
-        cat: "АКСЕССУАРЫ",
-        slug: "luster-zip-phone-case",
-        label: "FLASH SECT",
-        desc: "Чехол для смартфона с застежкой-молнией из премиального материала."
-      }
-    };
-
+    const productsData = {};
+    let productsList = [];
     let selectedBrand = 'ALL';
-    let cartCount = 2;
-    let currentProductId = 1;
+    let currentProductId = null;
+    let currentProduct = null;
+
+    const CART_KEY = 'fm_cart';
+    let cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
 
     let authState = {
       accessToken: localStorage.getItem('fm_access_token') || null,
@@ -1621,7 +1588,49 @@ Result: marcelo-miracles-zip-hoodie
     }
 
     function renderProfile(user, sessions) {
-      document.getElementById('profile-info').innerText = JSON.stringify(user, null, 2);
+      const initial = (user.full_name || user.email || 'U').charAt(0).toUpperCase();
+      const roleLabel = user.role === 'CUSTOMER' ? 'ПОКУПАТЕЛЬ' : (user.role === 'ADMIN' ? 'АДМИНИСТРАТОР' : user.role);
+      const createdAtFormatted = user.created_at ? new Date(user.created_at).toLocaleString('ru-RU') : '—';
+
+      const profileInfoEl = document.getElementById('profile-info');
+      profileInfoEl.innerHTML = `
+        <div class="profile-card">
+          <div class="profile-avatar">${initial}</div>
+          <div class="profile-user-details">
+            <div class="profile-user-name">${user.full_name || 'Пользователь'}</div>
+            <div class="profile-user-role">${roleLabel}</div>
+          </div>
+        </div>
+
+        <div class="profile-grid">
+          <div class="profile-field-card">
+            <div class="profile-field-label">Email</div>
+            <div class="profile-field-value">${user.email}</div>
+          </div>
+
+          <div class="profile-field-card">
+            <div class="profile-field-label">Имя</div>
+            <div class="profile-field-value">${user.full_name || 'Не указано'}</div>
+          </div>
+
+          <div class="profile-field-card">
+            <div class="profile-field-label">Статус аккаунта</div>
+            <div class="profile-field-value">
+              ${user.is_active ? '<span class="badge-status-active">Активен</span>' : '<span style="color:#E53935;font-weight:800;">Заблокирован</span>'}
+            </div>
+          </div>
+
+          <div class="profile-field-card">
+            <div class="profile-field-label">Дата регистрации</div>
+            <div class="profile-field-value">${createdAtFormatted}</div>
+          </div>
+
+          <div class="profile-field-card" style="grid-column: 1 / -1;">
+            <div class="profile-field-label">ID пользователя</div>
+            <div class="profile-field-value"><code class="profile-id-code">${user.id}</code></div>
+          </div>
+        </div>
+      `;
       const list = document.getElementById('sessions-list');
       list.innerHTML = sessions.map(s => `
         <div class="session-item">
@@ -1647,7 +1656,7 @@ Result: marcelo-miracles-zip-hoodie
     async function logout() {
       try {
         await apiJson('/auth/logout', { method: 'POST' });
-      } catch (e) {}
+      } catch (e) { }
       authState.accessToken = null;
       authState.user = null;
       localStorage.removeItem('fm_access_token');
@@ -1678,8 +1687,10 @@ Result: marcelo-miracles-zip-hoodie
       }
     }
 
-    (async function initAuth() {
+    (async function init() {
       updateAuthUI();
+      updateCartUI();
+      await loadCatalog();
       if (authState.accessToken) {
         await loadProfile();
       }
@@ -1717,6 +1728,13 @@ Result: marcelo-miracles-zip-hoodie
         target.classList.add('active-view');
         window.scrollTo(0, 0);
       }
+      if (viewName === 'cart') renderCart();
+    }
+
+    function formatPrice(value, currency) {
+      const num = Number(value);
+      const symbol = currency === 'RUB' ? '₽' : currency;
+      return `${num.toLocaleString('ru-RU')} ${symbol}`;
     }
 
     function openProduct(id) {
@@ -1724,20 +1742,142 @@ Result: marcelo-miracles-zip-hoodie
       if (!item) return;
 
       currentProductId = id;
+      currentProduct = item;
       document.getElementById('detail-name').innerText = item.name;
-      document.getElementById('detail-price').innerText = item.price;
-      document.getElementById('detail-cat').innerText = `${item.brand} / ${item.cat}`;
+      document.getElementById('detail-price').innerText = formatPrice(item.price, item.currency);
+      document.getElementById('detail-cat').innerText = `${item.category_name || 'FLASH MARKET'} / ${item.status}`;
       document.getElementById('detail-slug').innerText = item.slug;
-      document.getElementById('detail-desc').innerText = item.desc;
-      document.getElementById('detail-box-label').innerText = item.label;
+      document.getElementById('detail-desc').innerText = item.description || 'Описание появится позже.';
+      document.getElementById('detail-box-label').innerText = item.category_name || 'FLASH MARKET';
+
+      const imageBox = document.getElementById('detail-image-box');
+      if (item.cover_image) {
+        imageBox.style.background = `url(${item.cover_image}) center/cover no-repeat #000`;
+      } else {
+        imageBox.style.background = '#000';
+      }
 
       showView('product');
     }
 
-    function addToCartCurrent() {
-      cartCount++;
-      document.getElementById('cart-count').innerText = cartCount;
+    function getSelectedSize() {
+      const active = document.querySelector('#detail-sizes .size-btn.active');
+      return active ? active.innerText : 'OS';
+    }
+
+    function setSelectedSize(size) {
+      document.querySelectorAll('#detail-sizes .size-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText === size);
+      });
+    }
+
+    function saveCart() {
+      localStorage.setItem(CART_KEY, JSON.stringify(cart));
+      updateCartUI();
+    }
+
+    function addToCart(product, size, qty = 1) {
+      const existing = cart.find(i => i.id === product.id && i.size === size);
+      if (existing) {
+        existing.qty += qty;
+      } else {
+        cart.push({
+          id: product.id,
+          slug: product.slug,
+          name: product.name,
+          price: Number(product.price),
+          currency: product.currency,
+          size,
+          qty
+        });
+      }
+      saveCart();
       triggerToast('Товар успешно добавлен в корзину!');
+    }
+
+    function addToCartCurrent() {
+      if (!currentProduct) return;
+      addToCart(currentProduct, getSelectedSize(), 1);
+    }
+
+    function removeCartItem(index) {
+      cart.splice(index, 1);
+      saveCart();
+      renderCart();
+    }
+
+    function changeQty(index, delta) {
+      cart[index].qty += delta;
+      if (cart[index].qty <= 0) {
+        cart.splice(index, 1);
+      }
+      saveCart();
+      renderCart();
+    }
+
+    function cartTotal() {
+      return cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+    }
+
+    function getCartCount() {
+      return cart.reduce((sum, item) => sum + item.qty, 0);
+    }
+
+    function updateCartUI() {
+      const badge = document.getElementById('cart-count');
+      if (badge) badge.innerText = getCartCount();
+    }
+
+    function renderCart() {
+      const container = document.getElementById('cart-items');
+      const totalEl = document.getElementById('cart-total-price');
+      if (!container) return;
+
+      if (cart.length === 0) {
+        container.innerHTML = '<div style="padding: 24px 0; color: #888; text-align: center;">Корзина пуста</div>';
+        if (totalEl) totalEl.innerText = formatPrice(0, 'RUB');
+        return;
+      }
+
+      container.innerHTML = cart.map((item, idx) => `
+        <div class="cart-item">
+          <div class="cart-item-info">
+            <div class="cart-black-box">
+              <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path></svg>
+            </div>
+            <div>
+              <div style="font-weight: 800; font-size: 12.5px;">${escapeHtml(item.name)}</div>
+              <div style="font-size: 10.5px; color: #777;">
+                Размер: ${escapeHtml(item.size)} | Кол-во:
+                <button onclick="changeQty(${idx}, -1)" style="padding:0 4px;background:#eee;border:none;border-radius:2px;cursor:pointer;">−</button>
+                <span style="margin:0 4px;font-weight:700;">${item.qty}</span>
+                <button onclick="changeQty(${idx}, 1)" style="padding:0 4px;background:#eee;border:none;border-radius:2px;cursor:pointer;">+</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="font-weight: 800; font-size: 12.5px;">${formatPrice(item.price * item.qty, item.currency)}</div>
+            <button onclick="removeCartItem(${idx})" style="font-size:10px;background:#000;color:#fff;border:none;border-radius:4px;padding:6px 10px;cursor:pointer;">×</button>
+          </div>
+        </div>
+      `).join('');
+
+      if (totalEl) totalEl.innerText = formatPrice(cartTotal(), 'RUB');
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    }
+
+    function checkout() {
+      if (cart.length === 0) {
+        triggerToast('Корзина пуста');
+        return;
+      }
+      triggerToast(`Заказ оформлен! Сумма: ${formatPrice(cartTotal(), 'RUB')}`);
+      cart = [];
+      saveCart();
+      renderCart();
     }
 
     function triggerToast(msg) {
@@ -1751,6 +1891,42 @@ Result: marcelo-miracles-zip-hoodie
 
     let activeCategory = 'ALL';
     let activeStatus = 'ALL';
+
+    async function loadCatalog() {
+      const grid = document.getElementById('grid');
+      const loading = document.getElementById('catalog-loading');
+      try {
+        const data = await apiJson('/api/v1/products');
+        productsList = data.items || [];
+        productsList.forEach(p => { productsData[p.id] = p; });
+        renderCatalog();
+        if (loading) loading.style.display = 'none';
+      } catch (err) {
+        if (loading) loading.innerText = 'Ошибка загрузки каталога: ' + err.message;
+      }
+    }
+
+    function renderCatalog() {
+      const grid = document.getElementById('grid');
+      if (!grid) return;
+      grid.innerHTML = productsList.map(p => `
+        <div class="product-card" data-brand="${escapeHtml(p.category_name || 'ALL')}" data-category="ALL" data-status="${escapeHtml(p.status)}"
+          onclick="openProduct('${p.id}')">
+          <div class="card-black-box" style="${p.cover_image ? `background:url(${p.cover_image}) center/cover no-repeat #000;` : ''}">
+            <div class="card-badge">
+              <span class="badge-grey">${escapeHtml(p.status)}</span>
+            </div>
+            <svg class="black-box-icon" viewBox="0 0 24 24">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+            </svg>
+            <span class="black-box-brand-tag">${escapeHtml(p.category_name || 'FLASH MARKET')}</span>
+          </div>
+          <div class="product-brand-title">${escapeHtml(p.category_name || 'FLASH MARKET')}</div>
+          <div class="product-title">${escapeHtml(p.name)}</div>
+          <div class="product-price">${formatPrice(p.price, p.currency)}</div>
+        </div>
+      `).join('');
+    }
 
     async function loadCategories() {
       const out = document.getElementById('categories-output');
@@ -1819,17 +1995,18 @@ Result: marcelo-miracles-zip-hoodie
         .replace(/[^\w\s-]/g, '')
         .trim()
         .replace(/[\s_-]+/g, '-');
-      
+
       document.getElementById('slug-output').innerText = `Input: "${input}"\nSlug: "${slug}"\nCollision Check: "${slug}-2"`;
     }
 
     // Size selector behavior
     document.querySelectorAll('.size-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
       });
     });
   </script>
 </body>
+
 </html>

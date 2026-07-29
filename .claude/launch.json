@@ -4,9 +4,8 @@
     {
       "name": "gateway",
       "runtimeExecutable": "docker",
-      "runtimeArgs": ["compose", "up", "-d"],
-      "port": 8080,
-      "autoPort": false
+      "runtimeArgs": ["compose", "-f", "docker-compose.yml", "up", "-d", "--no-recreate"],
+      "port": 8080
     }
   ]
 }

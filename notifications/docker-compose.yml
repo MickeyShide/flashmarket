@@ -7,7 +7,7 @@ x-notifications-runtime: &notifications-runtime
 x-notifications-environment: &notifications-environment
   NOTIFICATIONS_ENVIRONMENT: development
   NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/notifications
-  NOTIFICATIONS_RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  NOTIFICATIONS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
   NOTIFICATIONS_CORS_ORIGINS: '["http://localhost:3000"]'
 
 services:
@@ -28,7 +28,7 @@ services:
       context: .
     environment: *notifications-environment
     ports:
-      - "127.0.0.1:${NOTIFICATIONS_PORT:-8016}:8000"
+      - "127.0.0.1:${NOTIFICATIONS_PORT:-4922}:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully
