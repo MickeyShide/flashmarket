@@ -840,6 +840,140 @@
     }
 
     /* ==========================================
+       AUTH VIEW
+       ========================================== */
+    .auth-container {
+      max-width: 960px;
+      margin: 28px auto;
+      padding: 18px;
+      background: #FFFFFF;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .auth-tab {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 8px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: #FFFFFF;
+      cursor: pointer;
+    }
+
+    .auth-tab.active {
+      background: #000000;
+      color: #FFFFFF;
+      border-color: #000000;
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-width: 420px;
+    }
+
+    .auth-form label {
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .auth-form input {
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    .auth-form button[type="submit"] {
+      background: #000000;
+      color: #FFFFFF;
+      padding: 14px 20px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .auth-form .error {
+      color: var(--accent-red);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .profile-section {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .profile-section h3 {
+      font-size: 13px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .session-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #EEEEEE;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .session-current {
+      background: #F9F9F9;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .user-badge {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      background: #FFFFFF;
+      cursor: pointer;
+      white-space: nowrap;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-badge:hover {
+      background: #000000;
+      color: #FFFFFF;
+      border-color: #000000;
+    }
+
+    /* ==========================================
        TOAST NOTIFICATION
        ========================================== */
     .toast {
@@ -924,6 +1058,10 @@
           <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
         </button>
 
+        <button class="icon-btn user-icon" id="auth-button" title="Войти" onclick="showView('auth')">
+          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        </button>
+
         <button class="icon-btn" title="Корзина" onclick="showView('cart')">
           <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
           <span class="cart-badge" id="cart-count">2</span>
@@ -940,6 +1078,7 @@
         <a href="#" class="nav-link" onclick="filterCategory('BAGS', this); closeMobileNav(); return false;">СУМКИ</a>
         <a href="#" class="nav-link" onclick="filterCategory('ACCESSORIES', this); closeMobileNav(); return false;">АКСЕССУАРЫ</a>
         <a href="#" class="nav-link" onclick="showView('admin'); closeMobileNav(); return false;">REST API</a>
+        <a href="#" class="nav-link" id="nav-auth-link" onclick="showView('auth'); closeMobileNav(); return false;">ВОЙТИ</a>
       </div>
     </nav>
   </header>
@@ -1204,6 +1343,71 @@ Result: marcelo-miracles-zip-hoodie
       </div>
     </div>
 
+    <!-- VIEW 5: AUTH -->
+    <div id="view-auth" class="page-view">
+      <div class="auth-container">
+        <span class="api-badge">AUTH MICROSERVICE</span>
+
+        <!-- Anonymous -->
+        <div id="auth-anonymous">
+          <div class="auth-tabs">
+            <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Вход</button>
+            <button class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Регистрация</button>
+          </div>
+
+          <form id="login-form" class="auth-form" onsubmit="return submitLogin(event)">
+            <label>
+              Email
+              <input type="email" id="login-email" placeholder="you@example.com" required>
+            </label>
+            <label>
+              Пароль
+              <input type="password" id="login-password" placeholder="минимум 12 символов" required minlength="12">
+            </label>
+            <div class="error" id="login-error"></div>
+            <button type="submit">Войти</button>
+          </form>
+
+          <form id="register-form" class="auth-form" style="display:none;" onsubmit="return submitRegister(event)">
+            <label>
+              Имя
+              <input type="text" id="register-name" placeholder="Ваше имя">
+            </label>
+            <label>
+              Email
+              <input type="email" id="register-email" placeholder="you@example.com" required>
+            </label>
+            <label>
+              Пароль
+              <input type="password" id="register-password" placeholder="минимум 12 символов" required minlength="12">
+            </label>
+            <div class="error" id="register-error"></div>
+            <button type="submit">Зарегистрироваться</button>
+          </form>
+        </div>
+
+        <!-- Authenticated -->
+        <div id="auth-authenticated" style="display:none;">
+          <h2 style="font-size: 15px; font-weight: 900; margin-bottom: 4px;">Профиль</h2>
+          <p style="font-size: 11px; color: #666;">Данные пользователя из Auth Service</p>
+
+          <div class="profile-section">
+            <h3>Основное</h3>
+            <div id="profile-info" class="code-block"></div>
+          </div>
+
+          <div class="profile-section">
+            <h3>Сессии</h3>
+            <div id="sessions-list"></div>
+          </div>
+
+          <div class="profile-section">
+            <button onclick="logout()" style="background: #000; color: #fff; padding: 12px 18px; font-size: 11px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; border-radius: 4px; cursor: pointer;">Выйти</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- Toast Notification -->
@@ -1312,6 +1516,175 @@ Result: marcelo-miracles-zip-hoodie
     let cartCount = 2;
     let currentProductId = 1;
 
+    let authState = {
+      accessToken: localStorage.getItem('fm_access_token') || null,
+      user: null
+    };
+
+    async function api(path, options = {}) {
+      const headers = { 'Accept': 'application/json', ...(options.headers || {}) };
+      if (authState.accessToken) {
+        headers['Authorization'] = `Bearer ${authState.accessToken}`;
+      }
+      const res = await fetch(path, { ...options, headers });
+      if (res.status === 401 && authState.accessToken) {
+        authState.accessToken = null;
+        authState.user = null;
+        localStorage.removeItem('fm_access_token');
+        updateAuthUI();
+        throw new Error('Сессия истекла. Войдите снова.');
+      }
+      return res;
+    }
+
+    async function apiJson(path, options = {}) {
+      const res = await api(path, options);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.detail || data.message || `${res.status} ${res.statusText}`;
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    function switchAuthTab(tab) {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      if (tab === 'login') {
+        document.getElementById('login-form').style.display = 'flex';
+        document.getElementById('register-form').style.display = 'none';
+      } else {
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('register-form').style.display = 'flex';
+      }
+    }
+
+    async function submitLogin(event) {
+      event.preventDefault();
+      document.getElementById('login-error').innerText = '';
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      try {
+        const data = await apiJson('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        finishAuth(data);
+      } catch (err) {
+        document.getElementById('login-error').innerText = err.message;
+      }
+      return false;
+    }
+
+    async function submitRegister(event) {
+      event.preventDefault();
+      document.getElementById('register-error').innerText = '';
+      const email = document.getElementById('register-email').value;
+      const password = document.getElementById('register-password').value;
+      const full_name = document.getElementById('register-name').value || undefined;
+      const body = { email, password };
+      if (full_name) body.full_name = full_name;
+      try {
+        const data = await apiJson('/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        finishAuth(data);
+      } catch (err) {
+        document.getElementById('register-error').innerText = err.message;
+      }
+      return false;
+    }
+
+    function finishAuth(data) {
+      authState.accessToken = data.tokens.access_token;
+      authState.user = data.user;
+      localStorage.setItem('fm_access_token', authState.accessToken);
+      updateAuthUI();
+      loadProfile();
+      showView('auth');
+      triggerToast(`Добро пожаловать, ${data.user.full_name || data.user.email}!`);
+    }
+
+    async function loadProfile() {
+      if (!authState.accessToken) return;
+      try {
+        authState.user = await apiJson('/users/me');
+        const sessions = await apiJson('/sessions');
+        updateAuthUI();
+        renderProfile(authState.user, sessions);
+      } catch (err) {
+        console.error('profile load failed', err);
+      }
+    }
+
+    function renderProfile(user, sessions) {
+      document.getElementById('profile-info').innerText = JSON.stringify(user, null, 2);
+      const list = document.getElementById('sessions-list');
+      list.innerHTML = sessions.map(s => `
+        <div class="session-item">
+          <div>
+            ${s.user_agent || 'Unknown'} · ${s.ip_address || '-'} · ${new Date(s.created_at).toLocaleString()}
+            ${s.current ? '<span class="session-current">ТЕКУЩАЯ</span>' : ''}
+          </div>
+          <button onclick="closeSession('${s.id}')" style="font-size:10px;font-weight:800;padding:6px 10px;background:#000;color:#fff;border:none;border-radius:4px;cursor:pointer;">ЗАКРЫТЬ</button>
+        </div>
+      `).join('');
+    }
+
+    async function closeSession(sessionId) {
+      try {
+        await apiJson('/sessions/' + sessionId, { method: 'DELETE' });
+        triggerToast('Сессия закрыта');
+        loadProfile();
+      } catch (err) {
+        triggerToast('Ошибка: ' + err.message);
+      }
+    }
+
+    async function logout() {
+      try {
+        await apiJson('/auth/logout', { method: 'POST' });
+      } catch (e) {}
+      authState.accessToken = null;
+      authState.user = null;
+      localStorage.removeItem('fm_access_token');
+      updateAuthUI();
+      switchAuthTab('login');
+      showView('auth');
+      triggerToast('Вы вышли из аккаунта');
+    }
+
+    function updateAuthUI() {
+      const btn = document.getElementById('auth-button');
+      const navLink = document.getElementById('nav-auth-link');
+      const anonymous = document.getElementById('auth-anonymous');
+      const authenticated = document.getElementById('auth-authenticated');
+      if (authState.user) {
+        const label = authState.user.full_name || authState.user.email;
+        btn.title = label;
+        btn.innerHTML = `<span class="user-badge">${label}</span>`;
+        navLink.innerText = 'ПРОФИЛЬ';
+        if (anonymous) anonymous.style.display = 'none';
+        if (authenticated) authenticated.style.display = 'block';
+      } else {
+        btn.title = 'Войти';
+        btn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+        navLink.innerText = 'ВОЙТИ';
+        if (anonymous) anonymous.style.display = 'block';
+        if (authenticated) authenticated.style.display = 'none';
+      }
+    }
+
+    (async function initAuth() {
+      updateAuthUI();
+      if (authState.accessToken) {
+        await loadProfile();
+      }
+    })();
+
     function selectBrandDrop(brandName, element) {
       selectedBrand = brandName;
       document.querySelectorAll('.drop-btn').forEach(btn => btn.classList.remove('active'));
@@ -1379,12 +1752,6 @@ Result: marcelo-miracles-zip-hoodie
     let activeCategory = 'ALL';
     let activeStatus = 'ALL';
 
-    async function apiGet(path) {
-      const res = await fetch(path, { headers: { 'Accept': 'application/json' } });
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      return res.json();
-    }
-
     async function loadCategories() {
       const out = document.getElementById('categories-output');
       const status = document.getElementById('categories-status');
@@ -1392,7 +1759,7 @@ Result: marcelo-miracles-zip-hoodie
       status.innerText = '';
       status.className = '';
       try {
-        const data = await apiGet('/api/v1/categories');
+        const data = await apiJson('/api/v1/categories');
         out.innerText = JSON.stringify(data, null, 2);
         status.innerText = 'OK';
         status.className = 'status-ok';

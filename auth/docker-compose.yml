@@ -11,7 +11,10 @@ x-auth-environment: &auth-environment
   AUTH_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
   AUTH_JWT_KEYS_DIRECTORY: /var/lib/flashmarket-auth/keys
   AUTH_JWT_KEY_ID: ${AUTH_JWT_KEY_ID:-flashmarket-auth-ed25519-v1}
-  AUTH_CORS_ORIGINS: '["http://localhost:3000"]'
+  AUTH_CORS_ORIGINS: '["http://localhost:3000","http://localhost:8080"]'
+  AUTH_TRUSTED_HOSTS: '["localhost","127.0.0.1","auth","gateway"]'
+  AUTH_REFRESH_COOKIE_SECURE: 'false'
+  AUTH_REFRESH_COOKIE_SAMESITE: 'lax'
 
 services:
   keygen:
@@ -44,7 +47,7 @@ services:
       context: .
     environment: *auth-environment
     ports:
-      - "127.0.0.1:${AUTH_PORT:-8000}:8000"
+      - "127.0.0.1:${AUTH_PORT:-4918}:8000"
     depends_on:
       keygen:
         condition: service_completed_successfully
@@ -98,7 +101,7 @@ services:
       POSTGRES_USER: flashmarket
       POSTGRES_PASSWORD: flashmarket
     ports:
-      - "127.0.0.1:${AUTH_DB_PORT:-5432}:5432"
+      - "127.0.0.1:${AUTH_DB_PORT:-5433}:5432"
     volumes:
       - auth-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -115,7 +118,7 @@ services:
       - --appendonly
       - "yes"
     ports:
-      - "127.0.0.1:${AUTH_REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${AUTH_REDIS_PORT:-6380}:6379"
     volumes:
       - auth-redis-data:/data
     healthcheck:
@@ -126,13 +129,13 @@ services:
     restart: unless-stopped
 
   rabbitmq:
-    image: rabbitmq:4-management-alpine
+    image: rabbitmq:4-alpine
     environment:
       RABBITMQ_DEFAULT_USER: flashmarket
       RABBITMQ_DEFAULT_PASS: flashmarket
     ports:
       - "127.0.0.1:${AUTH_RABBITMQ_PORT:-5672}:5672"
-      - "127.0.0.1:${AUTH_RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+      # Management UI intentionally not exposed to avoid port conflicts
     volumes:
       - auth-rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
