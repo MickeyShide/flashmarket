@@ -1,0 +1,33 @@
+server {
+    listen 80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 80;
+    server_name ${CATALOG_DOMAIN};
+    server_tokens off;
+
+    client_max_body_size 16k;
+
+    set_real_ip_from 172.16.0.0/12;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
+    location / {
+        proxy_pass http://api:8000;
+        proxy_http_version 1.1;
+        proxy_redirect off;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+}
