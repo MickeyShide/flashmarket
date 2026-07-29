@@ -37,7 +37,9 @@ def _product_to_response(product: ProductModel) -> ProductResponse:
         currency=product.currency,
         status=product.status,
         category_id=product.category_id,
-        category_name=product.category.name,
+        category_name=product.category.name if product.category else "",
+        brand_id=product.brand_id,
+        brand_name=product.brand.name if product.brand else None,
         cover_image=product.cover_image,
         images=[
             ImageResponse(id=img.id, url=img.url, sort_order=img.sort_order)

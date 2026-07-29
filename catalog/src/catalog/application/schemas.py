@@ -31,6 +31,32 @@ class CreateCategoryRequest(BaseModel):
         return normalized
 
 
+class CreateBrandRequest(BaseModel):
+    """Payload for creating a new brand."""
+
+    name: str = Field(min_length=1, max_length=255)
+    slug: str = Field(min_length=1, max_length=255, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    description: str | None = None
+    logo_url: str | None = Field(default=None, max_length=2048)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        """Trim a brand name and reject whitespace-only values."""
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("name must not be blank")
+        return normalized
+
+
+class UpdateBrandRequest(BaseModel):
+    """Partial update payload for a brand."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    logo_url: str | None = Field(default=None, max_length=2048)
+
+
 class ImageInput(BaseModel):
     """Single image entry inside a product request."""
 
@@ -55,6 +81,7 @@ class CreateProductRequest(BaseModel):
     price: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     currency: Currency = Currency.RUB
     category_id: uuid.UUID
+    brand_id: uuid.UUID | None = None
     cover_image: str | None = Field(default=None, max_length=2048)
     images: list[ImageInput] = Field(default_factory=list)
     status: ProductStatus = ProductStatus.HIDDEN
@@ -77,6 +104,7 @@ class UpdateProductRequest(BaseModel):
     price: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     currency: Currency | None = None
     category_id: uuid.UUID | None = None
+    brand_id: uuid.UUID | None = None
     cover_image: str | None = Field(default=None, max_length=2048)
     images: list[ImageInput] | None = None
     status: ProductStatus | None = None
@@ -99,6 +127,8 @@ class ProductListParams(BaseModel):
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
     category_id: uuid.UUID | None = None
+    brand_id: uuid.UUID | None = None
+    brand_slug: str | None = None
     status: ProductStatus | None = None
     price_from: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     price_to: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
@@ -141,6 +171,19 @@ class CategoryResponse(BaseModel):
     created_at: datetime
 
 
+class BrandResponse(BaseModel):
+    """Public representation of a brand."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    description: str | None
+    logo_url: str | None
+    created_at: datetime
+
+
 class CategoryTreeNode(BaseModel):
     """Recursive node used when returning the full category tree."""
 
@@ -179,6 +222,8 @@ class ProductResponse(BaseModel):
     status: ProductStatus
     category_id: uuid.UUID
     category_name: str
+    brand_id: uuid.UUID | None = None
+    brand_name: str | None = None
     cover_image: str | None
     images: list[ImageResponse]
     created_at: datetime

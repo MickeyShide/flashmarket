@@ -16,11 +16,11 @@ services:
       PAYMENTS_PROXY_PORT: ${PAYMENTS_PROXY_PORT:-4921}
       NOTIFICATIONS_PROXY_PORT: ${NOTIFICATIONS_PROXY_PORT:-4922}
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost/health"]
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/health || exit 1"]
       interval: 5s
       timeout: 3s
-      retries: 10
-      start_period: 5s
+      retries: 5
+      start_period: 2s
     restart: unless-stopped
 
 networks:

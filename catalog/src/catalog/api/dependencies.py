@@ -5,9 +5,11 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from catalog.application.services.brand import BrandService
 from catalog.application.services.category import CategoryService
 from catalog.application.services.product import ProductService
 from catalog.infrastructure.database import get_db
+from catalog.infrastructure.repositories.brand import BrandRepository
 from catalog.infrastructure.repositories.category import CategoryRepository
 from catalog.infrastructure.repositories.product import ProductRepository
 
@@ -27,5 +29,12 @@ def get_category_service(db: DbSession) -> CategoryService:
     return CategoryService(session=db, category_repo=category_repo)
 
 
+def get_brand_service(db: DbSession) -> BrandService:
+    """Build a brand service for the current request."""
+    brand_repo = BrandRepository(db)
+    return BrandService(session=db, brand_repo=brand_repo)
+
+
 ProductServiceDep = Annotated[ProductService, Depends(get_product_service)]
 CategoryServiceDep = Annotated[CategoryService, Depends(get_category_service)]
+BrandServiceDep = Annotated[BrandService, Depends(get_brand_service)]

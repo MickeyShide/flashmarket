@@ -17,6 +17,8 @@ from sqlalchemy import (
     String,
     Text,
     Uuid,
+    func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,7 +31,12 @@ class CategoryModel(Base):
 
     __tablename__ = "categories"
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid7,
+        server_default=text("gen_random_uuid()"),
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -40,6 +47,7 @@ class CategoryModel(Base):
         DateTime(timezone=True),
         nullable=False,
         default=utc_now,
+        server_default=func.now(),
     )
 
     children: Mapped[list[CategoryModel]] = relationship(
@@ -56,6 +64,29 @@ class CategoryModel(Base):
     )
 
 
+class BrandModel(Base):
+    """Product brand / manufacturer entity."""
+
+    __tablename__ = "brands"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid7,
+        server_default=text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text)
+    logo_url: Mapped[str | None] = mapped_column(String(2048))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        server_default=func.now(),
+    )
+
+
 class ProductModel(Base):
     """Catalog product with pricing and lifecycle status."""
 
@@ -65,9 +96,15 @@ class ProductModel(Base):
         Index("ix_products_status", "status"),
         Index("ix_products_price", "price"),
         Index("ix_products_category_status", "category_id", "status"),
+        Index("ix_products_brand_status", "brand_id", "status"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid7,
+        server_default=text("gen_random_uuid()"),
+    )
     slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
@@ -92,11 +129,17 @@ class ProductModel(Base):
         nullable=False,
         index=True,
     )
+    brand_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("brands.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     cover_image: Mapped[str | None] = mapped_column(String(2048))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         default=utc_now,
+        server_default=func.now(),
         index=True,
     )
     updated_at: Mapped[datetime] = mapped_column(
@@ -108,6 +151,7 @@ class ProductModel(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     category: Mapped[CategoryModel] = relationship(lazy="joined")
+    brand: Mapped[BrandModel | None] = relationship(lazy="joined")
     images: Mapped[list[ProductImageModel]] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",

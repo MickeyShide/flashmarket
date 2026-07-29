@@ -26,6 +26,13 @@ class CategoryNotFound(CatalogError):
     message = "Category not found"
 
 
+class BrandNotFound(CatalogError):
+    """Raised when a brand cannot be located."""
+
+    code = "brand_not_found"
+    message = "Brand not found"
+
+
 class DuplicateSlug(CatalogError):
     """Raised when a slug collision cannot be resolved."""
 

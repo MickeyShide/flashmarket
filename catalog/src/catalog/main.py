@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from catalog.api.error_handlers import catalog_error_handler
-from catalog.api.routes import categories, health, internal, products
+from catalog.api.routes import brands, categories, health, internal, products
 from catalog.config import get_settings
 from catalog.domain.exceptions import CatalogError
 from catalog.infrastructure.database import engine
@@ -51,6 +51,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(categories.router)
+    app.include_router(brands.router)
     app.include_router(products.router)
     app.include_router(internal.router)
 

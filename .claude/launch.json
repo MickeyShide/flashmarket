@@ -3,9 +3,7 @@
   "configurations": [
     {
       "name": "gateway",
-      "runtimeExecutable": "docker",
-      "runtimeArgs": ["compose", "-f", "docker-compose.yml", "up", "-d", "--no-recreate"],
-      "port": 8080
+      "url": "http://localhost:8080"
     }
   ]
 }

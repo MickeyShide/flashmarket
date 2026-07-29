@@ -20,6 +20,8 @@ class ProductSearchQuery:
     limit: int
     offset: int
     category_id: UUID | None = None
+    brand_id: UUID | None = None
+    brand_slug: str | None = None
     status: ProductStatus | None = None
     price_from: Decimal | None = None
     price_to: Decimal | None = None
@@ -54,6 +56,7 @@ class ProductRepository:
         return [
             selectinload(ProductModel.images),
             joinedload(ProductModel.category),
+            joinedload(ProductModel.brand),
         ]
 
     async def create(self, product: ProductModel) -> ProductModel:
@@ -91,6 +94,8 @@ class ProductRepository:
 
         if query.category_id is not None:
             filters.append(ProductModel.category_id == query.category_id)
+        if query.brand_id is not None:
+            filters.append(ProductModel.brand_id == query.brand_id)
         if query.status is not None:
             filters.append(ProductModel.status == query.status)
         if query.price_from is not None:

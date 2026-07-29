@@ -70,6 +70,7 @@ class ProductService:
             currency=data.currency,
             status=data.status,
             category_id=data.category_id,
+            brand_id=data.brand_id,
             cover_image=data.cover_image,
             published_at=published_at,
         )
@@ -111,6 +112,8 @@ class ProductService:
             limit=params.limit,
             offset=params.offset,
             category_id=params.category_id,
+            brand_id=params.brand_id,
+            brand_slug=params.brand_slug,
             status=params.status if params.status is not None else ProductStatus.ACTIVE,
             price_from=params.price_from,
             price_to=params.price_to,
@@ -141,6 +144,8 @@ class ProductService:
             product.currency = data.currency
         if data.category_id is not None:
             product.category_id = data.category_id
+        if data.brand_id is not None:
+            product.brand_id = data.brand_id
         if data.cover_image is not None:
             product.cover_image = data.cover_image
 

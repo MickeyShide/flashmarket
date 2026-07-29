@@ -1,6 +1,32 @@
 name: flashmarket
 
 services:
+  # -----------------------------------------------------------
+  # SHARED INFRASTRUCTURE (Single Redis & Single RabbitMQ)
+  # -----------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: flashmarket-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: flashmarket-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: flashmarket
+      RABBITMQ_DEFAULT_PASS: flashmarket
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+  # -----------------------------------------------------------
+  # AUTH MICROSERVICE
+  # -----------------------------------------------------------
   auth:
     extends:
       file: auth/docker-compose.yml
@@ -8,8 +34,8 @@ services:
     depends_on: !reset {}
     environment:
       AUTH_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@auth-db:5432/auth
-      AUTH_REDIS_URL: redis://auth-redis:6379/0
-      AUTH_RABBITMQ_URL: amqp://flashmarket:flashmarket@auth-rabbitmq:5672/
+      AUTH_REDIS_URL: redis://redis:6379/0
+      AUTH_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
     volumes:
       - auth-jwt-keys:/var/lib/flashmarket-auth/keys:ro
 
@@ -26,11 +52,6 @@ services:
       file: auth/docker-compose.yml
       service: db
 
-  auth-redis:
-    extends:
-      file: auth/docker-compose.yml
-      service: redis
-
   auth-outbox:
     extends:
       file: auth/docker-compose.yml
@@ -38,14 +59,12 @@ services:
     depends_on: !reset {}
     environment:
       AUTH_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@auth-db:5432/auth
-      AUTH_REDIS_URL: redis://auth-redis:6379/0
-      AUTH_RABBITMQ_URL: amqp://flashmarket:flashmarket@auth-rabbitmq:5672/
+      AUTH_REDIS_URL: redis://redis:6379/0
+      AUTH_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
-  auth-rabbitmq:
-    extends:
-      file: auth/docker-compose.yml
-      service: rabbitmq
-
+  # -----------------------------------------------------------
+  # CATALOG MICROSERVICE
+  # -----------------------------------------------------------
   catalog:
     extends:
       file: catalog/docker-compose.yml
@@ -67,6 +86,9 @@ services:
       file: catalog/docker-compose.yml
       service: db
 
+  # -----------------------------------------------------------
+  # INVENTORY MICROSERVICE
+  # -----------------------------------------------------------
   inventory:
     extends:
       file: inventory/docker-compose.yml
@@ -74,7 +96,7 @@ services:
     depends_on: !reset {}
     environment:
       INVENTORY_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@inventory-db:5432/inventory
-      INVENTORY_RABBITMQ_URL: amqp://guest:guest@inventory-rabbitmq:5672/
+      INVENTORY_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
   inventory-migrate:
     extends:
@@ -89,11 +111,6 @@ services:
       file: inventory/docker-compose.yml
       service: db
 
-  inventory-rabbitmq:
-    extends:
-      file: inventory/docker-compose.yml
-      service: rabbitmq
-
   inventory-consumer:
     extends:
       file: inventory/docker-compose.yml
@@ -101,7 +118,7 @@ services:
     depends_on: !reset {}
     environment:
       INVENTORY_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@inventory-db:5432/inventory
-      INVENTORY_RABBITMQ_URL: amqp://guest:guest@inventory-rabbitmq:5672/
+      INVENTORY_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
   inventory-outbox:
     extends:
@@ -110,8 +127,11 @@ services:
     depends_on: !reset {}
     environment:
       INVENTORY_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@inventory-db:5432/inventory
-      INVENTORY_RABBITMQ_URL: amqp://guest:guest@inventory-rabbitmq:5672/
+      INVENTORY_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
+  # -----------------------------------------------------------
+  # ORDERS MICROSERVICE
+  # -----------------------------------------------------------
   orders:
     extends:
       file: orders/docker-compose.yml
@@ -119,7 +139,7 @@ services:
     depends_on: !reset {}
     environment:
       ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@orders-db:5432/orders
-      ORDERS_RABBITMQ_URL: amqp://guest:guest@orders-rabbitmq:5672/
+      ORDERS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
   orders-migrate:
     extends:
@@ -134,11 +154,6 @@ services:
       file: orders/docker-compose.yml
       service: db
 
-  orders-rabbitmq:
-    extends:
-      file: orders/docker-compose.yml
-      service: rabbitmq
-
   orders-consumer:
     extends:
       file: orders/docker-compose.yml
@@ -146,7 +161,7 @@ services:
     depends_on: !reset {}
     environment:
       ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@orders-db:5432/orders
-      ORDERS_RABBITMQ_URL: amqp://guest:guest@orders-rabbitmq:5672/
+      ORDERS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
   orders-outbox:
     extends:
@@ -155,8 +170,11 @@ services:
     depends_on: !reset {}
     environment:
       ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@orders-db:5432/orders
-      ORDERS_RABBITMQ_URL: amqp://guest:guest@orders-rabbitmq:5672/
+      ORDERS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
+  # -----------------------------------------------------------
+  # PAYMENTS MICROSERVICE
+  # -----------------------------------------------------------
   payments:
     extends:
       file: payments/docker-compose.yml
@@ -164,7 +182,7 @@ services:
     depends_on: !reset {}
     environment:
       PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@payments-db:5432/payments
-      PAYMENTS_RABBITMQ_URL: amqp://guest:guest@payments-rabbitmq:5672/
+      PAYMENTS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
   payments-migrate:
     extends:
@@ -179,11 +197,6 @@ services:
       file: payments/docker-compose.yml
       service: db
 
-  payments-rabbitmq:
-    extends:
-      file: payments/docker-compose.yml
-      service: rabbitmq
-
   payments-consumer:
     extends:
       file: payments/docker-compose.yml
@@ -191,7 +204,7 @@ services:
     depends_on: !reset {}
     environment:
       PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@payments-db:5432/payments
-      PAYMENTS_RABBITMQ_URL: amqp://guest:guest@payments-rabbitmq:5672/
+      PAYMENTS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
   payments-outbox:
     extends:
@@ -200,8 +213,11 @@ services:
     depends_on: !reset {}
     environment:
       PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@payments-db:5432/payments
-      PAYMENTS_RABBITMQ_URL: amqp://guest:guest@payments-rabbitmq:5672/
+      PAYMENTS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
+  # -----------------------------------------------------------
+  # NOTIFICATIONS MICROSERVICE
+  # -----------------------------------------------------------
   notifications:
     extends:
       file: notifications/docker-compose.yml
@@ -209,7 +225,7 @@ services:
     depends_on: !reset {}
     environment:
       NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@notifications-db:5432/notifications
-      NOTIFICATIONS_RABBITMQ_URL: amqp://guest:guest@notifications-rabbitmq:5672/
+      NOTIFICATIONS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
   notifications-migrate:
     extends:
@@ -224,11 +240,6 @@ services:
       file: notifications/docker-compose.yml
       service: db
 
-  notifications-rabbitmq:
-    extends:
-      file: notifications/docker-compose.yml
-      service: rabbitmq
-
   notifications-consumer:
     extends:
       file: notifications/docker-compose.yml
@@ -236,7 +247,7 @@ services:
     depends_on: !reset {}
     environment:
       NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@notifications-db:5432/notifications
-      NOTIFICATIONS_RABBITMQ_URL: amqp://guest:guest@notifications-rabbitmq:5672/
+      NOTIFICATIONS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
   notifications-outbox:
     extends:
@@ -245,8 +256,11 @@ services:
     depends_on: !reset {}
     environment:
       NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@notifications-db:5432/notifications
-      NOTIFICATIONS_RABBITMQ_URL: amqp://guest:guest@notifications-rabbitmq:5672/
+      NOTIFICATIONS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
 
+  # -----------------------------------------------------------
+  # GATEWAY & FRONTEND
+  # -----------------------------------------------------------
   gateway:
     extends:
       file: gateway/docker-compose.yml
@@ -260,17 +274,13 @@ services:
 volumes:
   auth-jwt-keys:
   auth-postgres-data:
-  auth-rabbitmq-data:
-  auth-redis-data:
   catalog-postgres-data:
   inventory-postgres-data:
-  inventory-rabbitmq-data:
   orders-postgres-data:
-  orders-rabbitmq-data:
   payments-postgres-data:
-  payments-rabbitmq-data:
   notifications-postgres-data:
-  notifications-rabbitmq-data:
+  redis-data:
+  rabbitmq-data:
 
 networks:
   default:
