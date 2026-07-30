@@ -158,13 +158,20 @@ jobs:
         shell: bash
         run: |
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
-          ssh -p "$DEPLOY_PORT" "$target" "mkdir -p '$DEPLOY_PATH'"
+          ssh -p "$DEPLOY_PORT" "$target" "mkdir -p '$DEPLOY_PATH/gateway'"
+          ssh -p "$DEPLOY_PORT" "$target" "
+            [ -d '$DEPLOY_PATH/nginx.conf' ] && rm -rf '$DEPLOY_PATH/nginx.conf' || true;
+            [ -d '$DEPLOY_PATH/gateway/nginx.conf' ] && rm -rf '$DEPLOY_PATH/gateway/nginx.conf' || true
+          "
           scp -P "$DEPLOY_PORT" \
             docker-compose.prod.yml \
             "$target:$DEPLOY_PATH/docker-compose.yml"
           scp -P "$DEPLOY_PORT" \
             gateway/nginx.conf \
             "$target:$DEPLOY_PATH/nginx.conf"
+          scp -P "$DEPLOY_PORT" \
+            gateway/nginx.conf \
+            "$target:$DEPLOY_PATH/gateway/nginx.conf"
           ssh -p "$DEPLOY_PORT" "$target" \
             "umask 077; cat > '$DEPLOY_PATH/.env.next' && mv '$DEPLOY_PATH/.env.next' '$DEPLOY_PATH/.env'" \
             < "$RUNNER_TEMP/flashmarket-gateway.env"
