@@ -315,7 +315,7 @@ jobs:
             printf 'PAYMENTS_PROXY_PORT=4921\n'
             printf 'PAYMENTS_ENVIRONMENT=production\n'
             printf 'PAYMENTS_DOMAIN=%s\n' "$PAYMENTS_DOMAIN"
-            printf 'PAYMENTS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/payments?ssl=false\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'PAYMENTS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/payments\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
             printf 'PAYMENTS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//payments\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'PAYMENTS_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'PAYMENTS_DEBUG=false\n'

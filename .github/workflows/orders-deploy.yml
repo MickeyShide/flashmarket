@@ -315,7 +315,7 @@ jobs:
             printf 'ORDERS_PROXY_PORT=4920\n'
             printf 'ORDERS_ENVIRONMENT=production\n'
             printf 'ORDERS_DOMAIN=%s\n' "$ORDERS_DOMAIN"
-            printf 'ORDERS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/orders?ssl=false\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'ORDERS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/orders\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
             printf 'ORDERS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//orders\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'ORDERS_DEBUG=false\n'

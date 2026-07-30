@@ -318,7 +318,7 @@ jobs:
             printf 'AUTH_PROXY_PORT=4918\n'
             printf 'AUTH_ENVIRONMENT=production\n'
             printf 'AUTH_DOMAIN=%s\n' "$AUTH_DOMAIN"
-            printf 'AUTH_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/auth?ssl=false\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'AUTH_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/auth\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
             printf 'AUTH_REDIS_URL=redis://:%s@shide-redis:6379/0\n' "$DEPLOY_REDIS_PASSWORD"
             printf 'AUTH_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//auth\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'AUTH_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
