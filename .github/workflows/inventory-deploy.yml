@@ -290,14 +290,6 @@ jobs:
             echo "::error::INFRA_USER is invalid"
             exit 1
           fi
-          for password in \
-            "$DEPLOY_POSTGRES_PASSWORD" \
-            "$DEPLOY_RABBITMQ_PASSWORD"; do
-            if [[ ! "$password" =~ ^[A-Za-z0-9._~-]{32,128}$ ]]; then
-              echo "::error::Passwords must be 32-128 URL-safe characters"
-              exit 1
-            fi
-          done
 
       - name: Configure SSH
         shell: bash
