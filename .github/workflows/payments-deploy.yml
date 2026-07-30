@@ -242,7 +242,7 @@ jobs:
       GHCR_USERNAME: ${{ github.actor }}
       INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
       PAYMENTS_IMAGE: ghcr.io/mickeyshide/flashmarket-payments@${{ needs.image.outputs.digest }}
-      PAYMENTS_DOMAIN: ${{ vars.PAYMENTS_DOMAIN || vars.GATEWAY_DOMAIN || 'payments.flashmarket.shide.world' }}
+      GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
       PAYMENTS_CORS_ORIGINS: ${{ vars.PAYMENTS_CORS_ORIGINS }}
       DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
       DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
@@ -255,7 +255,7 @@ jobs:
         run: |
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
-          PAYMENTS_DOMAIN="${PAYMENTS_DOMAIN:-payments.flashmarket.shide.world}"
+          PAYMENTS_DOMAIN="payments.${GATEWAY_DOMAIN}"
           INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
           DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"

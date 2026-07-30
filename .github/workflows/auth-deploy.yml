@@ -242,7 +242,7 @@ jobs:
       GHCR_USERNAME: ${{ github.actor }}
       INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
       AUTH_IMAGE: ghcr.io/mickeyshide/flashmarket-auth@${{ needs.image.outputs.digest }}
-      AUTH_DOMAIN: ${{ vars.AUTH_DOMAIN || vars.GATEWAY_DOMAIN || 'auth.flashmarket.shide.world' }}
+      GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
       AUTH_CORS_ORIGINS: ${{ vars.AUTH_CORS_ORIGINS }}
       AUTH_JWT_KEY_ID: ${{ vars.AUTH_JWT_KEY_ID || 'flashmarket-auth-ed25519-v1' }}
       DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
@@ -257,7 +257,7 @@ jobs:
         run: |
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
-          AUTH_DOMAIN="${AUTH_DOMAIN:-auth.flashmarket.shide.world}"
+          AUTH_DOMAIN="auth.${GATEWAY_DOMAIN}"
           INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
           DEPLOY_REDIS_PASSWORD="${DEPLOY_REDIS_PASSWORD:-flashmarket_redis_pass_2026}"

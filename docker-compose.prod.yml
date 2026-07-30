@@ -8,17 +8,7 @@ services:
     volumes:
       - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     environment:
-      AUTH_PROXY_PORT: ${AUTH_PROXY_PORT:-4918}
-      CATALOG_PROXY_PORT: ${CATALOG_PROXY_PORT:-4919}
-      INVENTORY_PROXY_PORT: ${INVENTORY_PROXY_PORT:-4919}
-      ORDERS_PROXY_PORT: ${ORDERS_PROXY_PORT:-4920}
-      PAYMENTS_PROXY_PORT: ${PAYMENTS_PROXY_PORT:-4921}
-      NOTIFICATIONS_PROXY_PORT: ${NOTIFICATIONS_PROXY_PORT:-4922}
       GATEWAY_DOMAIN: ${GATEWAY_DOMAIN:-_}
-    command: |
-      /bin/sh -c "envsubst '\$AUTH_PROXY_PORT \$CATALOG_PROXY_PORT \$INVENTORY_PROXY_PORT \$ORDERS_PROXY_PORT \$PAYMENTS_PROXY_PORT \$NOTIFICATIONS_PROXY_PORT \$GATEWAY_DOMAIN' < /etc/nginx/conf.d/default.conf > /tmp/nginx.conf && \
-        cp /tmp/nginx.conf /etc/nginx/conf.d/default.conf && \
-        nginx -g 'daemon off;'"
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost/health"]
       interval: 5s

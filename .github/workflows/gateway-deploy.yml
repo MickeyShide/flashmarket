@@ -104,12 +104,6 @@ jobs:
       FRONTEND_IMAGE: ghcr.io/mickeyshide/flashmarket-frontend@${{ needs.image.outputs.digest }}
       GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
       GATEWAY_PORT: ${{ vars.GATEWAY_PORT || '8080' }}
-      AUTH_PROXY_PORT: ${{ vars.AUTH_PROXY_PORT || '4918' }}
-      CATALOG_PROXY_PORT: ${{ vars.CATALOG_PROXY_PORT || '4919' }}
-      INVENTORY_PROXY_PORT: ${{ vars.INVENTORY_PROXY_PORT || '4919' }}
-      ORDERS_PROXY_PORT: ${{ vars.ORDERS_PROXY_PORT || '4920' }}
-      PAYMENTS_PROXY_PORT: ${{ vars.PAYMENTS_PROXY_PORT || '4921' }}
-      NOTIFICATIONS_PROXY_PORT: ${{ vars.NOTIFICATIONS_PROXY_PORT || '4922' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -157,12 +151,6 @@ jobs:
             printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"
             printf 'GATEWAY_PORT=%s\n' "$GATEWAY_PORT"
             printf 'GATEWAY_DOMAIN=%s\n' "$GATEWAY_DOMAIN"
-            printf 'AUTH_PROXY_PORT=%s\n' "$AUTH_PROXY_PORT"
-            printf 'CATALOG_PROXY_PORT=%s\n' "$CATALOG_PROXY_PORT"
-            printf 'INVENTORY_PROXY_PORT=%s\n' "$INVENTORY_PROXY_PORT"
-            printf 'ORDERS_PROXY_PORT=%s\n' "$ORDERS_PROXY_PORT"
-            printf 'PAYMENTS_PROXY_PORT=%s\n' "$PAYMENTS_PROXY_PORT"
-            printf 'NOTIFICATIONS_PROXY_PORT=%s\n' "$NOTIFICATIONS_PROXY_PORT"
           } > "$environment_file"
           chmod 600 "$environment_file"
 

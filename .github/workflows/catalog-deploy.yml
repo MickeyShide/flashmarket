@@ -242,7 +242,7 @@ jobs:
       GHCR_USERNAME: ${{ github.actor }}
       INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
       CATALOG_IMAGE: ghcr.io/mickeyshide/flashmarket-catalog@${{ needs.image.outputs.digest }}
-      CATALOG_DOMAIN: ${{ vars.CATALOG_DOMAIN || vars.GATEWAY_DOMAIN || 'catalog.flashmarket.shide.world' }}
+      GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
       CATALOG_CORS_ORIGINS: ${{ vars.CATALOG_CORS_ORIGINS }}
       CATALOG_JWT_KEY_ID: ${{ vars.CATALOG_JWT_KEY_ID || 'flashmarket-catalog-ed25519-v1' }}
       DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
@@ -257,7 +257,7 @@ jobs:
         run: |
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
-          CATALOG_DOMAIN="${CATALOG_DOMAIN:-catalog.flashmarket.shide.world}"
+          CATALOG_DOMAIN="catalog.${GATEWAY_DOMAIN}"
           INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
           DEPLOY_REDIS_PASSWORD="${DEPLOY_REDIS_PASSWORD:-flashmarket_redis_pass_2026}"

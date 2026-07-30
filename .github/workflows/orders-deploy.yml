@@ -242,7 +242,7 @@ jobs:
       GHCR_USERNAME: ${{ github.actor }}
       INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
       ORDERS_IMAGE: ghcr.io/mickeyshide/flashmarket-orders@${{ needs.image.outputs.digest }}
-      ORDERS_DOMAIN: ${{ vars.ORDERS_DOMAIN || vars.GATEWAY_DOMAIN || 'orders.flashmarket.shide.world' }}
+      GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
       ORDERS_CORS_ORIGINS: ${{ vars.ORDERS_CORS_ORIGINS }}
       DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
       DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
@@ -255,7 +255,7 @@ jobs:
         run: |
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
-          ORDERS_DOMAIN="${ORDERS_DOMAIN:-orders.flashmarket.shide.world}"
+          ORDERS_DOMAIN="orders.${GATEWAY_DOMAIN}"
           INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
           DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"
