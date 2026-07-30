@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -72,6 +72,16 @@ def create_app() -> FastAPI:
     app.include_router(sessions.router)
     app.include_router(admin.router)
     app.include_router(audit.router)
+
+    # Also mount v1 prefix for gateway & backwards compatibility
+    v1_router = APIRouter(prefix="/api/v1")
+    v1_router.include_router(auth.router)
+    v1_router.include_router(users.router)
+    v1_router.include_router(sessions.router)
+    v1_router.include_router(admin.router)
+    v1_router.include_router(audit.router)
+    app.include_router(v1_router)
+
     return app
 
 

@@ -4,7 +4,7 @@ export function getCookie(name) {
 }
 
 export function getCsrfToken() {
-  return getCookie('flashmarket_csrf');
+  return getCookie('flashmarket_csrf') || getCookie('__Host-flashmarket-csrf') || getCookie('csrf_token');
 }
 
 export function escapeHtml(str) {
