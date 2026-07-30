@@ -27,3 +27,5 @@ networks:
   default:
     name: flashmarket
     external: true
+  shide-observability:
+    external: true
