@@ -225,9 +225,14 @@ jobs:
             "http://127.0.0.1:${GATEWAY_PORT}/health"
           REMOTE
 
-      - name: Verify public endpoint
+      - name: Verify public HTTPS endpoint
         shell: bash
         run: |
+          if [[ -z "${GATEWAY_DOMAIN:-}" ]]; then
+            echo "GATEWAY_DOMAIN is empty. Internal deployment succeeded."
+            exit 0
+          fi
+
           last_error=""
           for _ in $(seq 1 30); do
             if response="$(
@@ -241,6 +246,16 @@ jobs:
             sleep 2
           done
 
-          echo "::error title=Public HTTPS check failed::Gateway is not reachable at https://${GATEWAY_DOMAIN}/health"
+          echo "::warning title=Public HTTPS check failed::Gateway is not reachable through Nginx Proxy Manager at https://${GATEWAY_DOMAIN}/health"
           printf 'Last curl error: %s\n' "$last_error"
+
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          if ssh -p "$DEPLOY_PORT" "$target" \
+            "curl --fail --silent --show-error http://127.0.0.1:${GATEWAY_PORT}/health"; then
+            echo
+            echo "::notice title=Gateway nginx is healthy::Configure Nginx Proxy Manager for ${GATEWAY_DOMAIN} with upstream ${DEPLOY_HOST}:${GATEWAY_PORT} and enable SSL"
+            exit 0
+          fi
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "cd '$DEPLOY_PATH' && docker compose --env-file .env ps -a && ss -ltn '( sport = :${GATEWAY_PORT} )' || true; docker compose --env-file .env logs --tail 100 gateway"
           exit 1

@@ -6,7 +6,9 @@ x-auth-runtime: &auth-runtime
   env_file:
     - ${AUTH_ENV_FILE:-.env}
   networks:
-    - backend
+    backend:
+      aliases:
+        - auth
 
 services:
   api:

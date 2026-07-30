@@ -6,7 +6,9 @@ x-inventory-runtime: &inventory-runtime
   env_file:
     - ${INVENTORY_ENV_FILE:-.env}
   networks:
-    - backend
+    backend:
+      aliases:
+        - inventory
 
 x-inventory-environment: &inventory-environment
   INVENTORY_ENVIRONMENT: ${INVENTORY_ENVIRONMENT:-production}

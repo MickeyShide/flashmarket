@@ -6,7 +6,9 @@ x-notifications-runtime: &notifications-runtime
   env_file:
     - ${NOTIFICATIONS_ENV_FILE:-.env}
   networks:
-    - backend
+    backend:
+      aliases:
+        - notifications
 
 x-notifications-environment: &notifications-environment
   NOTIFICATIONS_ENVIRONMENT: ${NOTIFICATIONS_ENVIRONMENT:-production}

@@ -6,7 +6,9 @@ x-catalog-runtime: &catalog-runtime
   env_file:
     - ${CATALOG_ENV_FILE:-.env}
   networks:
-    - backend
+    backend:
+      aliases:
+        - catalog
 
 services:
   api:

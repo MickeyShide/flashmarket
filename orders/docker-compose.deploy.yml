@@ -6,7 +6,9 @@ x-orders-runtime: &orders-runtime
   env_file:
     - ${ORDERS_ENV_FILE:-.env}
   networks:
-    - backend
+    backend:
+      aliases:
+        - orders
 
 x-orders-environment: &orders-environment
   ORDERS_ENVIRONMENT: ${ORDERS_ENVIRONMENT:-production}

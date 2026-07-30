@@ -6,7 +6,9 @@ x-payments-runtime: &payments-runtime
   env_file:
     - ${PAYMENTS_ENV_FILE:-.env}
   networks:
-    - backend
+    backend:
+      aliases:
+        - payments
 
 x-payments-environment: &payments-environment
   PAYMENTS_ENVIRONMENT: ${PAYMENTS_ENVIRONMENT:-production}
