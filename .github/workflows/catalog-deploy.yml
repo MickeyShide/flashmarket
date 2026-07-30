@@ -318,7 +318,7 @@ jobs:
             printf 'CATALOG_PROXY_PORT=4919\n'
             printf 'CATALOG_ENVIRONMENT=production\n'
             printf 'CATALOG_DOMAIN=%s\n' "$CATALOG_DOMAIN"
-            printf 'CATALOG_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/catalog\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'CATALOG_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/catalog?ssl=false\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
             printf 'CATALOG_REDIS_URL=redis://:%s@shide-redis:6379/1\n' "$DEPLOY_REDIS_PASSWORD"
             printf 'CATALOG_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//catalog\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'CATALOG_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
