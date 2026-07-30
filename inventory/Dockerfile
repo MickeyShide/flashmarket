@@ -11,12 +11,12 @@ WORKDIR /app
 
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
-COPY pyproject.toml uv.lock README.md ./
+COPY inventory/pyproject.toml inventory/uv.lock inventory/README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY alembic.ini ./
-COPY migrations ./migrations
-COPY src ./src
+COPY inventory/alembic.ini ./
+COPY inventory/migrations ./migrations
+COPY inventory/src ./src
 COPY docker/init-infra.py ./docker/init-infra.py
 COPY docker/entrypoint.sh ./docker/entrypoint.sh
 

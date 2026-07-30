@@ -211,7 +211,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v7
         with:
-          context: ./inventory
+          context: .
           file: ./inventory/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
