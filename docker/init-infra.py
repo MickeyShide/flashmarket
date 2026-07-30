@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 import sys
 import time
+import urllib.error
+import urllib.request
 from urllib.parse import urlparse
 
 import asyncpg
-import httpx
 
 MAX_RETRIES = 30
 RETRY_DELAY_SECONDS = 2
@@ -118,20 +120,32 @@ def ensure_rabbitmq_vhost() -> None:
     host = url.hostname or "localhost"
     port = 15672
 
-    auth = httpx.BasicAuth(user, password)
-    base = f"http://{host}:{port}/api"
+    credentials = f"{user}:{password}"
+    b64_auth = base64.b64encode(credentials.encode("ascii")).decode("ascii")
+    headers = {"Authorization": f"Basic {b64_auth}"}
 
-    with httpx.Client(timeout=10.0) as client:
-        resp = client.get(f"{base}/vhosts/{vhost}", auth=auth)
-        if resp.status_code == 200:
-            print(f"RabbitMQ vhost '{vhost}' already exists")
-            return
-        if resp.status_code not in {404, 401}:
-            resp.raise_for_status()
-        encoded_vhost = vhost.replace("/", "%2F")
-        resp = client.put(f"{base}/vhosts/{encoded_vhost}", auth=auth)
-        resp.raise_for_status()
-        print(f"RabbitMQ vhost '{vhost}' created")
+    base = f"http://{host}:{port}/api"
+    check_url = f"{base}/vhosts/{vhost}"
+
+    req = urllib.request.Request(check_url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=10.0) as resp:
+            if resp.status == 200:
+                print(f"RabbitMQ vhost '{vhost}' already exists")
+                return
+    except urllib.error.HTTPError as err:
+        if err.code == 404:
+            encoded_vhost = vhost.replace("/", "%2F")
+            put_url = f"{base}/vhosts/{encoded_vhost}"
+            put_req = urllib.request.Request(put_url, headers=headers, method="PUT")
+            with urllib.request.urlopen(put_req, timeout=10.0) as put_resp:
+                if put_resp.status in (200, 201):
+                    print(f"RabbitMQ vhost '{vhost}' created")
+                    return
+        elif err.code == 401:
+            raise err
+        else:
+            raise err
 
 
 async def main() -> None:
