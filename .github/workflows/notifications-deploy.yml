@@ -442,3 +442,5 @@ jobs:
           ssh -p "$DEPLOY_PORT" "$target" \
             "cd '$DEPLOY_PATH' && docker compose --env-file .env ps -a && ss -ltn '( sport = :4922 )' || true; docker compose --env-file .env logs --tail 100 api nginx"
           exit 1
+
+          
