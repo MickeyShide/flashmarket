@@ -193,6 +193,7 @@ export const App = () => {
               brandsData={brandsData}
               onSelectBrand={handleSelectBrand}
               activeCategoryId={activeCategoryId}
+              activeBrandId={activeBrandId}
             />
 
             <CatalogControls

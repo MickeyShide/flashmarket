@@ -20,7 +20,7 @@ export const CatalogControls = ({
   const statuses = [
     { label: 'Все', value: null },
     { label: 'ACTIVE', value: 'ACTIVE' },
-    { label: 'DRAFT', value: 'DRAFT' },
+    { label: 'HIDDEN', value: 'HIDDEN' },
     { label: 'ARCHIVED', value: 'ARCHIVED' },
   ];
 

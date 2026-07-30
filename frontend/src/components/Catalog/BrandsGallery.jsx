@@ -1,8 +1,8 @@
 import React from 'react';
 import { DEFAULT_BRAND_COVERS } from '../../config/constants';
 
-export const BrandsGallery = ({ brandsData, onSelectBrand, activeCategoryId }) => {
-  if (activeCategoryId) return null; // Hidden when a category filter is active
+export const BrandsGallery = ({ brandsData, onSelectBrand, activeCategoryId, activeBrandId }) => {
+  if (activeCategoryId || activeBrandId) return null; // Hidden when a category or brand filter is active
 
   if (!brandsData || brandsData.length === 0) {
     return (
