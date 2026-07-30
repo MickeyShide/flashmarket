@@ -330,7 +330,7 @@ jobs:
             printf 'CATALOG_DOCS_ENABLED=false\n'
             printf 'CATALOG_RATE_LIMIT_ENABLED=true\n'
             printf 'CATALOG_CORS_ORIGINS=%s\n' "$cors_origins"
-            printf 'CATALOG_TRUSTED_HOSTS=["%s","localhost"]\n' "$CATALOG_DOMAIN"
+            printf 'CATALOG_TRUSTED_HOSTS=["%s","localhost","127.0.0.1"]\n' "$CATALOG_DOMAIN"
             printf 'CATALOG_TRUSTED_PROXY_IPS=["172.16.0.0/12"]\n'
             printf 'CATALOG_REFRESH_TOKEN_TRANSPORT=cookie\n'
             printf 'CATALOG_REFRESH_COOKIE_SECURE=true\n'

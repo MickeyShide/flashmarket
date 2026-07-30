@@ -321,7 +321,7 @@ jobs:
             printf 'PAYMENTS_DEBUG=false\n'
             printf 'PAYMENTS_DOCS_ENABLED=false\n'
             printf 'PAYMENTS_CORS_ORIGINS=%s\n' "$cors_origins"
-            printf 'PAYMENTS_TRUSTED_HOSTS=["%s","localhost"]\n' "$PAYMENTS_DOMAIN"
+            printf 'PAYMENTS_TRUSTED_HOSTS=["%s","localhost","127.0.0.1"]\n' "$PAYMENTS_DOMAIN"
             printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
             printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"

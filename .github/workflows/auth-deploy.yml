@@ -330,7 +330,7 @@ jobs:
             printf 'AUTH_DOCS_ENABLED=false\n'
             printf 'AUTH_RATE_LIMIT_ENABLED=true\n'
             printf 'AUTH_CORS_ORIGINS=%s\n' "$cors_origins"
-            printf 'AUTH_TRUSTED_HOSTS=["%s","localhost"]\n' "$AUTH_DOMAIN"
+            printf 'AUTH_TRUSTED_HOSTS=["%s","localhost","127.0.0.1"]\n' "$AUTH_DOMAIN"
             printf 'AUTH_TRUSTED_PROXY_IPS=["172.16.0.0/12"]\n'
             printf 'AUTH_REFRESH_TOKEN_TRANSPORT=cookie\n'
             printf 'AUTH_REFRESH_COOKIE_SECURE=true\n'

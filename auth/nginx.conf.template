@@ -1,6 +1,6 @@
 server {
     listen 80 default_server;
-    server_name auth.localhost auth.${GATEWAY_DOMAIN} ${AUTH_DOMAIN} _;
+    server_name _;
     server_tokens off;
 
     client_max_body_size 16k;
