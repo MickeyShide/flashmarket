@@ -5,8 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /uvx /bin/
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_CACHE_DIR=/tmp/.cache/uv
+    UV_LINK_MODE=copy
 
 WORKDIR /app
 
@@ -24,6 +23,8 @@ COPY docker/entrypoint.sh ./docker/entrypoint.sh
 RUN uv sync --frozen --no-dev && \
     sed -i 's/\r$//' ./docker/entrypoint.sh && \
     chmod +x ./docker/entrypoint.sh
+
+ENV UV_NO_CACHE=1
 
 USER app
 
