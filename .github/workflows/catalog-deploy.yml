@@ -426,7 +426,6 @@ jobs:
           docker compose -f docker-compose.yml --env-file .env ps -a
           echo 'Checking internal Nginx endpoint...'
           curl --fail --silent --show-error \
-            -H "Host: ${CATALOG_DOMAIN}" \
             http://127.0.0.1:4919/health/ready
           REMOTE
 
@@ -451,7 +450,7 @@ jobs:
 
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
           if ssh -p "$DEPLOY_PORT" "$target" \
-            "curl --fail --silent --show-error -H 'Host: ${CATALOG_DOMAIN}' http://127.0.0.1:4919/health/ready"; then
+            "curl --fail --silent --show-error http://127.0.0.1:4919/health/ready"; then
             echo
             echo "::notice title=Catalog nginx is healthy::Configure Nginx Proxy Manager for ${CATALOG_DOMAIN} with upstream ${DEPLOY_HOST}:4919 and enable SSL"
           fi

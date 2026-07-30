@@ -426,7 +426,6 @@ jobs:
           docker compose -f docker-compose.yml --env-file .env ps -a
           echo 'Checking internal Nginx endpoint...'
           curl --fail --silent --show-error \
-            -H "Host: ${AUTH_DOMAIN}" \
             http://127.0.0.1:4918/health/ready
           REMOTE
 
@@ -451,7 +450,7 @@ jobs:
 
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
           if ssh -p "$DEPLOY_PORT" "$target" \
-            "curl --fail --silent --show-error -H 'Host: ${AUTH_DOMAIN}' http://127.0.0.1:4918/health/ready"; then
+            "curl --fail --silent --show-error http://127.0.0.1:4918/health/ready"; then
             echo
             echo "::notice title=Auth nginx is healthy::Configure Nginx Proxy Manager for ${AUTH_DOMAIN} with upstream ${DEPLOY_HOST}:4918 and enable SSL"
           fi
