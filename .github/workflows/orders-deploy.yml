@@ -401,6 +401,7 @@ jobs:
             -d \
             --no-build \
             --force-recreate \
+            --remove-orphans \
             api consumer outbox nginx
           echo 'Orders runtime containers started.'
 

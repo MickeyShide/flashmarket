@@ -416,6 +416,7 @@ jobs:
             -d \
             --no-build \
             --force-recreate \
+            --remove-orphans \
             api nginx
           echo 'Catalog runtime containers started.'
 

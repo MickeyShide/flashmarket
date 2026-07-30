@@ -416,6 +416,7 @@ jobs:
             -d \
             --no-build \
             --force-recreate \
+            --remove-orphans \
             api outbox cleanup nginx
           echo 'Auth runtime containers started.'
 
