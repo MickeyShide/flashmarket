@@ -312,7 +312,7 @@ jobs:
           umask 077
           {
             printf 'INVENTORY_IMAGE=%s\n' "$INVENTORY_IMAGE"
-            printf 'INVENTORY_PROXY_PORT=4919\n'
+            printf 'INVENTORY_PROXY_PORT=4923\n'
             printf 'INVENTORY_ENVIRONMENT=production\n'
             printf 'INVENTORY_DOMAIN=%s\n' "$INVENTORY_DOMAIN"
             printf 'INVENTORY_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/inventory\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"

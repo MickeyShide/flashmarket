@@ -23,8 +23,6 @@ services:
   api:
     <<: *orders-runtime
     environment: *orders-environment
-    ports:
-      - "127.0.0.1:${ORDERS_PROXY_PORT:-4920}:8000"
     depends_on: {}
     healthcheck:
       test:

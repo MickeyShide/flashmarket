@@ -22,8 +22,6 @@ services:
   api:
     <<: *notifications-runtime
     environment: *notifications-environment
-    ports:
-      - "127.0.0.1:${NOTIFICATIONS_PROXY_PORT:-4922}:8000"
     depends_on: {}
     healthcheck:
       test:

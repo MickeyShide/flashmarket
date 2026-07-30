@@ -23,8 +23,6 @@ services:
   api:
     <<: *inventory-runtime
     environment: *inventory-environment
-    ports:
-      - "127.0.0.1:${INVENTORY_PROXY_PORT:-4919}:8000"
     depends_on: {}
     healthcheck:
       test:
@@ -61,7 +59,7 @@ services:
     env_file:
       - ${INVENTORY_ENV_FILE:-.env}
     ports:
-      - "${INVENTORY_PROXY_PORT:-4919}:80"
+      - "${INVENTORY_PROXY_PORT:-4923}:80"
     volumes:
       - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
     networks:

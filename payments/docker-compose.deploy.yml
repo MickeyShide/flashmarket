@@ -22,8 +22,6 @@ services:
   api:
     <<: *payments-runtime
     environment: *payments-environment
-    ports:
-      - "127.0.0.1:${PAYMENTS_PROXY_PORT:-4921}:8000"
     depends_on: {}
     healthcheck:
       test:
@@ -60,7 +58,7 @@ services:
     env_file:
       - ${PAYMENTS_ENV_FILE:-.env}
     ports:
-      - "${PAYMENTS_PROXY_PORT:-4922}:80"
+      - "${PAYMENTS_PROXY_PORT:-4921}:80"
     volumes:
       - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
     networks:
