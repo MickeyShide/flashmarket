@@ -48,12 +48,45 @@ def retry(message: str):
     return decorator
 
 
+def _get_db_url() -> str | None:
+    for key in [
+        "DATABASE_URL",
+        "CATALOG_DATABASE_URL",
+        "AUTH_DATABASE_URL",
+        "INVENTORY_DATABASE_URL",
+        "ORDERS_DATABASE_URL",
+        "PAYMENTS_DATABASE_URL",
+        "NOTIFICATIONS_DATABASE_URL",
+    ]:
+        if val := os.environ.get(key):
+            return val
+    return None
+
+
+def _get_rabbitmq_url() -> str | None:
+    for key in [
+        "RABBITMQ_URL",
+        "INVENTORY_RABBITMQ_URL",
+        "ORDERS_RABBITMQ_URL",
+        "PAYMENTS_RABBITMQ_URL",
+        "NOTIFICATIONS_RABBITMQ_URL",
+    ]:
+        if val := os.environ.get(key):
+            return val
+    return None
+
+
 @retry("Waiting for PostgreSQL")
 async def ensure_database() -> None:
-    url = urlparse(os.environ["DATABASE_URL"])
+    raw_url = _get_db_url()
+    if not raw_url:
+        print("No database URL configured in environment, skipping DB initialization.")
+        return
+
+    url = urlparse(raw_url)
     target_db = url.path.lstrip("/")
     if not target_db:
-        print("DATABASE_URL missing database name", file=sys.stderr)
+        print("Database URL missing database name", file=sys.stderr)
         sys.exit(1)
 
     admin_dsn = url._replace(path="/postgres", scheme="postgresql").geturl()
@@ -73,7 +106,12 @@ async def ensure_database() -> None:
 
 @retry("Waiting for RabbitMQ management API")
 def ensure_rabbitmq_vhost() -> None:
-    url = urlparse(os.environ["RABBITMQ_URL"])
+    raw_url = _get_rabbitmq_url()
+    if not raw_url:
+        print("No RabbitMQ URL configured in environment, skipping RabbitMQ initialization.")
+        return
+
+    url = urlparse(raw_url)
     vhost = url.path.lstrip("/") or "/"
     user = url.username or "guest"
     password = url.password or "guest"

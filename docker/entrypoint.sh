@@ -42,6 +42,8 @@ case "$CMD" in
     ;;
 
   migrate)
+    echo "Ensuring shared infrastructure resources..."
+    python /app/docker/init-infra.py
     echo "Running database migrations (alembic upgrade head)..."
     exec alembic upgrade head
     ;;
