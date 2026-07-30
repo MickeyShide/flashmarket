@@ -14,14 +14,14 @@ import urllib.request
 from urllib.parse import urlparse
 
 
-def resolve_host_ipv4(host: str) -> str:
-    """Force IPv4 (AF_INET) lookup to bypass Docker glibc AAAA resolution timeouts."""
+def resolve_host_ipv4(host: str, port: int = 5432) -> str:
+    """Force IPv4 (AF_INET) lookup with explicit port to bypass glibc servname and AAAA resolution failures."""
     try:
-        infos = socket.getaddrinfo(host, None, family=socket.AF_INET, type=socket.SOCK_STREAM)
+        infos = socket.getaddrinfo(host, port, family=socket.AF_INET, type=socket.SOCK_STREAM)
         if infos:
             return infos[0][4][0]
-    except Exception:
-        pass
+    except Exception as err:
+        print(f"Warning: IPv4 resolution for {host}:{port} failed: {err}", file=sys.stderr)
     return host
 
 import asyncpg
@@ -106,7 +106,8 @@ async def ensure_database() -> None:
 
     admin_dsn = url._replace(path="/postgres", scheme="postgresql").geturl()
     if url.hostname:
-        resolved_ip = resolve_host_ipv4(url.hostname)
+        db_port = url.port or 5432
+        resolved_ip = resolve_host_ipv4(url.hostname, db_port)
         admin_dsn = admin_dsn.replace(f"@{url.hostname}:", f"@{resolved_ip}:")
     conn = await asyncpg.connect(admin_dsn)
     try:
@@ -134,7 +135,7 @@ def ensure_rabbitmq_vhost() -> None:
     user = url.username or "guest"
     password = url.password or "guest"
     host = url.hostname or "localhost"
-    resolved_host = resolve_host_ipv4(host)
+    resolved_host = resolve_host_ipv4(host, 15672)
     port = 15672
 
     credentials = f"{user}:{password}"
