@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     refresh_cookie_samesite: Literal["strict", "lax"] = "strict"
 
     rate_limit_enabled: bool = True
+    log_file_path: str | None = None
+    prometheus_multiproc_dir: str | None = None
     login_ip_rate_limit: int = Field(default=20, ge=1, le=1000)
     login_account_rate_limit: int = Field(default=5, ge=1, le=1000)
     login_rate_window_seconds: int = Field(default=60, ge=1, le=86400)

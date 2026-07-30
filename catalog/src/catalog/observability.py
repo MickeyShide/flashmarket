@@ -1,3 +1,5 @@
+"""Observability helpers: logging, request middleware, Prometheus metrics."""
+
 import json
 import logging
 import re
@@ -8,32 +10,34 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 
 from fastapi import Request, Response
-from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, generate_latest, multiprocess
+from prometheus_client import (
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
 
-from auth_service.config import get_settings
+from catalog.config import get_settings
 
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 HTTP_REQUESTS = Counter(
-    "auth_http_requests_total",
+    "catalog_http_requests_total",
     "Total HTTP requests",
     labelnames=("method", "route", "status"),
 )
 HTTP_DURATION = Histogram(
-    "auth_http_request_duration_seconds",
+    "catalog_http_request_duration_seconds",
     "HTTP request duration",
     labelnames=("method", "route"),
 )
 HTTP_IN_PROGRESS = Gauge(
-    "auth_http_requests_in_progress",
+    "catalog_http_requests_in_progress",
     "HTTP requests currently in progress",
-)
-RATE_LIMIT_REJECTIONS = Counter(
-    "auth_rate_limit_rejections_total",
-    "Requests rejected by the distributed rate limiter",
-    labelnames=("scope",),
 )
 
 SENSITIVE_KEYS = {
@@ -146,7 +150,7 @@ def configure_logging() -> logging.Logger:
             lg.addHandler(handler)
         lg.propagate = False
 
-    logger = logging.getLogger("auth.http")
+    logger = logging.getLogger("catalog.http")
     logger.setLevel(logging.INFO)
     logger.propagate = False
     if not logger.handlers:
@@ -197,12 +201,6 @@ async def request_observability_middleware(
         response = await call_next(request)
         status_code = response.status_code
         response.headers["X-Request-ID"] = request_id
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Cache-Control"] = "no-store"
-        if get_settings().environment == "production":
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
     finally:
         route = request.scope.get("route")

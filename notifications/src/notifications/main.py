@@ -8,10 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from notifications.api.error_handlers import notification_error_handler
-from notifications.api.routes import health, notifications
+from notifications.api.routes import health, metrics, notifications
 from notifications.config import get_settings
 from notifications.domain.exceptions import NotificationError
 from notifications.infrastructure.database import engine
+from notifications.observability import (
+    request_observability_middleware,
+    setup_metrics,
+)
 
 
 @asynccontextmanager
@@ -23,6 +27,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    setup_metrics()
     settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
@@ -49,7 +54,10 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(NotificationError, notification_error_handler)  # type: ignore[arg-type]
 
+    app.middleware("http")(request_observability_middleware)
+
     app.include_router(health.router)
+    app.include_router(metrics.router)
     app.include_router(notifications.router)
 
     return app

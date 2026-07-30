@@ -1,7 +1,9 @@
+"""Prometheus metrics endpoint."""
+
 from fastapi import APIRouter, Response
 from prometheus_client import CONTENT_TYPE_LATEST
 
-from auth_service.observability import generate_metrics
+from payments.observability import generate_metrics
 
 router = APIRouter(tags=["metrics"])
 

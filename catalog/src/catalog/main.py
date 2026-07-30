@@ -8,10 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from catalog.api.error_handlers import catalog_error_handler
-from catalog.api.routes import brands, categories, health, internal, products
+from catalog.api.routes import brands, categories, health, internal, metrics, products
 from catalog.config import get_settings
 from catalog.domain.exceptions import CatalogError
 from catalog.infrastructure.database import engine
+from catalog.observability import (
+    request_observability_middleware,
+    setup_metrics,
+)
 
 
 @asynccontextmanager
@@ -23,6 +27,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    setup_metrics()
     settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
@@ -49,7 +54,10 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(CatalogError, catalog_error_handler)  # type: ignore[arg-type]
 
+    app.middleware("http")(request_observability_middleware)
+
     app.include_router(health.router)
+    app.include_router(metrics.router)
     app.include_router(categories.router)
     app.include_router(brands.router)
     app.include_router(products.router)

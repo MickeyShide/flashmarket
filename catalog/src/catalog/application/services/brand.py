@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from catalog.application.schemas import CreateBrandRequest, UpdateBrandRequest
+from catalog.application.schemas import CreateBrandRequest
 from catalog.domain.exceptions import BrandNotFound, DuplicateSlug
 from catalog.infrastructure.models import BrandModel
 from catalog.infrastructure.repositories.brand import BrandRepository

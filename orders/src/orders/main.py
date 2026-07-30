@@ -8,10 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from orders.api.error_handlers import order_error_handler
-from orders.api.routes import health, orders
+from orders.api.routes import health, metrics, orders
 from orders.config import get_settings
 from orders.domain.exceptions import OrderError
 from orders.infrastructure.database import engine
+from orders.observability import (
+    request_observability_middleware,
+    setup_metrics,
+)
 
 
 @asynccontextmanager
@@ -23,6 +27,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    setup_metrics()
     settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
@@ -49,7 +54,10 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(OrderError, order_error_handler)  # type: ignore[arg-type]
 
+    app.middleware("http")(request_observability_middleware)
+
     app.include_router(health.router)
+    app.include_router(metrics.router)
     app.include_router(orders.router)
 
     return app

@@ -9,6 +9,8 @@ x-orders-environment: &orders-environment
   ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/orders
   ORDERS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
   ORDERS_CORS_ORIGINS: '["http://localhost:3000"]'
+  ORDERS_LOG_FILE_PATH: /var/log/shide/orders-api.log
+  ORDERS_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
 
 services:
   migrate:
@@ -32,6 +34,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    volumes:
+      - backend-logs-local:/var/log/shide
+      - orders-metrics-data:/tmp/prometheus
     healthcheck:
       test:
         - CMD
@@ -46,24 +51,32 @@ services:
 
   consumer:
     <<: *orders-runtime
-    environment: *orders-environment
+    environment:
+      <<: *orders-environment
+      ORDERS_LOG_FILE_PATH: /var/log/shide/orders-consumer.log
     command: [".venv/bin/python", "-m", "orders.event_consumer"]
     depends_on:
       migrate:
         condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - backend-logs-local:/var/log/shide
     restart: unless-stopped
 
   outbox:
     <<: *orders-runtime
-    environment: *orders-environment
+    environment:
+      <<: *orders-environment
+      ORDERS_LOG_FILE_PATH: /var/log/shide/orders-outbox.log
     command: [".venv/bin/python", "-m", "orders.outbox_worker"]
     depends_on:
       migrate:
         condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - backend-logs-local:/var/log/shide
     restart: unless-stopped
 
   db:
@@ -99,8 +112,14 @@ services:
 
 volumes:
   orders-postgres-data:
+  orders-metrics-data:
+  backend-logs-local:
+    external: true
+    name: shide-backend-logs-local
 
 networks:
   default:
     name: flashmarket
+    external: true
+  shide-observability:
     external: true

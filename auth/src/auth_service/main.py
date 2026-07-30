@@ -21,7 +21,10 @@ from auth_service.cache import redis_client
 from auth_service.config import get_settings
 from auth_service.database import engine
 from auth_service.key_management import validate_configured_key_pair
-from auth_service.observability import request_observability_middleware
+from auth_service.observability import (
+    request_observability_middleware,
+    setup_metrics,
+)
 
 
 @asynccontextmanager
@@ -34,6 +37,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    setup_metrics()
     settings = get_settings()
     validate_configured_key_pair()
     app = FastAPI(
