@@ -79,5 +79,9 @@ services:
 
 networks:
   frontend:
+    external: true
+    name: shide-observability
   backend:
-    internal: true
+    external: true
+    name: shide-observability
+
