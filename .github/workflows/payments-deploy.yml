@@ -308,7 +308,7 @@ jobs:
         shell: bash
         run: |
           environment_file="$RUNNER_TEMP/flashmarket-payments.env"
-          cors_origins="${PAYMENTS_CORS_ORIGINS:-[\"https://${PAYMENTS_DOMAIN}\"]}"
+          cors_origins="${PAYMENTS_CORS_ORIGINS:-[\"https://${PAYMENTS_DOMAIN}\",\"https://${GATEWAY_DOMAIN}\"]}"
           umask 077
           {
             printf 'PAYMENTS_IMAGE=%s\n' "$PAYMENTS_IMAGE"
@@ -321,7 +321,7 @@ jobs:
             printf 'PAYMENTS_DEBUG=false\n'
             printf 'PAYMENTS_DOCS_ENABLED=false\n'
             printf 'PAYMENTS_CORS_ORIGINS=%s\n' "$cors_origins"
-            printf 'PAYMENTS_TRUSTED_HOSTS=["%s","localhost","127.0.0.1"]\n' "$PAYMENTS_DOMAIN"
+            printf 'PAYMENTS_TRUSTED_HOSTS=["%s","%s","*.%s","localhost","127.0.0.1","payments","api"]\n' "$PAYMENTS_DOMAIN" "$GATEWAY_DOMAIN" "$GATEWAY_DOMAIN"
             printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
             printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"

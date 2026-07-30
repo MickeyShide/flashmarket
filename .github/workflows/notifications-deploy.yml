@@ -308,7 +308,7 @@ jobs:
         shell: bash
         run: |
           environment_file="$RUNNER_TEMP/flashmarket-notifications.env"
-          cors_origins="${NOTIFICATIONS_CORS_ORIGINS:-[\"https://${NOTIFICATIONS_DOMAIN}\"]}"
+          cors_origins="${NOTIFICATIONS_CORS_ORIGINS:-[\"https://${NOTIFICATIONS_DOMAIN}\",\"https://${GATEWAY_DOMAIN}\"]}"
           umask 077
           {
             printf 'NOTIFICATIONS_IMAGE=%s\n' "$NOTIFICATIONS_IMAGE"
@@ -321,7 +321,7 @@ jobs:
             printf 'NOTIFICATIONS_DEBUG=false\n'
             printf 'NOTIFICATIONS_DOCS_ENABLED=false\n'
             printf 'NOTIFICATIONS_CORS_ORIGINS=%s\n' "$cors_origins"
-            printf 'NOTIFICATIONS_TRUSTED_HOSTS=["%s","localhost","127.0.0.1"]\n' "$NOTIFICATIONS_DOMAIN"
+            printf 'NOTIFICATIONS_TRUSTED_HOSTS=["%s","%s","*.%s","localhost","127.0.0.1","notifications","api"]\n' "$NOTIFICATIONS_DOMAIN" "$GATEWAY_DOMAIN" "$GATEWAY_DOMAIN"
             printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
             printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"

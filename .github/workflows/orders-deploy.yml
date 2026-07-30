@@ -308,7 +308,7 @@ jobs:
         shell: bash
         run: |
           environment_file="$RUNNER_TEMP/flashmarket-orders.env"
-          cors_origins="${ORDERS_CORS_ORIGINS:-[\"https://${ORDERS_DOMAIN}\"]}"
+          cors_origins="${ORDERS_CORS_ORIGINS:-[\"https://${ORDERS_DOMAIN}\",\"https://${GATEWAY_DOMAIN}\"]}"
           umask 077
           {
             printf 'ORDERS_IMAGE=%s\n' "$ORDERS_IMAGE"
@@ -321,7 +321,7 @@ jobs:
             printf 'ORDERS_DEBUG=false\n'
             printf 'ORDERS_DOCS_ENABLED=false\n'
             printf 'ORDERS_CORS_ORIGINS=%s\n' "$cors_origins"
-            printf 'ORDERS_TRUSTED_HOSTS=["%s","localhost","127.0.0.1"]\n' "$ORDERS_DOMAIN"
+            printf 'ORDERS_TRUSTED_HOSTS=["%s","%s","*.%s","localhost","127.0.0.1","orders","api"]\n' "$ORDERS_DOMAIN" "$GATEWAY_DOMAIN" "$GATEWAY_DOMAIN"
             printf 'ORDERS_PAYMENT_TIMEOUT_SECONDS=300\n'
             printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
