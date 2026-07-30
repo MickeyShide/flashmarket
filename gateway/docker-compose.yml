@@ -25,7 +25,6 @@ services:
     restart: unless-stopped
     networks:
       - default
-      - shide-observability
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:1.4.2
@@ -36,8 +35,4 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - shide-observability
-
-networks:
-  shide-observability:
-    external: true
+      - default

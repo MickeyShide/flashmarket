@@ -6,24 +6,14 @@ x-orders-runtime: &orders-runtime
 
 x-orders-environment: &orders-environment
   ORDERS_ENVIRONMENT: development
-  ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/orders
-  ORDERS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
+  ORDERS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/orders
+  ORDERS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672//orders
   ORDERS_CORS_ORIGINS: '["http://localhost:3000"]'
   ORDERS_LOG_FILE_PATH: /var/log/shide/orders-api.log
   ORDERS_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+  ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
 
 services:
-  migrate:
-    <<: *orders-runtime
-    environment:
-      ORDERS_ENVIRONMENT: development
-      ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/orders
-    command: [".venv/bin/alembic", "upgrade", "head"]
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
   api:
     <<: *orders-runtime
     build:
@@ -31,9 +21,6 @@ services:
     environment: *orders-environment
     ports:
       - "127.0.0.1:${ORDERS_PORT:-4920}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
     volumes:
       - backend-logs-local:/var/log/shide
       - orders-metrics-data:/tmp/prometheus
@@ -54,12 +41,9 @@ services:
     environment:
       <<: *orders-environment
       ORDERS_LOG_FILE_PATH: /var/log/shide/orders-consumer.log
-    command: [".venv/bin/python", "-m", "orders.event_consumer"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+    command:
+      - consumer
+      - orders.event_consumer
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
@@ -69,49 +53,14 @@ services:
     environment:
       <<: *orders-environment
       ORDERS_LOG_FILE_PATH: /var/log/shide/orders-outbox.log
-    command: [".venv/bin/python", "-m", "orders.outbox_worker"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+    command:
+      - outbox
+      - orders.outbox_worker
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
 
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: orders
-      POSTGRES_USER: flashmarket
-      POSTGRES_PASSWORD: flashmarket
-    ports:
-      - "127.0.0.1:${ORDERS_DB_PORT:-5435}:5432"
-    volumes:
-      - orders-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flashmarket -d orders"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:3.13-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    # Internal RabbitMQ reachable only via the Docker network to avoid port
-    # conflicts with other service brokers in the root compose stack.
-    healthcheck:
-      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
 volumes:
-  orders-postgres-data:
   orders-metrics-data:
   backend-logs-local:
     external: true
@@ -119,7 +68,5 @@ volumes:
 
 networks:
   default:
-    name: flashmarket
-    external: true
-  shide-observability:
+    name: shide-observability
     external: true

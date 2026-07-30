@@ -20,25 +20,12 @@ x-inventory-environment: &inventory-environment
   INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES: ${INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
 
 services:
-  migrate:
-    <<: *inventory-runtime
-    environment:
-      INVENTORY_ENVIRONMENT: development
-      INVENTORY_DATABASE_URL: ${INVENTORY_DATABASE_URL}
-    command: [".venv/bin/alembic", "upgrade", "head"]
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
   api:
     <<: *inventory-runtime
     environment: *inventory-environment
     ports:
       - "127.0.0.1:${INVENTORY_PROXY_PORT:-4919}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+    depends_on: {}
     healthcheck:
       test:
         - CMD
@@ -54,57 +41,19 @@ services:
   consumer:
     <<: *inventory-runtime
     environment: *inventory-environment
-    command: [".venv/bin/python", "-m", "inventory.event_consumer"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+    command:
+      - consumer
+      - inventory.event_consumer
+    depends_on: {}
     restart: unless-stopped
 
   outbox:
     <<: *inventory-runtime
     environment: *inventory-environment
-    command: [".venv/bin/python", "-m", "inventory.outbox_worker"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-inventory}
-      POSTGRES_USER: ${POSTGRES_USER:-flashmarket_inventory}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - inventory-postgres-data:/var/lib/postgresql/data
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:4-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-flashmarket_inventory}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-    volumes:
-      - inventory-rabbitmq-data:/var/lib/rabbitmq
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 15s
+    command:
+      - outbox
+      - inventory.outbox_worker
+    depends_on: {}
     restart: unless-stopped
 
   nginx:
@@ -136,9 +85,8 @@ services:
 
 networks:
   frontend:
+    external: true
+    name: shide-observability
   backend:
-    internal: true
-
-volumes:
-  inventory-postgres-data:
-  inventory-rabbitmq-data:
+    external: true
+    name: shide-observability

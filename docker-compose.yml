@@ -2,36 +2,6 @@ name: flashmarket
 
 services:
   # -----------------------------------------------------------
-  # SHARED INFRASTRUCTURE (Single Redis & Single RabbitMQ)
-  # -----------------------------------------------------------
-  redis:
-    image: redis:7-alpine
-    container_name: flashmarket-redis
-    ports:
-      - "127.0.0.1:6379:6379"
-    volumes:
-      - redis-data:/data
-    networks:
-      - default
-      - shide-observability
-
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: flashmarket-rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: flashmarket
-      RABBITMQ_DEFAULT_PASS: flashmarket
-    ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-      - ./docker/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
-    networks:
-      - default
-      - shide-observability
-
-  # -----------------------------------------------------------
   # AUTH MICROSERVICE
   # -----------------------------------------------------------
   auth:
@@ -39,39 +9,18 @@ services:
       file: auth/docker-compose.yml
       service: api
     depends_on: !reset {}
-    environment:
-      AUTH_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@auth-db:5432/auth
-      AUTH_REDIS_URL: redis://redis:6379/0
-      AUTH_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-    volumes:
-      - auth-jwt-keys:/var/lib/flashmarket-auth/keys:ro
-      - backend-logs-local:/var/log/shide
-
-  auth-migrate:
-    extends:
-      file: auth/docker-compose.yml
-      service: migrate
-    depends_on: !reset {}
-    environment:
-      AUTH_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@auth-db:5432/auth
-
-  auth-db:
-    extends:
-      file: auth/docker-compose.yml
-      service: db
 
   auth-outbox:
     extends:
       file: auth/docker-compose.yml
       service: outbox
     depends_on: !reset {}
-    environment:
-      AUTH_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@auth-db:5432/auth
-      AUTH_REDIS_URL: redis://redis:6379/0
-      AUTH_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      AUTH_LOG_FILE_PATH: /var/log/shide/auth-outbox.log
-    volumes:
-      - backend-logs-local:/var/log/shide
+
+  auth-cleanup:
+    extends:
+      file: auth/docker-compose.yml
+      service: cleanup
+    depends_on: !reset {}
 
   # -----------------------------------------------------------
   # CATALOG MICROSERVICE
@@ -81,24 +30,6 @@ services:
       file: catalog/docker-compose.yml
       service: api
     depends_on: !reset {}
-    environment:
-      CATALOG_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@catalog-db:5432/catalog
-      CATALOG_LOG_FILE_PATH: /var/log/shide/catalog-api.log
-    volumes:
-      - backend-logs-local:/var/log/shide
-
-  catalog-migrate:
-    extends:
-      file: catalog/docker-compose.yml
-      service: migrate
-    depends_on: !reset {}
-    environment:
-      CATALOG_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@catalog-db:5432/catalog
-
-  catalog-db:
-    extends:
-      file: catalog/docker-compose.yml
-      service: db
 
   # -----------------------------------------------------------
   # INVENTORY MICROSERVICE
@@ -108,49 +39,18 @@ services:
       file: inventory/docker-compose.yml
       service: api
     depends_on: !reset {}
-    environment:
-      INVENTORY_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@inventory-db:5432/inventory
-      INVENTORY_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      INVENTORY_LOG_FILE_PATH: /var/log/shide/inventory-api.log
-    volumes:
-      - backend-logs-local:/var/log/shide
-
-  inventory-migrate:
-    extends:
-      file: inventory/docker-compose.yml
-      service: migrate
-    depends_on: !reset {}
-    environment:
-      INVENTORY_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@inventory-db:5432/inventory
-
-  inventory-db:
-    extends:
-      file: inventory/docker-compose.yml
-      service: db
 
   inventory-consumer:
     extends:
       file: inventory/docker-compose.yml
       service: consumer
     depends_on: !reset {}
-    environment:
-      INVENTORY_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@inventory-db:5432/inventory
-      INVENTORY_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      INVENTORY_LOG_FILE_PATH: /var/log/shide/inventory-consumer.log
-    volumes:
-      - backend-logs-local:/var/log/shide
 
   inventory-outbox:
     extends:
       file: inventory/docker-compose.yml
       service: outbox
     depends_on: !reset {}
-    environment:
-      INVENTORY_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@inventory-db:5432/inventory
-      INVENTORY_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      INVENTORY_LOG_FILE_PATH: /var/log/shide/inventory-outbox.log
-    volumes:
-      - backend-logs-local:/var/log/shide
 
   # -----------------------------------------------------------
   # ORDERS MICROSERVICE
@@ -160,49 +60,18 @@ services:
       file: orders/docker-compose.yml
       service: api
     depends_on: !reset {}
-    environment:
-      ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@orders-db:5432/orders
-      ORDERS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      ORDERS_LOG_FILE_PATH: /var/log/shide/orders-api.log
-    volumes:
-      - backend-logs-local:/var/log/shide
-
-  orders-migrate:
-    extends:
-      file: orders/docker-compose.yml
-      service: migrate
-    depends_on: !reset {}
-    environment:
-      ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@orders-db:5432/orders
-
-  orders-db:
-    extends:
-      file: orders/docker-compose.yml
-      service: db
 
   orders-consumer:
     extends:
       file: orders/docker-compose.yml
       service: consumer
     depends_on: !reset {}
-    environment:
-      ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@orders-db:5432/orders
-      ORDERS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      ORDERS_LOG_FILE_PATH: /var/log/shide/orders-consumer.log
-    volumes:
-      - backend-logs-local:/var/log/shide
 
   orders-outbox:
     extends:
       file: orders/docker-compose.yml
       service: outbox
     depends_on: !reset {}
-    environment:
-      ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@orders-db:5432/orders
-      ORDERS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      ORDERS_LOG_FILE_PATH: /var/log/shide/orders-outbox.log
-    volumes:
-      - backend-logs-local:/var/log/shide
 
   # -----------------------------------------------------------
   # PAYMENTS MICROSERVICE
@@ -212,49 +81,18 @@ services:
       file: payments/docker-compose.yml
       service: api
     depends_on: !reset {}
-    environment:
-      PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@payments-db:5432/payments
-      PAYMENTS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      PAYMENTS_LOG_FILE_PATH: /var/log/shide/payments-api.log
-    volumes:
-      - backend-logs-local:/var/log/shide
-
-  payments-migrate:
-    extends:
-      file: payments/docker-compose.yml
-      service: migrate
-    depends_on: !reset {}
-    environment:
-      PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@payments-db:5432/payments
-
-  payments-db:
-    extends:
-      file: payments/docker-compose.yml
-      service: db
 
   payments-consumer:
     extends:
       file: payments/docker-compose.yml
       service: consumer
     depends_on: !reset {}
-    environment:
-      PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@payments-db:5432/payments
-      PAYMENTS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      PAYMENTS_LOG_FILE_PATH: /var/log/shide/payments-consumer.log
-    volumes:
-      - backend-logs-local:/var/log/shide
 
   payments-outbox:
     extends:
       file: payments/docker-compose.yml
       service: outbox
     depends_on: !reset {}
-    environment:
-      PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@payments-db:5432/payments
-      PAYMENTS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      PAYMENTS_LOG_FILE_PATH: /var/log/shide/payments-outbox.log
-    volumes:
-      - backend-logs-local:/var/log/shide
 
   # -----------------------------------------------------------
   # NOTIFICATIONS MICROSERVICE
@@ -264,49 +102,18 @@ services:
       file: notifications/docker-compose.yml
       service: api
     depends_on: !reset {}
-    environment:
-      NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@notifications-db:5432/notifications
-      NOTIFICATIONS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      NOTIFICATIONS_LOG_FILE_PATH: /var/log/shide/notifications-api.log
-    volumes:
-      - backend-logs-local:/var/log/shide
-
-  notifications-migrate:
-    extends:
-      file: notifications/docker-compose.yml
-      service: migrate
-    depends_on: !reset {}
-    environment:
-      NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@notifications-db:5432/notifications
-
-  notifications-db:
-    extends:
-      file: notifications/docker-compose.yml
-      service: db
 
   notifications-consumer:
     extends:
       file: notifications/docker-compose.yml
       service: consumer
     depends_on: !reset {}
-    environment:
-      NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@notifications-db:5432/notifications
-      NOTIFICATIONS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      NOTIFICATIONS_LOG_FILE_PATH: /var/log/shide/notifications-consumer.log
-    volumes:
-      - backend-logs-local:/var/log/shide
 
   notifications-outbox:
     extends:
       file: notifications/docker-compose.yml
       service: outbox
     depends_on: !reset {}
-    environment:
-      NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@notifications-db:5432/notifications
-      NOTIFICATIONS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
-      NOTIFICATIONS_LOG_FILE_PATH: /var/log/shide/notifications-outbox.log
-    volumes:
-      - backend-logs-local:/var/log/shide
 
   # -----------------------------------------------------------
   # GATEWAY & FRONTEND
@@ -321,29 +128,21 @@ services:
       file: frontend/docker-compose.yml
       service: frontend
 
+networks:
+  default:
+    name: shide-observability
+    external: true
+  shide-observability:
+    external: true
+
 volumes:
   auth-jwt-keys:
-  auth-postgres-data:
-  catalog-postgres-data:
-  inventory-postgres-data:
-  orders-postgres-data:
-  payments-postgres-data:
-  notifications-postgres-data:
-  redis-data:
-  rabbitmq-data:
-  backend-logs-local:
-    external: true
-    name: shide-backend-logs-local
   auth-metrics-data:
   catalog-metrics-data:
   inventory-metrics-data:
   orders-metrics-data:
   payments-metrics-data:
   notifications-metrics-data:
-
-networks:
-  default:
-    name: flashmarket
+  backend-logs-local:
     external: true
-  shide-observability:
-    external: true
+    name: shide-backend-logs-local

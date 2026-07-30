@@ -240,11 +240,12 @@ jobs:
       SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GHCR_USERNAME: ${{ github.actor }}
+      INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
       ORDERS_IMAGE: ghcr.io/mickeyshide/flashmarket-orders@${{ needs.image.outputs.digest }}
       ORDERS_DOMAIN: ${{ vars.ORDERS_DOMAIN || vars.GATEWAY_DOMAIN || 'orders.flashmarket.shide.world' }}
       ORDERS_CORS_ORIGINS: ${{ vars.ORDERS_CORS_ORIGINS }}
-      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.ORDERS_POSTGRES_PASSWORD || secrets.AUTH_POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
-      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.ORDERS_RABBITMQ_PASSWORD || secrets.AUTH_RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -255,6 +256,7 @@ jobs:
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           ORDERS_DOMAIN="${ORDERS_DOMAIN:-orders.flashmarket.shide.world}"
+          INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
           DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"
 
@@ -282,6 +284,10 @@ jobs:
           fi
           if [[ ! "$ORDERS_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
             echo "::error::ORDERS_DOMAIN must contain only a DNS hostname"
+            exit 1
+          fi
+          if [[ ! "$INFRA_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            echo "::error::INFRA_USER is invalid"
             exit 1
           fi
           for password in \
@@ -317,19 +323,17 @@ jobs:
             printf 'ORDERS_PROXY_PORT=4920\n'
             printf 'ORDERS_ENVIRONMENT=production\n'
             printf 'ORDERS_DOMAIN=%s\n' "$ORDERS_DOMAIN"
-            printf 'ORDERS_DATABASE_URL=postgresql+asyncpg://flashmarket_orders:%s@db:5432/orders\n' "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'ORDERS_RABBITMQ_URL=amqps://flashmarket_orders:%s@rabbitmq:5672/\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'ORDERS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/orders\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'ORDERS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//orders\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'ORDERS_DEBUG=false\n'
             printf 'ORDERS_DOCS_ENABLED=false\n'
             printf 'ORDERS_CORS_ORIGINS=%s\n' "$cors_origins"
             printf 'ORDERS_TRUSTED_HOSTS=["%s","localhost"]\n' "$ORDERS_DOMAIN"
             printf 'ORDERS_PAYMENT_TIMEOUT_SECONDS=300\n'
-            printf 'POSTGRES_DB=orders\n'
-            printf 'POSTGRES_USER=flashmarket_orders\n'
+            printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'RABBITMQ_DEFAULT_USER=flashmarket_orders\n'
-            printf 'RABBITMQ_DEFAULT_PASS=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
           } > "$environment_file"
           chmod 600 "$environment_file"
 
@@ -374,7 +378,6 @@ jobs:
           export ORDERS_IMAGE
           docker compose --env-file .env config --quiet
           docker compose --env-file .env pull
-          docker compose --env-file .env up -d --no-build db
 
           wait_for_healthy() {
             service="$1"
@@ -397,20 +400,16 @@ jobs:
             return 1
           }
 
-          wait_for_healthy db
-          wait_for_healthy rabbitmq
-
           echo 'Applying database migrations...'
-          timeout 120 docker compose --env-file .env run --rm --no-deps migrate </dev/null
+          timeout 120 docker compose --env-file .env run --rm --no-deps api migrate </dev/null
           echo 'Database migrations complete.'
 
           echo 'Starting Orders runtime containers...'
           docker compose --env-file .env up \
             -d \
             --no-build \
-            --no-deps \
             --force-recreate \
-            api nginx
+            api consumer outbox nginx
           echo 'Orders runtime containers started.'
 
           echo 'Waiting for Orders API...'

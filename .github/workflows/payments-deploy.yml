@@ -240,11 +240,12 @@ jobs:
       SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GHCR_USERNAME: ${{ github.actor }}
+      INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
       PAYMENTS_IMAGE: ghcr.io/mickeyshide/flashmarket-payments@${{ needs.image.outputs.digest }}
       PAYMENTS_DOMAIN: ${{ vars.PAYMENTS_DOMAIN || vars.GATEWAY_DOMAIN || 'payments.flashmarket.shide.world' }}
       PAYMENTS_CORS_ORIGINS: ${{ vars.PAYMENTS_CORS_ORIGINS }}
-      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.PAYMENTS_POSTGRES_PASSWORD || secrets.AUTH_POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
-      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.PAYMENTS_RABBITMQ_PASSWORD || secrets.AUTH_RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -255,6 +256,7 @@ jobs:
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           PAYMENTS_DOMAIN="${PAYMENTS_DOMAIN:-payments.flashmarket.shide.world}"
+          INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
           DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"
 
@@ -282,6 +284,10 @@ jobs:
           fi
           if [[ ! "$PAYMENTS_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
             echo "::error::PAYMENTS_DOMAIN must contain only a DNS hostname"
+            exit 1
+          fi
+          if [[ ! "$INFRA_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            echo "::error::INFRA_USER is invalid"
             exit 1
           fi
           for password in \
@@ -317,18 +323,16 @@ jobs:
             printf 'PAYMENTS_PROXY_PORT=4921\n'
             printf 'PAYMENTS_ENVIRONMENT=production\n'
             printf 'PAYMENTS_DOMAIN=%s\n' "$PAYMENTS_DOMAIN"
-            printf 'PAYMENTS_DATABASE_URL=postgresql+asyncpg://flashmarket_payments:%s@db:5432/payments\n' "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'PAYMENTS_RABBITMQ_URL=amqps://flashmarket_payments:%s@rabbitmq:5672/\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'PAYMENTS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/payments\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'PAYMENTS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//payments\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'PAYMENTS_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'PAYMENTS_DEBUG=false\n'
             printf 'PAYMENTS_DOCS_ENABLED=false\n'
             printf 'PAYMENTS_CORS_ORIGINS=%s\n' "$cors_origins"
             printf 'PAYMENTS_TRUSTED_HOSTS=["%s","localhost"]\n' "$PAYMENTS_DOMAIN"
-            printf 'POSTGRES_DB=payments\n'
-            printf 'POSTGRES_USER=flashmarket_payments\n'
+            printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'RABBITMQ_DEFAULT_USER=flashmarket_payments\n'
-            printf 'RABBITMQ_DEFAULT_PASS=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
           } > "$environment_file"
           chmod 600 "$environment_file"
 
@@ -353,7 +357,7 @@ jobs:
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
           printf '%s' "$GHCR_TOKEN" |
             ssh -p "$DEPLOY_PORT" "$target" \
-              "docker login ghcr --username '$GHCR_USERNAME' --password-stdin"
+              "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
 
       - name: Deploy exact image digest
         shell: bash
@@ -363,7 +367,7 @@ jobs:
             "DEPLOY_PATH='$DEPLOY_PATH' PAYMENTS_IMAGE='$PAYMENTS_IMAGE' PAYMENTS_DOMAIN='$PAYMENTS_DOMAIN' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           cd "$DEPLOY_PATH"
-          trap 'docker logout ghcr >/dev/null 2>&1 || true' EXIT
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
           if [[ ! -f .env ]]; then
             echo "Missing $DEPLOY_PATH/.env"
@@ -373,7 +377,6 @@ jobs:
           export PAYMENTS_IMAGE
           docker compose --env-file .env config --quiet
           docker compose --env-file .env pull
-          docker compose --env-file .env up -d --no-build db
 
           wait_for_healthy() {
             service="$1"
@@ -396,20 +399,16 @@ jobs:
             return 1
           }
 
-          wait_for_healthy db
-          wait_for_healthy rabbitmq
-
           echo 'Applying database migrations...'
-          timeout 120 docker compose --env-file .env run --rm --no-deps migrate </dev/null
+          timeout 120 docker compose --env-file .env run --rm --no-deps api migrate </dev/null
           echo 'Database migrations complete.'
 
           echo 'Starting Payments runtime containers...'
           docker compose --env-file .env up \
             -d \
             --no-build \
-            --no-deps \
             --force-recreate \
-            api nginx
+            api consumer outbox nginx
           echo 'Payments runtime containers started.'
 
           echo 'Waiting for Payments API...'

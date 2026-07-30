@@ -240,11 +240,12 @@ jobs:
       SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GHCR_USERNAME: ${{ github.actor }}
+      INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
       INVENTORY_IMAGE: ghcr.io/mickeyshide/flashmarket-inventory@${{ needs.image.outputs.digest }}
       INVENTORY_DOMAIN: ${{ vars.INVENTORY_DOMAIN || vars.GATEWAY_DOMAIN || 'inventory.flashmarket.shide.world' }}
       INVENTORY_CORS_ORIGINS: ${{ vars.INVENTORY_CORS_ORIGINS }}
-      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.INVENTORY_POSTGRES_PASSWORD || secrets.AUTH_POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
-      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.INVENTORY_RABBITMQ_PASSWORD || secrets.AUTH_RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -255,6 +256,7 @@ jobs:
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           INVENTORY_DOMAIN="${INVENTORY_DOMAIN:-inventory.flashmarket.shide.world}"
+          INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
           DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"
 
@@ -282,6 +284,10 @@ jobs:
           fi
           if [[ ! "$INVENTORY_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
             echo "::error::INVENTORY_DOMAIN must contain only a DNS hostname"
+            exit 1
+          fi
+          if [[ ! "$INFRA_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            echo "::error::INFRA_USER is invalid"
             exit 1
           fi
           for password in \
@@ -317,19 +323,17 @@ jobs:
             printf 'INVENTORY_PROXY_PORT=4919\n'
             printf 'INVENTORY_ENVIRONMENT=production\n'
             printf 'INVENTORY_DOMAIN=%s\n' "$INVENTORY_DOMAIN"
-            printf 'INVENTORY_DATABASE_URL=postgresql+asyncpg://flashmarket_inventory:%s@db:5432/inventory\n' "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'INVENTORY_RABBITMQ_URL=amqps://flashmarket_inventory:%s@rabbitmq:5672/\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'INVENTORY_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/inventory\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'INVENTORY_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//inventory\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'INVENTORY_DEBUG=false\n'
             printf 'INVENTORY_DOCS_ENABLED=false\n'
             printf 'INVENTORY_CORS_ORIGINS=%s\n' "$cors_origins"
             printf 'INVENTORY_TRUSTED_HOSTS=["%s","localhost"]\n' "$INVENTORY_DOMAIN"
             printf 'INVENTORY_RESERVATION_TTL_SECONDS=300\n'
-            printf 'POSTGRES_DB=inventory\n'
-            printf 'POSTGRES_USER=flashmarket_inventory\n'
+            printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'RABBITMQ_DEFAULT_USER=flashmarket_inventory\n'
-            printf 'RABBITMQ_DEFAULT_PASS=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
           } > "$environment_file"
           chmod 600 "$environment_file"
 
@@ -374,7 +378,6 @@ jobs:
           export INVENTORY_IMAGE
           docker compose --env-file .env config --quiet
           docker compose --env-file .env pull
-          docker compose --env-file .env up -d --no-build db
 
           wait_for_healthy() {
             service="$1"
@@ -397,20 +400,16 @@ jobs:
             return 1
           }
 
-          wait_for_healthy db
-          wait_for_healthy rabbitmq
-
           echo 'Applying database migrations...'
-          timeout 120 docker compose --env-file .env run --rm --no-deps migrate </dev/null
+          timeout 120 docker compose --env-file .env run --rm --no-deps api migrate </dev/null
           echo 'Database migrations complete.'
 
           echo 'Starting Inventory runtime containers...'
           docker compose --env-file .env up \
             -d \
             --no-build \
-            --no-deps \
             --force-recreate \
-            api nginx
+            api consumer outbox nginx
           echo 'Inventory runtime containers started.'
 
           echo 'Waiting for Inventory API...'

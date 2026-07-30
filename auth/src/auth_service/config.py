@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     app_name: str = "FlashMarket Auth"
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
-    database_url: str = "postgresql+asyncpg://flashmarket:flashmarket@localhost:5432/auth"
-    redis_url: str = "redis://localhost:6379/0"
-    rabbitmq_url: str = "amqp://flashmarket:flashmarket@localhost:5672/"
+    database_url: str = "postgresql+asyncpg://shide:shide@shide-postgres:5432/auth"
+    redis_url: str = "redis://shide-redis:6379/0"
+    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672//auth"
     allow_insecure_internal_services: bool = False
     rabbitmq_exchange: str = "flashmarket.events"
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
@@ -86,12 +86,21 @@ class Settings(BaseSettings):
             errors.append("wildcard CORS origins are forbidden")
         if "*" in self.trusted_hosts:
             errors.append("wildcard trusted hosts are forbidden")
-        if "flashmarket:flashmarket@" in self.database_url:
+        if "flashmarket:flashmarket@" in self.database_url or (":shide@" in self.database_url and "shide-postgres" in self.database_url):
             errors.append("default database credentials are forbidden")
+        db_is_internal = (
+            self.allow_insecure_internal_services
+            and urlsplit(self.database_url).hostname in {"db", "shide-postgres"}
+        )
+        if "localhost" in self.database_url or "127.0.0.1" in self.database_url:
+            errors.append("AUTH_DATABASE_URL must point to production database")
+        if "sslmode" not in self.database_url and not db_is_internal:
+            errors.append("AUTH_DATABASE_URL must use TLS (sslmode)")
         if "localhost" in self.redis_url or "127.0.0.1" in self.redis_url:
             errors.append("AUTH_REDIS_URL must point to production Redis")
         redis_is_internal = (
-            self.allow_insecure_internal_services and urlsplit(self.redis_url).hostname == "redis"
+            self.allow_insecure_internal_services
+            and urlsplit(self.redis_url).hostname in {"redis", "shide-redis"}
         )
         if not self.redis_url.startswith("rediss://") and not redis_is_internal:
             errors.append("AUTH_REDIS_URL must use TLS (rediss://)")
@@ -99,10 +108,12 @@ class Settings(BaseSettings):
             errors.append("AUTH_RABBITMQ_URL must point to production RabbitMQ")
         rabbitmq_is_internal = (
             self.allow_insecure_internal_services
-            and urlsplit(self.rabbitmq_url).hostname == "rabbitmq"
+            and urlsplit(self.rabbitmq_url).hostname in {"rabbitmq", "shide-rabbitmq"}
         )
         if not self.rabbitmq_url.startswith("amqps://") and not rabbitmq_is_internal:
             errors.append("AUTH_RABBITMQ_URL must use TLS (amqps://)")
+        if "flashmarket:flashmarket@" in self.rabbitmq_url or (":shide@" in self.rabbitmq_url and "shide-rabbitmq" in self.rabbitmq_url):
+            errors.append("default RabbitMQ credentials are forbidden")
         if self.refresh_token_transport == "cookie" and not self.refresh_cookie_secure:
             errors.append("AUTH_REFRESH_COOKIE_SECURE must be true")
         if self.refresh_token_transport == "cookie" and not self.refresh_cookie_name.startswith(

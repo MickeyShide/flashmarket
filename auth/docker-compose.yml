@@ -6,9 +6,9 @@ x-auth-runtime: &auth-runtime
 
 x-auth-environment: &auth-environment
   AUTH_ENVIRONMENT: development
-  AUTH_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/auth
-  AUTH_REDIS_URL: redis://redis:6379/0
-  AUTH_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
+  AUTH_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/auth
+  AUTH_REDIS_URL: redis://shide-redis:6379/0
+  AUTH_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672//auth
   AUTH_JWT_KEYS_DIRECTORY: /var/lib/flashmarket-auth/keys
   AUTH_JWT_KEY_ID: ${AUTH_JWT_KEY_ID:-flashmarket-auth-ed25519-v1}
   AUTH_CORS_ORIGINS: '["http://localhost:3000","http://localhost:8080"]'
@@ -17,6 +17,7 @@ x-auth-environment: &auth-environment
   AUTH_REFRESH_COOKIE_SAMESITE: 'lax'
   AUTH_LOG_FILE_PATH: /var/log/shide/auth-api.log
   AUTH_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+  AUTH_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
 
 services:
   keygen:
@@ -32,17 +33,6 @@ services:
       - auth-jwt-keys:/var/lib/flashmarket-auth/keys
     restart: "no"
 
-  migrate:
-    <<: *auth-runtime
-    environment:
-      AUTH_ENVIRONMENT: development
-      AUTH_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/auth
-    command: [".venv/bin/alembic", "upgrade", "head"]
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
   api:
     <<: *auth-runtime
     build:
@@ -53,10 +43,6 @@ services:
     depends_on:
       keygen:
         condition: service_completed_successfully
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
     volumes:
       - auth-jwt-keys:/var/lib/flashmarket-auth/keys:ro
       - backend-logs-local:/var/log/shide
@@ -75,91 +61,30 @@ services:
 
   cleanup:
     <<: *auth-runtime
-    environment:
-      AUTH_ENVIRONMENT: development
-      AUTH_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/auth
-      AUTH_LOG_FILE_PATH: /var/log/shide/auth-cleanup.log
     command:
+      - cleanup
       - sh
       - -c
       - while true; do .venv/bin/python -m auth_service.cli cleanup-expired; sleep 3600; done
+    environment:
+      <<: *auth-environment
+      AUTH_LOG_FILE_PATH: /var/log/shide/auth-cleanup.log
     volumes:
       - backend-logs-local:/var/log/shide
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
     restart: unless-stopped
 
   outbox:
     <<: *auth-runtime
     environment: *auth-environment
-    command: [".venv/bin/python", "-m", "auth_service.outbox_worker"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+    command:
+      - outbox
+      - auth_service.outbox_worker
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
 
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: auth
-      POSTGRES_USER: flashmarket
-      POSTGRES_PASSWORD: flashmarket
-    ports:
-      - "127.0.0.1:${AUTH_DB_PORT:-5433}:5432"
-    volumes:
-      - auth-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flashmarket -d auth"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command:
-      - redis-server
-      - --appendonly
-      - "yes"
-    ports:
-      - "127.0.0.1:${AUTH_REDIS_PORT:-6380}:6379"
-    volumes:
-      - auth-redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:4-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: flashmarket
-      RABBITMQ_DEFAULT_PASS: flashmarket
-    ports:
-      - "127.0.0.1:${AUTH_RABBITMQ_PORT:-5672}:5672"
-      # Management UI intentionally not exposed to avoid port conflicts
-    volumes:
-      - auth-rabbitmq-data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 10s
-    restart: unless-stopped
-
 volumes:
   auth-jwt-keys:
-  auth-postgres-data:
-  auth-rabbitmq-data:
-  auth-redis-data:
   auth-metrics-data:
   backend-logs-local:
     external: true
@@ -167,7 +92,5 @@ volumes:
 
 networks:
   default:
-    name: flashmarket
-    external: true
-  shide-observability:
+    name: shide-observability
     external: true

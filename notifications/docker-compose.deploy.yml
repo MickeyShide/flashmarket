@@ -19,25 +19,12 @@ x-notifications-environment: &notifications-environment
   NOTIFICATIONS_ALLOW_INSECURE_INTERNAL_SERVICES: ${NOTIFICATIONS_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
 
 services:
-  migrate:
-    <<: *notifications-runtime
-    environment:
-      NOTIFICATIONS_ENVIRONMENT: development
-      NOTIFICATIONS_DATABASE_URL: ${NOTIFICATIONS_DATABASE_URL}
-    command: [".venv/bin/alembic", "upgrade", "head"]
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
   api:
     <<: *notifications-runtime
     environment: *notifications-environment
     ports:
-      - "127.0.0.1:${NOTIFICATIONS_PROXY_PORT:-4924}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+      - "127.0.0.1:${NOTIFICATIONS_PROXY_PORT:-4922}:8000"
+    depends_on: {}
     healthcheck:
       test:
         - CMD
@@ -53,57 +40,19 @@ services:
   consumer:
     <<: *notifications-runtime
     environment: *notifications-environment
-    command: [".venv/bin/python", "-m", "notifications.event_consumer"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+    command:
+      - consumer
+      - notifications.event_consumer
+    depends_on: {}
     restart: unless-stopped
 
   outbox:
     <<: *notifications-runtime
     environment: *notifications-environment
-    command: [".venv/bin/python", "-m", "notifications.outbox_worker"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: ${NOTIFICATIONS_DB:-notifications}
-      POSTGRES_USER: ${POSTGRES_USER:-flashmarket_notifications}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - notifications-postgres-data:/var/lib/postgresql/data
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:4-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-flashmarket_notifications}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-    volumes:
-      - notifications-rabbitmq-data:/var/lib/rabbitmq
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 15s
+    command:
+      - outbox
+      - notifications.outbox_worker
+    depends_on: {}
     restart: unless-stopped
 
   nginx:
@@ -111,7 +60,7 @@ services:
     env_file:
       - ${NOTIFICATIONS_ENV_FILE:-.env}
     ports:
-      - "${NOTIFICATIONS_PROXY_PORT:-4924}:80"
+      - "${NOTIFICATIONS_PROXY_PORT:-4922}:80"
     volumes:
       - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
     networks:
@@ -137,7 +86,3 @@ networks:
   frontend:
   backend:
     internal: true
-
-volumes:
-  notifications-postgres-data:
-  notifications-rabbitmq-data:

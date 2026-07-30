@@ -17,10 +17,16 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY src ./src
-RUN uv sync --frozen --no-dev
+COPY docker/init-infra.py ./docker/init-infra.py
+COPY docker/entrypoint.sh ./docker/entrypoint.sh
+
+RUN uv sync --frozen --no-dev && \
+    sed -i 's/\r$//' ./docker/entrypoint.sh && \
+    chmod +x ./docker/entrypoint.sh
 
 USER app
 
 EXPOSE 8000
 
-CMD [".venv/bin/uvicorn", "catalog.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
+CMD ["api", "catalog.main:app"]

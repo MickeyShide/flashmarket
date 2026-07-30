@@ -6,23 +6,13 @@ x-catalog-runtime: &catalog-runtime
 
 x-catalog-environment: &catalog-environment
   CATALOG_ENVIRONMENT: development
-  CATALOG_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/catalog
+  CATALOG_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/catalog
   CATALOG_CORS_ORIGINS: '["http://localhost:3000"]'
   CATALOG_LOG_FILE_PATH: /var/log/shide/catalog-api.log
   CATALOG_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+  CATALOG_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
 
 services:
-  migrate:
-    <<: *catalog-runtime
-    environment:
-      CATALOG_ENVIRONMENT: development
-      CATALOG_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/catalog
-    command: [".venv/bin/alembic", "upgrade", "head"]
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
   api:
     <<: *catalog-runtime
     build:
@@ -30,9 +20,6 @@ services:
     environment: *catalog-environment
     ports:
       - "127.0.0.1:${CATALOG_PORT:-4919}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
     volumes:
       - backend-logs-local:/var/log/shide
       - catalog-metrics-data:/tmp/prometheus
@@ -48,25 +35,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: catalog
-      POSTGRES_USER: flashmarket
-      POSTGRES_PASSWORD: flashmarket
-    ports:
-      - "127.0.0.1:${CATALOG_DB_PORT:-5433}:5432"
-    volumes:
-      - catalog-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flashmarket -d catalog"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
 volumes:
-  catalog-postgres-data:
   catalog-metrics-data:
   backend-logs-local:
     external: true
@@ -74,7 +43,5 @@ volumes:
 
 networks:
   default:
-    name: flashmarket
-    external: true
-  shide-observability:
+    name: shide-observability
     external: true

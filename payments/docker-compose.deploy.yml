@@ -19,25 +19,12 @@ x-payments-environment: &payments-environment
   PAYMENTS_ALLOW_INSECURE_INTERNAL_SERVICES: ${PAYMENTS_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
 
 services:
-  migrate:
-    <<: *payments-runtime
-    environment:
-      PAYMENTS_ENVIRONMENT: development
-      PAYMENTS_DATABASE_URL: ${PAYMENTS_DATABASE_URL}
-    command: [".venv/bin/alembic", "upgrade", "head"]
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
   api:
     <<: *payments-runtime
     environment: *payments-environment
     ports:
-      - "127.0.0.1:${PAYMENTS_PROXY_PORT:-4922}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+      - "127.0.0.1:${PAYMENTS_PROXY_PORT:-4921}:8000"
+    depends_on: {}
     healthcheck:
       test:
         - CMD
@@ -53,57 +40,19 @@ services:
   consumer:
     <<: *payments-runtime
     environment: *payments-environment
-    command: [".venv/bin/python", "-m", "payments.event_consumer"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+    command:
+      - consumer
+      - payments.event_consumer
+    depends_on: {}
     restart: unless-stopped
 
   outbox:
     <<: *payments-runtime
     environment: *payments-environment
-    command: [".venv/bin/python", "-m", "payments.outbox_worker"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-payments}
-      POSTGRES_USER: ${POSTGRES_USER:-flashmarket_payments}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - payments-postgres-data:/var/lib/postgresql/data
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:4-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-flashmarket_payments}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-    volumes:
-      - payments-rabbitmq-data:/var/lib/rabbitmq
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 15s
+    command:
+      - outbox
+      - payments.outbox_worker
+    depends_on: {}
     restart: unless-stopped
 
   nginx:
@@ -135,9 +84,8 @@ services:
 
 networks:
   frontend:
+    external: true
+    name: shide-observability
   backend:
-    internal: true
-
-volumes:
-  payments-postgres-data:
-  payments-rabbitmq-data:
+    external: true
+    name: shide-observability

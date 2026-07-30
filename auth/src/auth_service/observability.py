@@ -8,7 +8,14 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 
 from fastapi import Request, Response
-from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, generate_latest, multiprocess
+from prometheus_client import (
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
 
 from auth_service.config import get_settings
 

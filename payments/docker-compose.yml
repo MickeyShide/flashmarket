@@ -6,24 +6,14 @@ x-payments-runtime: &payments-runtime
 
 x-payments-environment: &payments-environment
   PAYMENTS_ENVIRONMENT: development
-  PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/payments
-  PAYMENTS_RABBITMQ_URL: amqp://flashmarket:flashmarket@rabbitmq:5672/
+  PAYMENTS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/payments
+  PAYMENTS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672//payments
   PAYMENTS_CORS_ORIGINS: '["http://localhost:3000"]'
   PAYMENTS_LOG_FILE_PATH: /var/log/shide/payments-api.log
   PAYMENTS_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+  PAYMENTS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
 
 services:
-  migrate:
-    <<: *payments-runtime
-    environment:
-      PAYMENTS_ENVIRONMENT: development
-      PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@db:5432/payments
-    command: [".venv/bin/alembic", "upgrade", "head"]
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
   api:
     <<: *payments-runtime
     build:
@@ -31,9 +21,6 @@ services:
     environment: *payments-environment
     ports:
       - "127.0.0.1:${PAYMENTS_PORT:-4921}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
     volumes:
       - backend-logs-local:/var/log/shide
       - payments-metrics-data:/tmp/prometheus
@@ -54,12 +41,9 @@ services:
     environment:
       <<: *payments-environment
       PAYMENTS_LOG_FILE_PATH: /var/log/shide/payments-consumer.log
-    command: [".venv/bin/python", "-m", "payments.event_consumer"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+    command:
+      - consumer
+      - payments.event_consumer
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
@@ -69,49 +53,14 @@ services:
     environment:
       <<: *payments-environment
       PAYMENTS_LOG_FILE_PATH: /var/log/shide/payments-outbox.log
-    command: [".venv/bin/python", "-m", "payments.outbox_worker"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+    command:
+      - outbox
+      - payments.outbox_worker
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
 
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: payments
-      POSTGRES_USER: flashmarket
-      POSTGRES_PASSWORD: flashmarket
-    ports:
-      - "127.0.0.1:${PAYMENTS_DB_PORT:-5436}:5432"
-    volumes:
-      - payments-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flashmarket -d payments"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:3.13-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    # Internal RabbitMQ reachable only via the Docker network to avoid port
-    # conflicts with other service brokers in the root compose stack.
-    healthcheck:
-      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
 volumes:
-  payments-postgres-data:
   payments-metrics-data:
   backend-logs-local:
     external: true
@@ -119,7 +68,5 @@ volumes:
 
 networks:
   default:
-    name: flashmarket
-    external: true
-  shide-observability:
+    name: shide-observability
     external: true

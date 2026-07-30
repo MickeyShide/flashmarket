@@ -25,13 +25,13 @@ class Settings(BaseSettings):
     app_name: str = "FlashMarket Orders"
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
-    database_url: str = "postgresql+asyncpg://flashmarket:flashmarket@localhost:5435/orders"
+    database_url: str = "postgresql+asyncpg://shide:shide@shide-postgres:5432/orders"
     log_file_path: str | None = None
     prometheus_multiproc_dir: str | None = None
     docs_enabled: bool = True
     trusted_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
     cors_origins: list[str] = Field(default_factory=list)
-    rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
+    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672//orders"
     rabbitmq_exchange: str = "flashmarket.events"
     allow_insecure_internal_services: bool = False
     payment_timeout_seconds: int = 300
@@ -49,13 +49,13 @@ class Settings(BaseSettings):
             errors.append("ORDERS_DEBUG must be false")
         if self.docs_enabled:
             errors.append("ORDERS_DOCS_ENABLED must be false")
-        if "flashmarket:flashmarket@" in self.database_url:
+        if "flashmarket:flashmarket@" in self.database_url or (":shide@" in self.database_url and "shide-postgres" in self.database_url):
             errors.append("default database credentials are forbidden")
         if "localhost" in self.database_url or "127.0.0.1" in self.database_url:
             errors.append("ORDERS_DATABASE_URL must point to production database")
         db_is_internal = (
             self.allow_insecure_internal_services
-            and urlsplit(self.database_url).hostname == "postgres"
+            and urlsplit(self.database_url).hostname in {"postgres", "db", "shide-postgres"}
         )
         if "sslmode" not in self.database_url and not db_is_internal:
             errors.append("ORDERS_DATABASE_URL must use TLS (sslmode)")
@@ -63,10 +63,12 @@ class Settings(BaseSettings):
             errors.append("ORDERS_RABBITMQ_URL must point to production RabbitMQ")
         rabbitmq_is_internal = (
             self.allow_insecure_internal_services
-            and urlsplit(self.rabbitmq_url).hostname == "rabbitmq"
+            and urlsplit(self.rabbitmq_url).hostname in {"rabbitmq", "shide-rabbitmq"}
         )
         if not self.rabbitmq_url.startswith("amqps://") and not rabbitmq_is_internal:
             errors.append("ORDERS_RABBITMQ_URL must use TLS (amqps://)")
+        if "flashmarket:flashmarket@" in self.rabbitmq_url or (":shide@" in self.rabbitmq_url and "shide-rabbitmq" in self.rabbitmq_url):
+            errors.append("default RabbitMQ credentials are forbidden")
         if "*" in self.cors_origins:
             errors.append("wildcard CORS origins are forbidden")
         if "*" in self.trusted_hosts:

@@ -20,25 +20,12 @@ x-orders-environment: &orders-environment
   ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES: ${ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
 
 services:
-  migrate:
-    <<: *orders-runtime
-    environment:
-      ORDERS_ENVIRONMENT: development
-      ORDERS_DATABASE_URL: ${ORDERS_DATABASE_URL}
-    command: [".venv/bin/alembic", "upgrade", "head"]
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
   api:
     <<: *orders-runtime
     environment: *orders-environment
     ports:
       - "127.0.0.1:${ORDERS_PROXY_PORT:-4920}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+    depends_on: {}
     healthcheck:
       test:
         - CMD
@@ -54,57 +41,19 @@ services:
   consumer:
     <<: *orders-runtime
     environment: *orders-environment
-    command: [".venv/bin/python", "-m", "orders.event_consumer"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+    command:
+      - consumer
+      - orders.event_consumer
+    depends_on: {}
     restart: unless-stopped
 
   outbox:
     <<: *orders-runtime
     environment: *orders-environment
-    command: [".venv/bin/python", "-m", "orders.outbox_worker"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-orders}
-      POSTGRES_USER: ${POSTGRES_USER:-flashmarket_orders}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - orders-postgres-data:/var/lib/postgresql/data
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:4-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-flashmarket_orders}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-    volumes:
-      - orders-rabbitmq-data:/var/lib/rabbitmq
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 15s
+    command:
+      - outbox
+      - orders.outbox_worker
+    depends_on: {}
     restart: unless-stopped
 
   nginx:
@@ -136,9 +85,8 @@ services:
 
 networks:
   frontend:
+    external: true
+    name: shide-observability
   backend:
-    internal: true
-
-volumes:
-  orders-postgres-data:
-  orders-rabbitmq-data:
+    external: true
+    name: shide-observability

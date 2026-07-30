@@ -240,11 +240,12 @@ jobs:
       SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GHCR_USERNAME: ${{ github.actor }}
+      INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
       NOTIFICATIONS_IMAGE: ghcr.io/mickeyshide/flashmarket-notifications@${{ needs.image.outputs.digest }}
       NOTIFICATIONS_DOMAIN: ${{ vars.NOTIFICATIONS_DOMAIN || vars.GATEWAY_DOMAIN || 'notifications.flashmarket.shide.world' }}
       NOTIFICATIONS_CORS_ORIGINS: ${{ vars.NOTIFICATIONS_CORS_ORIGINS }}
-      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.NOTIFICATIONS_POSTGRES_PASSWORD || secrets.AUTH_POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
-      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.NOTIFICATIONS_RABBITMQ_PASSWORD || secrets.AUTH_RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -255,6 +256,7 @@ jobs:
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           NOTIFICATIONS_DOMAIN="${NOTIFICATIONS_DOMAIN:-notifications.flashmarket.shide.world}"
+          INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
           DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"
 
@@ -282,6 +284,10 @@ jobs:
           fi
           if [[ ! "$NOTIFICATIONS_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
             echo "::error::NOTIFICATIONS_DOMAIN must contain only a DNS hostname"
+            exit 1
+          fi
+          if [[ ! "$INFRA_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            echo "::error::INFRA_USER is invalid"
             exit 1
           fi
           for password in \
@@ -317,18 +323,16 @@ jobs:
             printf 'NOTIFICATIONS_PROXY_PORT=4922\n'
             printf 'NOTIFICATIONS_ENVIRONMENT=production\n'
             printf 'NOTIFICATIONS_DOMAIN=%s\n' "$NOTIFICATIONS_DOMAIN"
-            printf 'NOTIFICATIONS_DATABASE_URL=postgresql+asyncpg://flashmarket_notifications:%s@db:5432/notifications\n' "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'NOTIFICATIONS_RABBITMQ_URL=amqps://flashmarket_notifications:%s@rabbitmq:5672/\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'NOTIFICATIONS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/notifications\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'NOTIFICATIONS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//notifications\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'NOTIFICATIONS_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'NOTIFICATIONS_DEBUG=false\n'
             printf 'NOTIFICATIONS_DOCS_ENABLED=false\n'
             printf 'NOTIFICATIONS_CORS_ORIGINS=%s\n' "$cors_origins"
             printf 'NOTIFICATIONS_TRUSTED_HOSTS=["%s","localhost"]\n' "$NOTIFICATIONS_DOMAIN"
-            printf 'POSTGRES_DB=notifications\n'
-            printf 'POSTGRES_USER=flashmarket_notifications\n'
+            printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'RABBITMQ_DEFAULT_USER=flashmarket_notifications\n'
-            printf 'RABBITMQ_DEFAULT_PASS=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
           } > "$environment_file"
           chmod 600 "$environment_file"
 
@@ -353,7 +357,7 @@ jobs:
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
           printf '%s' "$GHCR_TOKEN" |
             ssh -p "$DEPLOY_PORT" "$target" \
-              "docker login ghcr --username '$GHCR_USERNAME' --password-stdin"
+              "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
 
       - name: Deploy exact image digest
         shell: bash
@@ -363,7 +367,7 @@ jobs:
             "DEPLOY_PATH='$DEPLOY_PATH' NOTIFICATIONS_IMAGE='$NOTIFICATIONS_IMAGE' NOTIFICATIONS_DOMAIN='$NOTIFICATIONS_DOMAIN' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           cd "$DEPLOY_PATH"
-          trap 'docker logout ghcr >/dev/null 2>&1 || true' EXIT
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
           if [[ ! -f .env ]]; then
             echo "Missing $DEPLOY_PATH/.env"
@@ -373,7 +377,6 @@ jobs:
           export NOTIFICATIONS_IMAGE
           docker compose --env-file .env config --quiet
           docker compose --env-file .env pull
-          docker compose --env-file .env up -d --no-build db
 
           wait_for_healthy() {
             service="$1"
@@ -396,20 +399,16 @@ jobs:
             return 1
           }
 
-          wait_for_healthy db
-          wait_for_healthy rabbitmq
-
           echo 'Applying database migrations...'
-          timeout 120 docker compose --env-file .env run --rm --no-deps migrate </dev/null
+          timeout 120 docker compose --env-file .env run --rm --no-deps api migrate </dev/null
           echo 'Database migrations complete.'
 
           echo 'Starting Notifications runtime containers...'
           docker compose --env-file .env up \
             -d \
             --no-build \
-            --no-deps \
             --force-recreate \
-            api nginx
+            api consumer outbox nginx
           echo 'Notifications runtime containers started.'
 
           echo 'Waiting for Notifications API...'

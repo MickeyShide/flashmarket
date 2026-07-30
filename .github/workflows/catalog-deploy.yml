@@ -240,13 +240,14 @@ jobs:
       SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GHCR_USERNAME: ${{ github.actor }}
+      INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
       CATALOG_IMAGE: ghcr.io/mickeyshide/flashmarket-catalog@${{ needs.image.outputs.digest }}
       CATALOG_DOMAIN: ${{ vars.CATALOG_DOMAIN || vars.GATEWAY_DOMAIN || 'catalog.flashmarket.shide.world' }}
       CATALOG_CORS_ORIGINS: ${{ vars.CATALOG_CORS_ORIGINS }}
       CATALOG_JWT_KEY_ID: ${{ vars.CATALOG_JWT_KEY_ID || 'flashmarket-catalog-ed25519-v1' }}
-      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.CATALOG_POSTGRES_PASSWORD || secrets.AUTH_POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
-      DEPLOY_REDIS_PASSWORD: ${{ secrets.CATALOG_REDIS_PASSWORD || secrets.AUTH_REDIS_PASSWORD || 'flashmarket_redis_pass_2026' }}
-      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.CATALOG_RABBITMQ_PASSWORD || secrets.AUTH_RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
+      DEPLOY_REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD || 'flashmarket_redis_pass_2026' }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -257,6 +258,7 @@ jobs:
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           CATALOG_DOMAIN="${CATALOG_DOMAIN:-catalog.flashmarket.shide.world}"
+          INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
           DEPLOY_REDIS_PASSWORD="${DEPLOY_REDIS_PASSWORD:-flashmarket_redis_pass_2026}"
           DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"
@@ -285,6 +287,10 @@ jobs:
           fi
           if [[ ! "$CATALOG_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
             echo "::error::CATALOG_DOMAIN must contain only a DNS hostname"
+            exit 1
+          fi
+          if [[ ! "$INFRA_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            echo "::error::INFRA_USER is invalid"
             exit 1
           fi
           for password in \
@@ -321,9 +327,9 @@ jobs:
             printf 'CATALOG_PROXY_PORT=4919\n'
             printf 'CATALOG_ENVIRONMENT=production\n'
             printf 'CATALOG_DOMAIN=%s\n' "$CATALOG_DOMAIN"
-            printf 'CATALOG_DATABASE_URL=postgresql+asyncpg://flashmarket_catalog:%s@db:5432/catalog\n' "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'CATALOG_REDIS_URL=redis://:%s@redis:6379/0\n' "$DEPLOY_REDIS_PASSWORD"
-            printf 'CATALOG_RABBITMQ_URL=amqp://flashmarket_catalog:%s@rabbitmq:5672/\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'CATALOG_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/catalog\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'CATALOG_REDIS_URL=redis://:%s@shide-redis:6379/1\n' "$DEPLOY_REDIS_PASSWORD"
+            printf 'CATALOG_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//catalog\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'CATALOG_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'CATALOG_JWT_KEYS_DIRECTORY=/var/lib/flashmarket-catalog/keys\n'
             printf 'CATALOG_JWT_KEY_ID=%s\n' "$CATALOG_JWT_KEY_ID"
@@ -340,12 +346,10 @@ jobs:
             printf 'CATALOG_REFRESH_COOKIE_NAME=__Host-flashmarket-refresh\n'
             printf 'CATALOG_CSRF_COOKIE_NAME=__Host-flashmarket-csrf\n'
             printf 'CATALOG_REFRESH_COOKIE_SAMESITE=strict\n'
-            printf 'POSTGRES_DB=catalog\n'
-            printf 'POSTGRES_USER=flashmarket_catalog\n'
+            printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
             printf 'REDIS_PASSWORD=%s\n' "$DEPLOY_REDIS_PASSWORD"
-            printf 'RABBITMQ_DEFAULT_USER=flashmarket_catalog\n'
-            printf 'RABBITMQ_DEFAULT_PASS=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
           } > "$environment_file"
           chmod 600 "$environment_file"
 
@@ -390,7 +394,6 @@ jobs:
           export CATALOG_IMAGE
           docker compose -f docker-compose.yml --env-file .env config --quiet
           docker compose -f docker-compose.yml --env-file .env pull
-          docker compose -f docker-compose.yml --env-file .env up -d --no-build db
 
           wait_for_healthy() {
             service="$1"
@@ -413,23 +416,14 @@ jobs:
             return 1
           }
 
-          wait_for_healthy db
-          wait_for_healthy redis
-          wait_for_healthy rabbitmq
-
-          echo 'Generating or validating JWT keys...'
-          timeout 60 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps keygen </dev/null || true
-          echo 'JWT key generation complete.'
-
           echo 'Applying database migrations...'
-          timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps migrate </dev/null
+          timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps api migrate </dev/null
           echo 'Database migrations complete.'
 
           echo 'Starting Catalog runtime containers...'
           docker compose -f docker-compose.yml --env-file .env up \
             -d \
             --no-build \
-            --no-deps \
             --force-recreate \
             api nginx
           echo 'Catalog runtime containers started.'
