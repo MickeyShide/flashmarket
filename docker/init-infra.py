@@ -4,12 +4,25 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import inspect
 import os
+import socket
 import sys
 import time
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
+
+
+def resolve_host_ipv4(host: str) -> str:
+    """Force IPv4 (AF_INET) lookup to bypass Docker glibc AAAA resolution timeouts."""
+    try:
+        infos = socket.getaddrinfo(host, None, family=socket.AF_INET, type=socket.SOCK_STREAM)
+        if infos:
+            return infos[0][4][0]
+    except Exception:
+        pass
+    return host
 
 import asyncpg
 
@@ -43,7 +56,7 @@ def retry(message: str):
                         time.sleep(RETRY_DELAY_SECONDS)
             raise last_exc  # type: ignore[misc]
 
-        if asyncio.iscoroutinefunction(func):
+        if inspect.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
 
@@ -92,6 +105,9 @@ async def ensure_database() -> None:
         sys.exit(1)
 
     admin_dsn = url._replace(path="/postgres", scheme="postgresql").geturl()
+    if url.hostname:
+        resolved_ip = resolve_host_ipv4(url.hostname)
+        admin_dsn = admin_dsn.replace(f"@{url.hostname}:", f"@{resolved_ip}:")
     conn = await asyncpg.connect(admin_dsn)
     try:
         exists = await conn.fetchval(
@@ -118,13 +134,14 @@ def ensure_rabbitmq_vhost() -> None:
     user = url.username or "guest"
     password = url.password or "guest"
     host = url.hostname or "localhost"
+    resolved_host = resolve_host_ipv4(host)
     port = 15672
 
     credentials = f"{user}:{password}"
     b64_auth = base64.b64encode(credentials.encode("ascii")).decode("ascii")
     headers = {"Authorization": f"Basic {b64_auth}"}
 
-    base = f"http://{host}:{port}/api"
+    base = f"http://{resolved_host}:{port}/api"
     check_url = f"{base}/vhosts/{vhost}"
 
     req = urllib.request.Request(check_url, headers=headers, method="GET")
