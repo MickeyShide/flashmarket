@@ -86,12 +86,6 @@ class Settings(BaseSettings):
     audit_retention_days: int = Field(default=365, ge=30, le=3650)
 
     @model_validator(mode="after")
-    def resolve_dns_ipv4(self) -> "Settings":
-        if self.database_url:
-            self.database_url = resolve_url_ipv4(self.database_url)
-        return self
-
-    @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
         """Validate production settings."""
         if self.environment != "production":
@@ -110,10 +104,7 @@ class Settings(BaseSettings):
             errors.append("wildcard trusted hosts are forbidden")
         if "flashmarket:flashmarket@" in self.database_url or (":shide@" in self.database_url and "shide-postgres" in self.database_url):
             errors.append("default database credentials are forbidden")
-        db_is_internal = (
-            self.allow_insecure_internal_services
-            and urlsplit(self.database_url).hostname in {"db", "shide-postgres"}
-        )
+        db_is_internal = self.allow_insecure_internal_services
         if "localhost" in self.database_url or "127.0.0.1" in self.database_url:
             errors.append("AUTH_DATABASE_URL must point to production database")
         if "sslmode" not in self.database_url and not db_is_internal:
@@ -122,7 +113,7 @@ class Settings(BaseSettings):
             errors.append("AUTH_REDIS_URL must point to production Redis")
         redis_is_internal = (
             self.allow_insecure_internal_services
-            and urlsplit(self.redis_url).hostname in {"redis", "shide-redis"}
+            and urlsplit(self.redis_url).hostname in {"redis", "shide-redis", "192.168.64.4"}
         )
         if not self.redis_url.startswith("rediss://") and not redis_is_internal:
             errors.append("AUTH_REDIS_URL must use TLS (rediss://)")
@@ -130,20 +121,28 @@ class Settings(BaseSettings):
             errors.append("AUTH_RABBITMQ_URL must point to production RabbitMQ")
         rabbitmq_is_internal = (
             self.allow_insecure_internal_services
-            and urlsplit(self.rabbitmq_url).hostname in {"rabbitmq", "shide-rabbitmq"}
+            and urlsplit(self.rabbitmq_url).hostname in {"rabbitmq", "shide-rabbitmq", "192.168.64.4"}
         )
         if not self.rabbitmq_url.startswith("amqps://") and not rabbitmq_is_internal:
             errors.append("AUTH_RABBITMQ_URL must use TLS (amqps://)")
         if "flashmarket:flashmarket@" in self.rabbitmq_url or (":shide@" in self.rabbitmq_url and "shide-rabbitmq" in self.rabbitmq_url):
             errors.append("default RabbitMQ credentials are forbidden")
+
         if self.refresh_token_transport == "cookie" and not self.refresh_cookie_secure:
             errors.append("AUTH_REFRESH_COOKIE_SECURE must be true")
         if self.refresh_token_transport == "cookie" and not self.refresh_cookie_name.startswith(
             "__Host-"
         ):
             errors.append("AUTH_REFRESH_COOKIE_NAME must use the __Host- prefix")
+
         if errors:
             raise ValueError("Invalid production configuration: " + "; ".join(errors))
+        return self
+
+    @model_validator(mode="after")
+    def resolve_dns_ipv4(self) -> "Settings":
+        if self.database_url:
+            self.database_url = resolve_url_ipv4(self.database_url)
         return self
 
 

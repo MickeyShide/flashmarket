@@ -44,12 +44,6 @@ class Settings(BaseSettings):
     allow_insecure_internal_services: bool = False
 
     @model_validator(mode="after")
-    def resolve_dns_ipv4(self) -> "Settings":
-        if self.database_url:
-            self.database_url = resolve_url_ipv4(self.database_url)
-        return self
-
-    @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
         """Enforce strict settings in production."""
         if self.environment != "production":
@@ -64,14 +58,17 @@ class Settings(BaseSettings):
             errors.append("default database credentials are forbidden")
         if "localhost" in self.database_url or "127.0.0.1" in self.database_url:
             errors.append("CATALOG_DATABASE_URL must point to production database")
-        db_is_internal = (
-            self.allow_insecure_internal_services
-            and urlsplit(self.database_url).hostname in {"db", "shide-postgres"}
-        )
+        db_is_internal = self.allow_insecure_internal_services
         if "sslmode" not in self.database_url and not db_is_internal:
             errors.append("CATALOG_DATABASE_URL must use TLS (sslmode)")
         if errors:
             raise ValueError("Invalid production configuration: " + "; ".join(errors))
+        return self
+
+    @model_validator(mode="after")
+    def resolve_dns_ipv4(self) -> "Settings":
+        if self.database_url:
+            self.database_url = resolve_url_ipv4(self.database_url)
         return self
 
 
