@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import inspect
+import json
 import os
 import socket
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from urllib.parse import urlparse
 
@@ -78,17 +80,21 @@ def _get_db_url() -> str | None:
     return None
 
 
-def _get_rabbitmq_url() -> str | None:
-    for key in [
+def _get_rabbitmq_urls() -> list[str]:
+    urls = []
+    keys = [
         "RABBITMQ_URL",
+        "AUTH_RABBITMQ_URL",
+        "CATALOG_RABBITMQ_URL",
         "INVENTORY_RABBITMQ_URL",
         "ORDERS_RABBITMQ_URL",
         "PAYMENTS_RABBITMQ_URL",
         "NOTIFICATIONS_RABBITMQ_URL",
-    ]:
+    ]
+    for key in keys:
         if val := os.environ.get(key):
-            return val
-    return None
+            urls.append(val)
+    return urls
 
 
 @retry("Waiting for PostgreSQL")
@@ -123,15 +129,23 @@ async def ensure_database() -> None:
         await conn.close()
 
 
-@retry("Waiting for RabbitMQ management API")
-def ensure_rabbitmq_vhost() -> None:
-    raw_url = _get_rabbitmq_url()
-    if not raw_url:
-        print("No RabbitMQ URL configured in environment, skipping RabbitMQ initialization.")
+def _ensure_vhost_and_permissions(raw_url: str) -> None:
+    url = urlparse(raw_url)
+    if not url.hostname:
         return
 
-    url = urlparse(raw_url)
-    vhost = url.path.lstrip("/") or "/"
+    path = url.path
+    if path.startswith("//"):
+        vhosts_to_create = [path[1:], path.lstrip("/")]
+    elif path.startswith("/"):
+        vhost_stripped = path.lstrip("/")
+        if vhost_stripped:
+            vhosts_to_create = [f"/{vhost_stripped}", vhost_stripped]
+        else:
+            vhosts_to_create = ["/"]
+    else:
+        vhosts_to_create = ["/"]
+
     user = url.username or "guest"
     password = url.password or "guest"
     host = url.hostname or "localhost"
@@ -140,30 +154,49 @@ def ensure_rabbitmq_vhost() -> None:
 
     credentials = f"{user}:{password}"
     b64_auth = base64.b64encode(credentials.encode("ascii")).decode("ascii")
-    headers = {"Authorization": f"Basic {b64_auth}"}
-
+    headers = {
+        "Authorization": f"Basic {b64_auth}",
+        "Content-Type": "application/json"
+    }
     base = f"http://{resolved_host}:{port}/api"
-    check_url = f"{base}/vhosts/{vhost}"
 
-    req = urllib.request.Request(check_url, headers=headers, method="GET")
-    try:
-        with urllib.request.urlopen(req, timeout=10.0) as resp:
-            if resp.status == 200:
-                print(f"RabbitMQ vhost '{vhost}' already exists")
-                return
-    except urllib.error.HTTPError as err:
-        if err.code == 404:
-            encoded_vhost = vhost.replace("/", "%2F")
-            put_url = f"{base}/vhosts/{encoded_vhost}"
-            put_req = urllib.request.Request(put_url, headers=headers, method="PUT")
-            with urllib.request.urlopen(put_req, timeout=10.0) as put_resp:
-                if put_resp.status in (200, 201):
-                    print(f"RabbitMQ vhost '{vhost}' created")
-                    return
-        elif err.code == 401:
-            raise err
-        else:
-            raise err
+    for vhost in vhosts_to_create:
+        encoded_vhost = urllib.parse.quote(vhost, safe="")
+
+        # 1. Create vhost
+        vhost_url = f"{base}/vhosts/{encoded_vhost}"
+        req = urllib.request.Request(vhost_url, headers=headers, method="PUT", data=b"{}")
+        try:
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                if resp.status in (200, 201, 204):
+                    print(f"RabbitMQ vhost '{vhost}' created or verified")
+        except urllib.error.HTTPError as err:
+            if err.code != 204:
+                print(f"Warning: PUT vhost '{vhost}' code {err.code}: {err.reason}", file=sys.stderr)
+        except Exception as exc:
+            print(f"Warning: Failed to create vhost '{vhost}': {exc}", file=sys.stderr)
+
+        # 2. Set user permissions
+        perm_url = f"{base}/permissions/{encoded_vhost}/{user}"
+        perm_body = json.dumps({"configure": ".*", "write": ".*", "read": ".*"}).encode("utf-8")
+        perm_req = urllib.request.Request(perm_url, headers=headers, method="PUT", data=perm_body)
+        try:
+            with urllib.request.urlopen(perm_req, timeout=10.0) as resp:
+                if resp.status in (200, 201, 204):
+                    print(f"Granted permissions for user '{user}' on vhost '{vhost}'")
+        except Exception as exc:
+            print(f"Warning: Failed to set permissions for user '{user}' on vhost '{vhost}': {exc}", file=sys.stderr)
+
+
+@retry("Waiting for RabbitMQ management API")
+def ensure_rabbitmq_vhost() -> None:
+    urls = _get_rabbitmq_urls()
+    if not urls:
+        print("No RabbitMQ URL configured in environment, skipping RabbitMQ initialization.")
+        return
+
+    for raw_url in urls:
+        _ensure_vhost_and_permissions(raw_url)
 
 
 async def main() -> None:
