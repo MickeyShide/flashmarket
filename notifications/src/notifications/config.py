@@ -1,10 +1,26 @@
+import socket
 from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def resolve_url_ipv4(url_str: str) -> str:
+    try:
+        parsed = urlsplit(url_str)
+        if parsed.hostname and not parsed.hostname.replace(".", "").isdigit():
+            port = parsed.port or 5432
+            infos = socket.getaddrinfo(parsed.hostname, port, family=socket.AF_INET, type=socket.SOCK_STREAM)
+            if infos:
+                ip = infos[0][4][0]
+                netloc = parsed.netloc.replace(parsed.hostname, ip, 1)
+                return urlunsplit(parsed._replace(netloc=netloc))
+    except Exception:
+        pass
+    return url_str
 
 
 def utc_now() -> datetime:
@@ -43,7 +59,13 @@ class Settings(BaseSettings):
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
 
     @model_validator(mode="after")
-    def validate_production_settings(self) -> Settings:
+    def resolve_dns_ipv4(self) -> "Settings":
+        if self.database_url:
+            self.database_url = resolve_url_ipv4(self.database_url)
+        return self
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
         """Enforce strict settings in production."""
         if self.environment != "production":
             return self
