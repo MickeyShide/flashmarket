@@ -11,8 +11,27 @@ from payments.config import get_settings
 from payments.infrastructure import models  # noqa: F401
 from payments.infrastructure.database import Base
 
+import socket
+from urllib.parse import urlsplit, urlunsplit
+
+
+def resolve_url_ipv4(url_str: str) -> str:
+    try:
+        parsed = urlsplit(url_str)
+        if parsed.hostname and not parsed.hostname.replace(".", "").isdigit():
+            port = parsed.port or 5432
+            infos = socket.getaddrinfo(parsed.hostname, port, family=socket.AF_INET, type=socket.SOCK_STREAM)
+            if infos:
+                ip = infos[0][4][0]
+                netloc = parsed.netloc.replace(parsed.hostname, ip, 1)
+                return urlunsplit(parsed._replace(netloc=netloc))
+    except Exception:
+        pass
+    return url_str
+
+
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+config.set_main_option("sqlalchemy.url", resolve_url_ipv4(get_settings().database_url))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
