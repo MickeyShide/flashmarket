@@ -8,9 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from orders.api.error_handlers import order_error_handler
-from orders.api.routes import health, metrics, orders
+from orders.api.routes import health, metrics, orders, promocodes
 from orders.config import get_settings
-from orders.domain.exceptions import OrderError
+from orders.domain.exceptions import OrderError, PromocodeError
 from orders.infrastructure.database import engine
 from orders.observability import (
     request_observability_middleware,
@@ -53,12 +53,14 @@ def create_app() -> FastAPI:
     )
 
     app.add_exception_handler(OrderError, order_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(PromocodeError, order_error_handler)  # type: ignore[arg-type]
 
     app.middleware("http")(request_observability_middleware)
 
     app.include_router(health.router)
     app.include_router(metrics.router)
     app.include_router(orders.router)
+    app.include_router(promocodes.router)
 
     return app
 

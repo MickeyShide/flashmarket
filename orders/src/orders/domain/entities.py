@@ -23,3 +23,19 @@ class OrderEventType(StrEnum):
     PAYMENT_REQUESTED = "PaymentRequested"
     ORDER_CONFIRMED = "OrderConfirmed"
     ORDER_CANCELLED = "OrderCancelled"
+
+
+class DiscountType(StrEnum):
+    """Type of discount applied by a promocode."""
+
+    FIXED = "FIXED"
+    PERCENTAGE = "PERCENTAGE"
+
+
+class PromocodeStatus(StrEnum):
+    """Lifecycle status of a promocode."""
+
+    ACTIVE = "ACTIVE"
+    EXPIRED = "EXPIRED"
+    DISABLED = "DISABLED"
+
