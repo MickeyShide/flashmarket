@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, delete, func, or_, select
@@ -11,6 +12,13 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from catalog.domain.entities import ProductStatus
 from catalog.infrastructure.models import ProductImageModel, ProductModel
+from catalog.infrastructure.search import (
+    product_search_condition,
+    product_search_rank,
+    product_similarity_condition,
+    product_similarity_rank,
+    tokenize_search_phrase,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +67,16 @@ class ProductRepository:
             joinedload(ProductModel.brand),
         ]
 
+    def _is_postgresql(self) -> bool:
+        """Detect whether the bound engine is PostgreSQL.
+
+        Full-text search (``tsvector``/``tsquery``) and ``pg_trgm`` are
+        PostgreSQL-only; other dialects (SQLite in tests) fall back to
+        ``ILIKE`` substring matching.
+        """
+        bind = self._session.get_bind()
+        return bind.dialect.name == "postgresql"
+
     async def create(self, product: ProductModel) -> ProductModel:
         """Persist a new product."""
         self._session.add(product)
@@ -91,6 +109,7 @@ class ProductRepository:
     async def search(self, query: ProductSearchQuery) -> ProductPage:
         """Execute a filtered, sorted, and paginated product search."""
         filters: list[ColumnElement[bool]] = []
+        rank: ColumnElement[float] | None = None
 
         if query.category_id is not None:
             filters.append(ProductModel.category_id == query.category_id)
@@ -103,16 +122,34 @@ class ProductRepository:
         if query.price_to is not None:
             filters.append(ProductModel.price <= query.price_to)
         if query.search:
-            pattern = f"%{query.search}%"
-            filters.append(
-                or_(
-                    ProductModel.name.ilike(pattern),
-                    ProductModel.description.ilike(pattern),
+            tokens = tokenize_search_phrase(query.search)
+            if tokens and self._is_postgresql():
+                fts_condition = product_search_condition(
+                    ProductModel.name, ProductModel.description, tokens
                 )
-            )
+                trgm_condition = product_similarity_condition(ProductModel.name, query.search)
+                filters.append(or_(fts_condition, trgm_condition))
+                rank = product_search_rank(
+                    ProductModel.name, ProductModel.description, tokens
+                ) + product_similarity_rank(ProductModel.name, query.search)
+            else:
+                pattern = f"%{query.search}%"
+                filters.append(
+                    or_(
+                        ProductModel.name.ilike(pattern),
+                        ProductModel.description.ilike(pattern),
+                    )
+                )
 
-        sort_column = _SORT_COLUMNS.get(query.sort_by, ProductModel.created_at)
-        order = sort_column.asc() if query.sort_order == "asc" else sort_column.desc()
+        wants_relevance = query.sort_by in ("relevance", "created_at") and (
+            query.sort_by == "relevance" or query.sort_order == "desc"
+        )
+        order: ColumnElement[Any]
+        if rank is not None and wants_relevance:
+            order = rank.desc()
+        else:
+            sort_column = _SORT_COLUMNS.get(query.sort_by, ProductModel.created_at)
+            order = sort_column.asc() if query.sort_order == "asc" else sort_column.desc()
 
         items_result = await self._session.scalars(
             select(ProductModel)

@@ -45,3 +45,32 @@ class InvalidProductData(CatalogError):
 
     code = "invalid_product_data"
     message = "Product data validation failed"
+
+
+class VariantError(CatalogError):
+    """Base exception for variant errors."""
+
+    code = "variant_error"
+    message = "Variant operation failed"
+
+
+class VariantNotFound(VariantError):
+    """Raised when a product variant cannot be located."""
+
+    code = "variant_not_found"
+    message = "Product variant not found"
+
+
+class DuplicateSKU(VariantError):
+    """Raised when a SKU collision occurs."""
+
+    code = "duplicate_sku"
+    message = "A variant with this SKU already exists"
+
+
+class DuplicateVariantOptions(VariantError):
+    """Raised when a size+color combination already exists for a product."""
+
+    code = "duplicate_variant_options"
+    message = "A variant with these options already exists for this product"
+

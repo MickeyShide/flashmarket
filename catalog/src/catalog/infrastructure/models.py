@@ -16,7 +16,9 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
+    column,
     func,
     text,
 )
@@ -24,6 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from catalog.domain.entities import Currency, ProductStatus
 from catalog.infrastructure.database import Base, utc_now
+from catalog.infrastructure.search import product_search_vector
 
 
 class CategoryModel(Base):
@@ -97,6 +100,17 @@ class ProductModel(Base):
         Index("ix_products_price", "price"),
         Index("ix_products_category_status", "category_id", "status"),
         Index("ix_products_brand_status", "brand_id", "status"),
+        Index(
+            "ix_products_search_vector",
+            product_search_vector(column("name"), column("description")),
+            postgresql_using="gin",
+        ).ddl_if(dialect="postgresql"),
+        Index(
+            "ix_products_name_trgm",
+            "name",
+            postgresql_using="gin",
+            postgresql_ops={"name": "gin_trgm_ops"},
+        ).ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -159,6 +173,13 @@ class ProductModel(Base):
         order_by="ProductImageModel.sort_order",
         lazy="selectin",
     )
+    variants: Mapped[list[ProductVariantModel]] = relationship(
+        back_populates="product",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ProductVariantModel.sort_order",
+        lazy="selectin",
+    )
 
 
 class ProductImageModel(Base):
@@ -186,3 +207,48 @@ class ProductImageModel(Base):
     )
 
     product: Mapped[ProductModel] = relationship(back_populates="images")
+
+
+class ProductVariantModel(Base):
+    """Product variant with specific SKU, size, color, and optional price override."""
+
+    __tablename__ = "product_variants"
+    __table_args__ = (
+        UniqueConstraint("product_id", "size", "color", name="uq_variant_product_size_color"),
+        Index("ix_variants_product_active", "product_id", "is_active"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid7,
+        server_default=text("gen_random_uuid()"),
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sku: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
+    size: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    color_hex: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    material: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    weight_grams: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    price_override: Mapped[Decimal | None] = mapped_column(
+        Numeric(precision=12, scale=2), nullable=True
+    )
+    is_active: Mapped[bool] = mapped_column(
+        nullable=False, default=True, server_default=text("true")
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        server_default=func.now(),
+    )
+
+    product: Mapped[ProductModel] = relationship(back_populates="variants")

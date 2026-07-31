@@ -35,6 +35,15 @@ def get_brand_service(db: DbSession) -> BrandService:
     return BrandService(session=db, brand_repo=brand_repo)
 
 
+def get_variant_service(db: DbSession) -> VariantService:
+    """Build a variant service for the current request."""
+    variant_repo = VariantRepository(db)
+    product_repo = ProductRepository(db)
+    return VariantService(session=db, repo=variant_repo, product_repo=product_repo)
+
+
 ProductServiceDep = Annotated[ProductService, Depends(get_product_service)]
 CategoryServiceDep = Annotated[CategoryService, Depends(get_category_service)]
 BrandServiceDep = Annotated[BrandService, Depends(get_brand_service)]
+VariantServiceDep = Annotated[VariantService, Depends(get_variant_service)]
+

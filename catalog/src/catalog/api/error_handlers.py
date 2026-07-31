@@ -4,17 +4,26 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from catalog.domain.exceptions import (
+    BrandNotFound,
     CatalogError,
     CategoryNotFound,
+    DuplicateSKU,
     DuplicateSlug,
+    DuplicateVariantOptions,
     InvalidProductData,
     ProductNotFound,
+    VariantError,
+    VariantNotFound,
 )
 
 ERROR_STATUS: dict[type[CatalogError], int] = {
     ProductNotFound: status.HTTP_404_NOT_FOUND,
     CategoryNotFound: status.HTTP_404_NOT_FOUND,
+    BrandNotFound: status.HTTP_404_NOT_FOUND,
+    VariantNotFound: status.HTTP_404_NOT_FOUND,
     DuplicateSlug: status.HTTP_409_CONFLICT,
+    DuplicateSKU: status.HTTP_409_CONFLICT,
+    DuplicateVariantOptions: status.HTTP_409_CONFLICT,
     InvalidProductData: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 

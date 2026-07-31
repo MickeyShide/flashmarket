@@ -133,7 +133,7 @@ class ProductListParams(BaseModel):
     price_from: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     price_to: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     search: str | None = Field(default=None, max_length=255)
-    sort_by: Literal["price", "name", "created_at"] = "created_at"
+    sort_by: Literal["price", "name", "created_at", "relevance"] = "created_at"
     sort_order: Literal["asc", "desc"] = "desc"
 
     @field_validator("search")
@@ -208,6 +208,71 @@ class ImageResponse(BaseModel):
     sort_order: int
 
 
+class CreateVariantRequest(BaseModel):
+    """Payload for creating a new product variant."""
+
+    sku: str | None = Field(default=None, max_length=100)
+    size: str | None = Field(default=None, max_length=20)
+    color: str | None = Field(default=None, max_length=50)
+    color_hex: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    material: str | None = Field(default=None, max_length=100)
+    weight_grams: int | None = Field(default=None, ge=0)
+    price_override: Decimal | None = Field(default=None, gt=0)
+    is_active: bool = True
+    sort_order: int = Field(default=0, ge=0)
+
+
+class UpdateVariantRequest(BaseModel):
+    """Payload for updating a product variant."""
+
+    sku: str | None = Field(default=None, max_length=100)
+    size: str | None = Field(default=None, max_length=20)
+    color: str | None = Field(default=None, max_length=50)
+    color_hex: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    material: str | None = Field(default=None, max_length=100)
+    weight_grams: int | None = Field(default=None, ge=0)
+    price_override: Decimal | None = Field(default=None, gt=0)
+    is_active: bool | None = None
+    sort_order: int | None = Field(default=None, ge=0)
+
+
+class VariantResponse(BaseModel):
+    """Public representation of a product variant."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    product_id: uuid.UUID
+    sku: str
+    size: str | None
+    color: str | None
+    color_hex: str | None
+    material: str | None
+    weight_grams: int | None
+    price_override: Decimal | None
+    effective_price: Decimal
+    is_active: bool
+    sort_order: int
+    created_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def compute_effective_price(cls, data: Any) -> Any:
+        if hasattr(data, "price_override"):
+            override = getattr(data, "price_override", None)
+            product = getattr(data, "product", None)
+            effective = override if override is not None else (product.price if product is not None else Decimal("0"))
+            if isinstance(data, dict):
+                data["effective_price"] = effective
+            else:
+                setattr(data, "effective_price", effective)
+        elif isinstance(data, dict):
+            if "effective_price" not in data:
+                override = data.get("price_override")
+                data["effective_price"] = override if override is not None else Decimal("0")
+        return data
+
+
 class ProductResponse(BaseModel):
     """Public representation of a product."""
 
@@ -226,6 +291,7 @@ class ProductResponse(BaseModel):
     brand_name: str | None = None
     cover_image: str | None
     images: list[ImageResponse]
+    variants: list[VariantResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     published_at: datetime | None
