@@ -74,6 +74,8 @@ def _get_db_url() -> str | None:
         "ORDERS_DATABASE_URL",
         "PAYMENTS_DATABASE_URL",
         "NOTIFICATIONS_DATABASE_URL",
+        "WISHLIST_DATABASE_URL",
+        "DROPS_DATABASE_URL",
     ]:
         if val := os.environ.get(key):
             return val
@@ -90,6 +92,7 @@ def _get_rabbitmq_urls() -> list[str]:
         "ORDERS_RABBITMQ_URL",
         "PAYMENTS_RABBITMQ_URL",
         "NOTIFICATIONS_RABBITMQ_URL",
+        "DROPS_RABBITMQ_URL",
     ]
     for key in keys:
         if val := os.environ.get(key):

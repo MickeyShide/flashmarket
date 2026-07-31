@@ -1,0 +1,36 @@
+name: flashmarket-wishlist
+
+x-wishlist-runtime: &wishlist-runtime
+  image: flashmarket-wishlist-api:local
+  pull_policy: never
+
+x-wishlist-environment: &wishlist-environment
+  WISHLIST_ENVIRONMENT: development
+  WISHLIST_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/wishlist
+  WISHLIST_CORS_ORIGINS: '["http://localhost:3000"]'
+  WISHLIST_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
+
+services:
+  api:
+    <<: *wishlist-runtime
+    build:
+      context: .
+    environment: *wishlist-environment
+    ports:
+      - "127.0.0.1:${WISHLIST_PORT:-4921}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+networks:
+  default:
+    name: shide-observability
+    external: true

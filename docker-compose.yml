@@ -116,6 +116,36 @@ services:
     depends_on: !reset {}
 
   # -----------------------------------------------------------
+  # WISHLIST MICROSERVICE
+  # -----------------------------------------------------------
+  wishlist:
+    extends:
+      file: wishlist/docker-compose.yml
+      service: api
+    depends_on: !reset {}
+
+  # -----------------------------------------------------------
+  # DROPS MICROSERVICE
+  # -----------------------------------------------------------
+  drops:
+    extends:
+      file: drops/docker-compose.yml
+      service: api
+    depends_on: !reset {}
+
+  drops-scheduler:
+    extends:
+      file: drops/docker-compose.yml
+      service: scheduler
+    depends_on: !reset {}
+
+  drops-outbox:
+    extends:
+      file: drops/docker-compose.yml
+      service: outbox
+    depends_on: !reset {}
+
+  # -----------------------------------------------------------
   # GATEWAY & FRONTEND
   # -----------------------------------------------------------
   gateway:
