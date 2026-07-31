@@ -48,8 +48,8 @@ class InventoryService:
         self._outbox_repo = outbox_repo
 
     async def create_stock(self, data: StockCreateRequest) -> StockModel:
-        """Initialize stock for a product."""
-        existing = await self._stock_repo.get_by_product_id(data.product_id)
+        """Initialize stock for a product or variant."""
+        existing = await self._stock_repo.get_by_product_and_variant(data.product_id, data.variant_id)
         if existing is not None:
             existing.total = data.total
             existing.available = data.total
@@ -60,6 +60,7 @@ class InventoryService:
 
         stock = StockModel(
             product_id=data.product_id,
+            variant_id=data.variant_id,
             total=data.total,
             available=data.total,
         )
@@ -68,9 +69,11 @@ class InventoryService:
         await self._session.refresh(stock)
         return stock
 
-    async def update_total(self, product_id: UUID, data: StockUpdateRequest) -> StockModel:
-        """Change the total stock of a product, preserving sold units."""
-        stock = await self._stock_repo.get_by_product_id_for_update(product_id)
+    async def update_total(
+        self, product_id: UUID, data: StockUpdateRequest, variant_id: UUID | None = None
+    ) -> StockModel:
+        """Change the total stock of a product or variant, preserving sold units."""
+        stock = await self._stock_repo.get_by_product_and_variant_for_update(product_id, variant_id)
         if stock is None:
             raise StockNotFound
 
@@ -85,9 +88,9 @@ class InventoryService:
         await self._session.refresh(stock)
         return stock
 
-    async def get_stock(self, product_id: UUID) -> StockModel:
-        """Return stock for a product."""
-        stock = await self._stock_repo.get_by_product_id(product_id)
+    async def get_stock(self, product_id: UUID, variant_id: UUID | None = None) -> StockModel:
+        """Return stock for a product or variant."""
+        stock = await self._stock_repo.get_by_product_and_variant(product_id, variant_id)
         if stock is None:
             raise StockNotFound
         return stock
@@ -98,7 +101,9 @@ class InventoryService:
         data: ReserveRequest,
     ) -> ReservationModel:
         """Atomically reserve stock for a user."""
-        stock = await self._stock_repo.get_by_product_id_for_update(product_id)
+        stock = await self._stock_repo.get_by_product_and_variant_for_update(
+            product_id, data.variant_id
+        )
         if stock is None:
             raise StockNotFound
 
@@ -107,23 +112,26 @@ class InventoryService:
 
         stock.available -= data.quantity
         stock.reserved += data.quantity
+        await self._stock_repo.update(stock)
 
-        ttl = get_settings().reservation_ttl_seconds
+        settings = get_settings()
+        expires_at = utc_now() + timedelta(seconds=settings.reservation_ttl_seconds)
+
         reservation = ReservationModel(
             stock_id=stock.id,
             user_id=data.user_id,
-            quantity=data.quantity,
             order_id=data.order_id,
+            quantity=data.quantity,
             status=ReservationStatus.RESERVED,
-            expires_at=datetime.now(UTC) + timedelta(seconds=ttl),
+            expires_at=expires_at,
         )
         await self._reservation_repo.create(reservation)
-        await self._stock_repo.update(stock)
 
         payload = {
             "reservation_id": str(reservation.id),
-            "product_id": str(product_id),
             "user_id": str(data.user_id),
+            "product_id": str(product_id),
+            "variant_id": str(stock.variant_id) if stock.variant_id else None,
             "quantity": data.quantity,
             "order_id": str(data.order_id) if data.order_id else None,
             "expires_at": reservation.expires_at.isoformat(),

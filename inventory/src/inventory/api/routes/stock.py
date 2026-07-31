@@ -51,9 +51,10 @@ async def create_stock(
 async def get_stock(
     product_id: UUID,
     service: InventoryServiceDep,
+    variant_id: UUID | None = None,
 ) -> StockResponse:
-    """Return current stock counters for a product."""
-    stock = await service.get_stock(product_id)
+    """Return current stock counters for a product or variant."""
+    stock = await service.get_stock(product_id, variant_id)
     return _stock_response(stock)
 
 
@@ -66,9 +67,10 @@ async def update_stock(
     product_id: UUID,
     data: StockUpdateRequest,
     service: InventoryServiceDep,
+    variant_id: UUID | None = None,
 ) -> StockResponse:
-    """Adjust the total stock of a product."""
-    stock = await service.update_total(product_id, data)
+    """Adjust the total stock of a product or variant."""
+    stock = await service.update_total(product_id, data, variant_id)
     return _stock_response(stock)
 
 
@@ -85,7 +87,7 @@ async def reserve(
 ) -> ReservationResult:
     """Reserve one or more units for a user."""
     reservation = await service.reserve(product_id, data)
-    stock = await service.get_stock(product_id)
+    stock = await service.get_stock(product_id, data.variant_id)
     return ReservationResult(
         reservation=_reservation_response(reservation),
         stock=_stock_response(stock),

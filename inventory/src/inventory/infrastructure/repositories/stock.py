@@ -29,19 +29,37 @@ class StockRepository:
         """Fetch a stock record by primary key."""
         return await self._session.get(StockModel, stock_id)
 
+    async def get_by_product_and_variant(
+        self, product_id: UUID, variant_id: UUID | None = None
+    ) -> StockModel | None:
+        """Fetch a stock record by product id and variant id."""
+        stmt = select(StockModel).where(StockModel.product_id == product_id)
+        if variant_id is not None:
+            stmt = stmt.where(StockModel.variant_id == variant_id)
+        else:
+            stmt = stmt.where(StockModel.variant_id.is_(None))
+        result = await self._session.scalars(stmt)
+        return result.first()
+
+    async def get_by_product_and_variant_for_update(
+        self, product_id: UUID, variant_id: UUID | None = None
+    ) -> StockModel | None:
+        """Lock a stock row for atomic reservation updates."""
+        stmt = select(StockModel).where(StockModel.product_id == product_id).with_for_update()
+        if variant_id is not None:
+            stmt = stmt.where(StockModel.variant_id == variant_id)
+        else:
+            stmt = stmt.where(StockModel.variant_id.is_(None))
+        result = await self._session.scalars(stmt)
+        return result.first()
+
     async def get_by_product_id(self, product_id: UUID) -> StockModel | None:
         """Fetch a stock record by product id."""
-        result = await self._session.scalars(
-            select(StockModel).where(StockModel.product_id == product_id)
-        )
-        return result.first()
+        return await self.get_by_product_and_variant(product_id, None)
 
     async def get_by_product_id_for_update(self, product_id: UUID) -> StockModel | None:
         """Lock a stock row for atomic reservation updates."""
-        result = await self._session.scalars(
-            select(StockModel).where(StockModel.product_id == product_id).with_for_update()
-        )
-        return result.first()
+        return await self.get_by_product_and_variant_for_update(product_id, None)
 
     async def update(self, stock: StockModel) -> StockModel:
         """Flush pending attribute changes on a stock record."""

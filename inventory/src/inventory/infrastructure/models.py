@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,7 +23,7 @@ from inventory.infrastructure.database import Base, utc_now
 
 
 class StockModel(Base):
-    """Available, reserved and sold units for a product."""
+    """Available, reserved and sold units for a product or variant."""
 
     __tablename__ = "stocks"
     __table_args__ = (
@@ -34,10 +35,12 @@ class StockModel(Base):
             "reserved + sold <= total",
             name="ck_stocks_reservation_invariant",
         ),
+        UniqueConstraint("product_id", "variant_id", name="uq_stocks_product_variant"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
-    product_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, unique=True, index=True)
+    product_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    variant_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     available: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     reserved: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

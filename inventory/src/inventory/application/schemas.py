@@ -15,9 +15,10 @@ from inventory.domain.entities import ReservationStatus
 
 
 class StockCreateRequest(BaseModel):
-    """Payload for initializing stock for a product."""
+    """Payload for initializing stock for a product or variant."""
 
     product_id: uuid.UUID
+    variant_id: uuid.UUID | None = None
     total: int = Field(ge=0, le=1_000_000)
 
 
@@ -31,6 +32,7 @@ class ReserveRequest(BaseModel):
     """Payload for reserving stock for a user."""
 
     user_id: uuid.UUID
+    variant_id: uuid.UUID | None = None
     quantity: int = Field(default=1, ge=1, le=10_000)
     order_id: uuid.UUID | None = None
 
@@ -59,6 +61,7 @@ class StockResponse(BaseModel):
 
     id: uuid.UUID
     product_id: uuid.UUID
+    variant_id: uuid.UUID | None = None
     total: int
     available: int
     reserved: int
