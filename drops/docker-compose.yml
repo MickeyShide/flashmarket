@@ -1,0 +1,53 @@
+name: flashmarket-drops
+
+x-drops-runtime: &drops-runtime
+  image: flashmarket-drops-api:local
+  pull_policy: never
+
+x-drops-environment: &drops-environment
+  DROPS_ENVIRONMENT: development
+  DROPS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/drops
+  DROPS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/drop
+  DROPS_CORS_ORIGINS: '["http://localhost:3000"]'
+  DROPS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
+
+services:
+  api:
+    <<: *drops-runtime
+    build:
+      context: .
+    environment: *drops-environment
+    ports:
+      - "127.0.0.1:${DROPS_PORT:-4922}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  scheduler:
+    <<: *drops-runtime
+    environment: *drops-environment
+    command:
+      - consumer
+      - drops.scheduler
+    restart: unless-stopped
+
+  outbox:
+    <<: *drops-runtime
+    environment: *drops-environment
+    command:
+      - outbox
+      - drops.outbox_worker
+    restart: unless-stopped
+
+networks:
+  default:
+    name: shide-observability
+    external: true
