@@ -66,6 +66,38 @@ jobs:
           docker compose up -d --build
           sleep 30
 
+      - name: Debug - Container Status and Logs
+        if: always()
+        run: |
+          echo "=== Docker Compose PS ==="
+          docker compose ps -a
+          echo ""
+          echo "=== Docker Network Inspect ==="
+          docker network inspect shide-observability --format '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}'
+          echo ""
+          echo "=== Gateway Logs ==="
+          docker compose logs gateway --tail=30 2>&1 || true
+          echo ""
+          echo "=== Catalog Logs ==="
+          docker compose logs catalog --tail=30 2>&1 || true
+          echo ""
+          echo "=== Auth Logs ==="
+          docker compose logs auth --tail=30 2>&1 || true
+          echo ""
+          echo "=== Inventory Logs ==="
+          docker compose logs inventory --tail=30 2>&1 || true
+          echo ""
+          echo "=== Orders Logs ==="
+          docker compose logs orders --tail=30 2>&1 || true
+          echo ""
+          echo "=== Payments Logs ==="
+          docker compose logs payments --tail=30 2>&1 || true
+          echo ""
+          echo "=== Direct health checks ==="
+          docker compose exec -T gateway wget -qO- http://127.0.0.1/health 2>&1 || echo "Gateway health FAILED"
+          docker compose exec -T gateway wget -qO- http://catalog:8000/health/ready 2>&1 || echo "Catalog health from gateway FAILED"
+          docker compose exec -T gateway wget -qO- http://auth:8000/health/ready 2>&1 || echo "Auth health from gateway FAILED"
+
       - name: Run Purchase Saga E2E Integration Suite
         run: |
           uv run --with pytest,pytest-asyncio,httpx,aio-pika pytest tests/test_purchase_saga.py -v -m integration
