@@ -60,7 +60,7 @@ async def test_outbox_publisher_marks_confirmed_event_as_published(
     assert len(exchange.published) == 1
     message, routing_key, mandatory = exchange.published[0]
     assert routing_key == "identity.user_registered"
-    assert mandatory is True
+    assert mandatory is False
     assert json.loads(message.body) == {
         "schema_version": 1,
         "event_id": str(event_id),

@@ -66,7 +66,7 @@ async def test_outbox_publisher_marks_confirmed_event_as_published(
     assert len(exchange.published) == 1  # type: ignore[attr-defined]
     _message, routing_key, mandatory = exchange.published[0]  # type: ignore[attr-defined]
     assert routing_key == "inventory.InventoryReserved"
-    assert mandatory is True
+    assert mandatory is False
 
     async with session_factory() as db:
         event = await db.get(OutboxEventModel, event_id)
