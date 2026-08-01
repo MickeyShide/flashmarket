@@ -11,10 +11,34 @@ x-auth-runtime: &auth-runtime
         - auth
 
 services:
+  keygen:
+    <<: *auth-runtime
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        if [ -d /var/lib/flashmarket-auth/legacy-keys/public ]; then
+          cp -n /var/lib/flashmarket-auth/legacy-keys/public/*.pem \
+            /var/lib/flashmarket-auth/keys/public/ 2>/dev/null || true
+        fi
+        exec .venv/bin/python scripts/generate_jwt_keys.py \
+          --output-dir /var/lib/flashmarket-auth/keys \
+          --key-id "$${AUTH_JWT_KEY_ID}"
+    volumes:
+      - auth-jwt-keys:/var/lib/flashmarket-auth/keys
+      - auth-jwt-keys:/var/lib/flashmarket-auth/legacy-keys:ro
+      - auth-jwt-keys-public:/var/lib/flashmarket-auth/keys/public
+    restart: "no"
+
   api:
     <<: *auth-runtime
     volumes:
       - auth-jwt-keys:/var/lib/flashmarket-auth/keys
+      - auth-jwt-keys-public:/var/lib/flashmarket-auth/keys/public:ro
+    depends_on:
+      keygen:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
@@ -83,3 +107,5 @@ networks:
 
 volumes:
   auth-jwt-keys:
+  auth-jwt-keys-public:
+    name: flashmarket-auth-jwt-keys-public

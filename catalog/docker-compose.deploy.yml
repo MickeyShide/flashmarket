@@ -13,6 +13,13 @@ x-catalog-runtime: &catalog-runtime
 services:
   api:
     <<: *catalog-runtime
+    environment:
+      CATALOG_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+      CATALOG_JWT_ALGORITHM: EdDSA
+      CATALOG_JWT_ISSUER: flashmarket-auth
+      CATALOG_JWT_AUDIENCE: flashmarket-api
+    volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
     depends_on: {}
     healthcheck:
       test:
@@ -57,3 +64,8 @@ networks:
   backend:
     external: true
     name: shide-observability
+
+volumes:
+  auth-jwt-keys-public:
+    external: true
+    name: flashmarket-auth-jwt-keys-public

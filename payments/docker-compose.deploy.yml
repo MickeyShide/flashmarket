@@ -19,11 +19,17 @@ x-payments-environment: &payments-environment
   PAYMENTS_DOCS_ENABLED: ${PAYMENTS_DOCS_ENABLED:-false}
   PAYMENTS_DEBUG: ${PAYMENTS_DEBUG:-false}
   PAYMENTS_ALLOW_INSECURE_INTERNAL_SERVICES: ${PAYMENTS_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
+  PAYMENTS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  PAYMENTS_JWT_ALGORITHM: EdDSA
+  PAYMENTS_JWT_ISSUER: flashmarket-auth
+  PAYMENTS_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
     <<: *payments-runtime
     environment: *payments-environment
+    volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
     depends_on: {}
     healthcheck:
       test:
@@ -86,3 +92,8 @@ networks:
   backend:
     external: true
     name: shide-observability
+
+volumes:
+  auth-jwt-keys-public:
+    external: true
+    name: flashmarket-auth-jwt-keys-public

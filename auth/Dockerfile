@@ -27,8 +27,10 @@ RUN uv sync --frozen --no-dev --no-editable && \
     chmod +x ./docker/entrypoint.sh && \
     chown -R app:app /app
 
-RUN mkdir -p /var/lib/flashmarket-auth/keys \
-    && chown app:app /var/lib/flashmarket-auth/keys
+RUN mkdir -p \
+        /var/lib/flashmarket-auth/keys/private \
+        /var/lib/flashmarket-auth/keys/public \
+    && chown -R app:app /var/lib/flashmarket-auth/keys
 
 ENV UV_NO_CACHE=1
 

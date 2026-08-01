@@ -19,11 +19,17 @@ x-notifications-environment: &notifications-environment
   NOTIFICATIONS_DOCS_ENABLED: ${NOTIFICATIONS_DOCS_ENABLED:-false}
   NOTIFICATIONS_DEBUG: ${NOTIFICATIONS_DEBUG:-false}
   NOTIFICATIONS_ALLOW_INSECURE_INTERNAL_SERVICES: ${NOTIFICATIONS_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
+  NOTIFICATIONS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  NOTIFICATIONS_JWT_ALGORITHM: EdDSA
+  NOTIFICATIONS_JWT_ISSUER: flashmarket-auth
+  NOTIFICATIONS_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
     <<: *notifications-runtime
     environment: *notifications-environment
+    volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
     depends_on: {}
     healthcheck:
       test:
@@ -87,3 +93,7 @@ networks:
     external: true
     name: shide-observability
 
+volumes:
+  auth-jwt-keys-public:
+    external: true
+    name: flashmarket-auth-jwt-keys-public

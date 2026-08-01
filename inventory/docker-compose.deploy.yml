@@ -20,11 +20,17 @@ x-inventory-environment: &inventory-environment
   INVENTORY_DOCS_ENABLED: ${INVENTORY_DOCS_ENABLED:-false}
   INVENTORY_DEBUG: ${INVENTORY_DEBUG:-false}
   INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES: ${INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
+  INVENTORY_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  INVENTORY_JWT_ALGORITHM: EdDSA
+  INVENTORY_JWT_ISSUER: flashmarket-auth
+  INVENTORY_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
     <<: *inventory-runtime
     environment: *inventory-environment
+    volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
     depends_on: {}
     healthcheck:
       test:
@@ -87,3 +93,8 @@ networks:
   backend:
     external: true
     name: shide-observability
+
+volumes:
+  auth-jwt-keys-public:
+    external: true
+    name: flashmarket-auth-jwt-keys-public

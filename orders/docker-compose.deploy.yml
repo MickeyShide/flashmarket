@@ -20,11 +20,17 @@ x-orders-environment: &orders-environment
   ORDERS_DOCS_ENABLED: ${ORDERS_DOCS_ENABLED:-false}
   ORDERS_DEBUG: ${ORDERS_DEBUG:-false}
   ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES: ${ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES:-false}
+  ORDERS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  ORDERS_JWT_ALGORITHM: EdDSA
+  ORDERS_JWT_ISSUER: flashmarket-auth
+  ORDERS_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
     <<: *orders-runtime
     environment: *orders-environment
+    volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
     depends_on: {}
     healthcheck:
       test:
@@ -87,3 +93,8 @@ networks:
   backend:
     external: true
     name: shide-observability
+
+volumes:
+  auth-jwt-keys-public:
+    external: true
+    name: flashmarket-auth-jwt-keys-public
