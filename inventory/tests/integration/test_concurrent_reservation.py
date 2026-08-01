@@ -79,7 +79,7 @@ async def test_concurrent_reservations_no_oversell(
             reservation_repo=ReservationRepository(db),
             outbox_repo=OutboxRepository(db),
         )
-        await service.create_stock(type("Data", (), {"product_id": product_id, "total": 100})())
+        await service.create_stock(type("Data", (), {"product_id": product_id, "variant_id": None, "total": 100})())
 
     semaphore = asyncio.Semaphore(20)
 

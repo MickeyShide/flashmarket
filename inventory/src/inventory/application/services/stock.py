@@ -49,7 +49,8 @@ class InventoryService:
 
     async def create_stock(self, data: StockCreateRequest) -> StockModel:
         """Initialize stock for a product or variant."""
-        existing = await self._stock_repo.get_by_product_and_variant(data.product_id, data.variant_id)
+        variant_id = getattr(data, "variant_id", None)
+        existing = await self._stock_repo.get_by_product_and_variant(data.product_id, variant_id)
         if existing is not None:
             reserved_plus_sold = existing.reserved + existing.sold
             if data.total < reserved_plus_sold:
