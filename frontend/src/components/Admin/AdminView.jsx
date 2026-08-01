@@ -1,0 +1,68 @@
+import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { AdminNav } from './AdminNav';
+
+import { ProductsTab } from './Catalog/ProductsTab';
+import { BrandsTab } from './Catalog/BrandsTab';
+import { CategoriesTab } from './Catalog/CategoriesTab';
+import { DropsTab } from './Drops/DropsTab';
+import { PromocodesTab } from './Promocodes/PromocodesTab';
+import { MediaTab } from './Media/MediaTab';
+import { UsersTab } from './Users/UsersTab';
+import { AuditTab } from './Audit/AuditTab';
+import { NotificationsAdminTab } from './Notifications/NotificationsAdminTab';
+
+export const AdminView = ({ onBack }) => {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('catalog');
+
+  // Guard access for non-admin users
+  if (!user || user.role !== 'ADMIN') {
+    return (
+      <div className="max-w-[800px] mx-auto my-8 px-4 text-center">
+        <button className="text-[11px] font-bold uppercase mb-6 cursor-pointer text-text-muted hover:text-black" onClick={onBack}>
+          ← Назад в каталог
+        </button>
+        <div className="bg-red-50 border border-red-200 text-red-700 p-8 rounded-lg">
+          <h2 className="text-lg font-black uppercase mb-2">Доступ запрещен</h2>
+          <p className="text-xs">Панель управления доступна только пользователям с ролью АДМИНИСТРАТОР.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-[1280px] mx-auto my-6 md:my-8 px-3.5 md:px-6">
+      <div className="flex items-center justify-between mb-4">
+        <button
+          className="text-[11px] font-bold uppercase tracking-wider cursor-pointer text-text-muted hover:text-black flex items-center gap-1"
+          onClick={onBack}
+        >
+          ← Назад в магазин
+        </button>
+
+        <div className="text-xs font-bold font-mono text-purple-700 uppercase">
+          ● Панель администратора ({user.email})
+        </div>
+      </div>
+
+      <h2 className="text-xl md:text-2xl font-black uppercase tracking-wide mb-6">
+        УПРАВЛЕНИЕ МАГАЗИНОМ
+      </h2>
+
+      <AdminNav activeTab={activeTab} onSelectTab={setActiveTab} />
+
+      <main className="mt-6">
+        {activeTab === 'catalog' && <ProductsTab />}
+        {activeTab === 'brands' && <BrandsTab />}
+        {activeTab === 'categories' && <CategoriesTab />}
+        {activeTab === 'drops' && <DropsTab />}
+        {activeTab === 'promocodes' && <PromocodesTab />}
+        {activeTab === 'media' && <MediaTab />}
+        {activeTab === 'users' && <UsersTab />}
+        {activeTab === 'audit' && <AuditTab />}
+        {activeTab === 'notifications' && <NotificationsAdminTab />}
+      </main>
+    </div>
+  );
+};

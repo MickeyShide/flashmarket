@@ -1,0 +1,116 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { apiJson } from '../../../services/api';
+import { useToast } from '../../../context/ToastContext';
+import { formatDate } from '../../../utils/formatters';
+
+export const MediaTab = () => {
+  const { triggerToast } = useToast();
+  const [assets, setAssets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [purposeFilter, setPurposeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  const loadAssets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiJson('/api/v1/media/admin/assets?limit=100');
+      setAssets(Array.isArray(data) ? data : (data.items || []));
+    } catch (err) {
+      console.warn('Failed to load media assets:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAssets();
+  }, [loadAssets]);
+
+  const handleDeleteAsset = async (assetId) => {
+    if (!window.confirm('Удалить этот медиа файл?')) return;
+    try {
+      await apiJson(`/api/v1/media/assets/${assetId}`, { method: 'DELETE' });
+      triggerToast('Файл удален');
+      loadAssets();
+    } catch (err) {
+      triggerToast(err.message || 'Ошибка удаления', true);
+    }
+  };
+
+  if (loading) return <div className="spinner"></div>;
+
+  const visibleAssets = assets.filter(asset =>
+    (!purposeFilter || asset.purpose === purposeFilter) &&
+    (!statusFilter || asset.status === statusFilter)
+  );
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-black uppercase">Медиа файлы и ассеты ({assets.length})</h3>
+      <div className="flex gap-2">
+        <input className="border rounded px-2 py-1 text-xs" placeholder="purpose" value={purposeFilter} onChange={(e) => setPurposeFilter(e.target.value)} />
+        <select className="border rounded px-2 py-1 text-xs" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="">Все статусы</option>
+          <option value="READY">READY</option>
+          <option value="PENDING">PENDING</option>
+          <option value="REJECTED">REJECTED</option>
+          <option value="DELETED">DELETED</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-border-color rounded-lg overflow-hidden">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50 border-b text-[10px] font-black uppercase text-gray-500">
+              <th className="p-3">Превью</th>
+              <th className="p-3">Файл / Назначение</th>
+              <th className="p-3">Сущность</th>
+              <th className="p-3">Статус</th>
+              <th className="p-3">Дата</th>
+              <th className="p-3 text-right">Действия</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 text-xs">
+            {visibleAssets.map(a => (
+              <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                <td className="p-3">
+                  {a.public_url ? (
+                    <img src={a.public_url} alt="" className="w-10 h-10 object-cover rounded bg-black" />
+                  ) : (
+                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-[9px] font-mono text-gray-400">
+                      NO URL
+                    </div>
+                  )}
+                </td>
+                <td className="p-3 font-extrabold">
+                  <div>{a.original_filename || a.id}</div>
+                  <div className="text-[10px] text-gray-400 font-mono">цель: {a.purpose || 'general'}</div>
+                </td>
+                <td className="p-3 font-mono text-[10.5px]">
+                  {a.entity_type || '-'}: {a.entity_id || '-'}
+                </td>
+                <td className="p-3">
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${
+                    a.status === 'READY' ? 'bg-emerald-100 text-emerald-800' :
+                    a.status === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {a.status}
+                  </span>
+                </td>
+                <td className="p-3 font-mono text-[10.5px]">{formatDate(a.created_at)}</td>
+                <td className="p-3 text-right">
+                  <button
+                    className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase hover:bg-red-200"
+                    onClick={() => handleDeleteAsset(a.id)}
+                  >
+                    Удалить
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
