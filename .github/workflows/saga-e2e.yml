@@ -46,7 +46,7 @@ jobs:
 
       - name: Run Purchase Saga E2E Integration Suite
         run: |
-          uv run pytest tests/test_purchase_saga.py -v -m integration
+          uv run --with pytest,pytest-asyncio,httpx,aio-pika pytest tests/test_purchase_saga.py -v -m integration
 
       - name: Teardown Docker Stack
         if: always()
