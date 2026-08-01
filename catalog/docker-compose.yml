@@ -20,7 +20,8 @@ services:
   api:
     <<: *catalog-runtime
     build:
-      context: .
+      context: ..
+      dockerfile: catalog/Dockerfile
     environment: *catalog-environment
     ports:
       - "127.0.0.1:${CATALOG_PORT:-4919}:8000"

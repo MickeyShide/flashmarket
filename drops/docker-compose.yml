@@ -19,7 +19,8 @@ services:
   api:
     <<: *drops-runtime
     build:
-      context: .
+      context: ..
+      dockerfile: drops/Dockerfile
     environment: *drops-environment
     ports:
       - "127.0.0.1:${DROPS_PORT:-4925}:8000"

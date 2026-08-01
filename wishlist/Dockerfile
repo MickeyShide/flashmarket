@@ -13,7 +13,7 @@ WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
 COPY shared/jwt_verifier /shared/jwt_verifier
-COPY wishlist/pyproject.toml wishlist/README.md ./
+COPY wishlist/pyproject.toml wishlist/uv.lock wishlist/README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY wishlist/alembic.ini ./

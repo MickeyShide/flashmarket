@@ -37,7 +37,8 @@ services:
   api:
     <<: *auth-runtime
     build:
-      context: .
+      context: ..
+      dockerfile: auth/Dockerfile
     environment: *auth-environment
     ports:
       - "127.0.0.1:${AUTH_PORT:-4918}:8000"

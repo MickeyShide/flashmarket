@@ -18,7 +18,8 @@ services:
   api:
     <<: *wishlist-runtime
     build:
-      context: .
+      context: ..
+      dockerfile: wishlist/Dockerfile
     environment: *wishlist-environment
     ports:
       - "127.0.0.1:${WISHLIST_PORT:-4924}:8000"

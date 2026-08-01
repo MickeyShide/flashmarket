@@ -21,7 +21,8 @@ services:
   api:
     <<: *payments-runtime
     build:
-      context: .
+      context: ..
+      dockerfile: payments/Dockerfile
     environment: *payments-environment
     ports:
       - "127.0.0.1:${PAYMENTS_PORT:-4921}:8000"

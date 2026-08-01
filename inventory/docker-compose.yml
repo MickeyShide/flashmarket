@@ -21,7 +21,8 @@ services:
   api:
     <<: *inventory-runtime
     build:
-      context: .
+      context: ..
+      dockerfile: inventory/Dockerfile
     environment: *inventory-environment
     ports:
       - "127.0.0.1:${INVENTORY_PORT:-4923}:8000"

@@ -21,7 +21,8 @@ services:
   api:
     <<: *notifications-runtime
     build:
-      context: .
+      context: ..
+      dockerfile: notifications/Dockerfile
     environment: *notifications-environment
     ports:
       - "127.0.0.1:${NOTIFICATIONS_PORT:-4922}:8000"

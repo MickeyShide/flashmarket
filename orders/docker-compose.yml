@@ -21,7 +21,8 @@ services:
   api:
     <<: *orders-runtime
     build:
-      context: .
+      context: ..
+      dockerfile: orders/Dockerfile
     environment: *orders-environment
     ports:
       - "127.0.0.1:${ORDERS_PORT:-4920}:8000"
