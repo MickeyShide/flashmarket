@@ -1199,6 +1199,26 @@
         "title": "ImageResponse",
         "type": "object"
       },
+      "CatalogProductBatchRequest": {
+        "description": "Bounded product hydration request used by Drops and Wishlist.",
+        "properties": {
+          "product_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Product Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "product_ids"
+        ],
+        "title": "ProductBatchRequest",
+        "type": "object"
+      },
       "CatalogProductListResponse": {
         "description": "Paginated product listing.",
         "properties": {
@@ -1370,6 +1390,49 @@
         ],
         "title": "ProductStatus",
         "type": "string"
+      },
+      "CatalogUpdateBrandRequest": {
+        "description": "Partial update payload for a brand.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "UpdateBrandRequest",
+        "type": "object"
       },
       "CatalogUpdateProductRequest": {
         "description": "Partial-update payload; explicitly supplied fields are applied.",
@@ -2205,14 +2268,30 @@
         "description": "Payload for manually releasing a reservation.",
         "properties": {
           "order_id": {
-            "format": "uuid",
-            "title": "Order Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "reservation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reservation Id"
           }
         },
-        "required": [
-          "order_id"
-        ],
         "title": "ReleaseRequest",
         "type": "object"
       },
@@ -2223,6 +2302,18 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "drop_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drop Id"
           },
           "expires_at": {
             "format": "date-time",
@@ -2308,6 +2399,18 @@
       "InventoryReserveRequest": {
         "description": "Payload for reserving stock for a user.",
         "properties": {
+          "drop_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drop Id"
+          },
           "order_id": {
             "anyOf": [
               {
@@ -2910,6 +3013,18 @@
       "NotificationsCreateNotificationRequest": {
         "description": "Payload for creating a notification.",
         "properties": {
+          "attachment_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attachment Url"
+          },
           "body": {
             "maxLength": 10000,
             "minLength": 1,
@@ -2921,10 +3036,17 @@
             "default": "EMAIL"
           },
           "recipient": {
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Recipient",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient"
           },
           "subject": {
             "maxLength": 255,
@@ -2941,8 +3063,7 @@
         "required": [
           "user_id",
           "subject",
-          "body",
-          "recipient"
+          "body"
         ],
         "title": "CreateNotificationRequest",
         "type": "object"
@@ -2965,7 +3086,9 @@
         "enum": [
           "EMAIL",
           "SMS",
-          "PUSH"
+          "PUSH",
+          "SYSTEM",
+          "DROP_ALERT"
         ],
         "title": "NotificationChannel",
         "type": "string"
@@ -3005,6 +3128,17 @@
       "NotificationsNotificationResponse": {
         "description": "Public representation of a notification.",
         "properties": {
+          "attachment_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attachment Url"
+          },
           "attempts": {
             "title": "Attempts",
             "type": "integer"
@@ -3036,6 +3170,18 @@
               }
             ],
             "title": "Last Error"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
           },
           "recipient": {
             "title": "Recipient",
@@ -3081,6 +3227,8 @@
           "status",
           "attempts",
           "last_error",
+          "attachment_url",
+          "read_at",
           "created_at",
           "updated_at",
           "sent_at"
@@ -3138,6 +3286,37 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "OrdersCreateOrderBatchRequest": {
+        "description": "Create all reservation-backed lines in one Orders transaction.",
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/OrdersCreateOrderRequest"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          },
+          "promocode_code": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promocode Code"
+          }
+        },
+        "required": [
+          "lines"
+        ],
+        "title": "CreateOrderBatchRequest",
+        "type": "object"
+      },
       "OrdersCreateOrderRequest": {
         "description": "Payload for creating an order from a reservation.",
         "properties": {
@@ -3147,6 +3326,30 @@
             "minLength": 3,
             "title": "Currency",
             "type": "string"
+          },
+          "drop_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drop Id"
+          },
+          "payment_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Expires At"
           },
           "price": {
             "exclusiveMinimum": 0.0,
@@ -3193,6 +3396,54 @@
             "format": "uuid",
             "title": "User Id",
             "type": "string"
+          },
+          "variant_color": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Color"
+          },
+          "variant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Id"
+          },
+          "variant_size": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Size"
+          },
+          "variant_sku": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Sku"
           }
         },
         "required": [
@@ -3330,6 +3581,46 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "OrdersOrderBatchResponse": {
+        "properties": {
+          "checkout_id": {
+            "format": "uuid",
+            "title": "Checkout Id",
+            "type": "string"
+          },
+          "discount_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Discount Amount",
+            "type": "string"
+          },
+          "final_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Final Amount",
+            "type": "string"
+          },
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/OrdersOrderResponse"
+            },
+            "title": "Orders",
+            "type": "array"
+          },
+          "original_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Original Amount",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkout_id",
+          "orders",
+          "original_amount",
+          "discount_amount",
+          "final_amount"
+        ],
+        "title": "OrderBatchResponse",
+        "type": "object"
+      },
       "OrdersOrderListResponse": {
         "description": "Paginated order listing.",
         "properties": {
@@ -3365,6 +3656,18 @@
       "OrdersOrderResponse": {
         "description": "Public representation of an order.",
         "properties": {
+          "checkout_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkout Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -3379,6 +3682,18 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Discount Amount",
             "type": "string"
+          },
+          "drop_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drop Id"
           },
           "final_price": {
             "anyOf": [
@@ -3408,6 +3723,18 @@
               }
             ],
             "title": "Original Price"
+          },
+          "payment_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Expires At"
           },
           "payment_id": {
             "anyOf": [
@@ -3467,6 +3794,51 @@
             "format": "uuid",
             "title": "User Id",
             "type": "string"
+          },
+          "variant_color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Color"
+          },
+          "variant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Id"
+          },
+          "variant_size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Size"
+          },
+          "variant_sku": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Sku"
           }
         },
         "required": [
@@ -3911,6 +4283,18 @@
             "title": "Currency",
             "type": "string"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "order_id": {
             "format": "uuid",
             "title": "Order Id",
@@ -3998,6 +4382,18 @@
             "title": "Currency",
             "type": "string"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "external_id": {
             "anyOf": [
               {
@@ -4046,6 +4442,7 @@
           "provider",
           "status",
           "external_id",
+          "expires_at",
           "created_at",
           "updated_at"
         ],
@@ -5856,6 +6253,86 @@
         "x-flashmarket-service": "catalog"
       }
     },
+    "/api/v1/brands/{brand_id}": {
+      "patch": {
+        "operationId": "update_brand_api_v1_brands__brand_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brand_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Brand Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogUpdateBrandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogBrandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a brand",
+        "tags": [
+          "brands"
+        ],
+        "x-flashmarket-access": "admin",
+        "x-flashmarket-service": "catalog"
+      }
+    },
     "/api/v1/brands/{slug_or_id}": {
       "get": {
         "description": "Fetch brand details by unique slug or UUID.",
@@ -6070,6 +6547,52 @@
         },
         "security": [],
         "summary": "Get currently active drops",
+        "tags": [
+          "drops"
+        ],
+        "x-flashmarket-access": "anonymous",
+        "x-flashmarket-service": "drops"
+      }
+    },
+    "/api/v1/drops/id/{drop_id}": {
+      "get": {
+        "operationId": "get_drop_by_id_api_v1_drops_id__drop_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "drop_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Drop Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DropsDropResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DropsHTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [],
+        "summary": "Get public drop by ID",
         "tags": [
           "drops"
         ],
@@ -6990,6 +7513,56 @@
         "x-flashmarket-service": "notifications"
       }
     },
+    "/api/v1/notifications/{notification_id}/read": {
+      "post": {
+        "operationId": "read_notification_api_v1_notifications__notification_id__read_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notification_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notification Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsNotificationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsHTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Mark a notification as read",
+        "tags": [
+          "notifications"
+        ],
+        "x-flashmarket-access": "authenticated",
+        "x-flashmarket-service": "notifications"
+      }
+    },
     "/api/v1/notifications/{notification_id}/send": {
       "post": {
         "description": "Mark a notification as sent and emit an event.",
@@ -7083,6 +7656,54 @@
           }
         ],
         "summary": "Create an order from a reservation",
+        "tags": [
+          "orders"
+        ],
+        "x-flashmarket-access": "authenticated",
+        "x-flashmarket-service": "orders"
+      }
+    },
+    "/api/v1/orders/batch": {
+      "post": {
+        "operationId": "create_order_batch_api_v1_orders_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersCreateOrderBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdersOrderBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdersHTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a checkout from reserved lines",
         "tags": [
           "orders"
         ],
@@ -7802,6 +8423,24 @@
           },
           {
             "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Size"
+            }
+          },
+          {
+            "in": "query",
             "name": "search",
             "required": false,
             "schema": {
@@ -7963,6 +8602,74 @@
           "products"
         ],
         "x-flashmarket-access": "admin",
+        "x-flashmarket-service": "catalog"
+      }
+    },
+    "/api/v1/products/batch": {
+      "post": {
+        "operationId": "batch_products_api_v1_products_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogProductBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CatalogProductResponse"
+                  },
+                  "title": "Response Batch Products Api V1 Products Batch Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [],
+        "summary": "Hydrate public products by ID",
+        "tags": [
+          "products"
+        ],
+        "x-flashmarket-access": "anonymous",
         "x-flashmarket-service": "catalog"
       }
     },

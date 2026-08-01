@@ -1,6 +1,6 @@
 {
   "openapi": "3.1.0",
-  "operationCount": 98,
+  "operationCount": 103,
   "serviceCount": 9,
   "services": [
     {
@@ -40,7 +40,7 @@
       ],
       "id": "catalog",
       "name": "Catalog",
-      "operationCount": 15,
+      "operationCount": 17,
       "prefixes": [
         "/api/v1/brands",
         "/api/v1/products",
@@ -62,7 +62,7 @@
       ],
       "id": "drops",
       "name": "Drops",
-      "operationCount": 13,
+      "operationCount": 14,
       "prefixes": [
         "/api/v1/drops",
         "/api/v1/admin/drops"
@@ -117,7 +117,7 @@
       ],
       "id": "notifications",
       "name": "Notifications",
-      "operationCount": 5,
+      "operationCount": 6,
       "prefixes": [
         "/api/v1/notifications"
       ],
@@ -134,7 +134,7 @@
       ],
       "id": "orders",
       "name": "Orders",
-      "operationCount": 10,
+      "operationCount": 11,
       "prefixes": [
         "/api/v1/orders",
         "/api/v1/promocodes"
