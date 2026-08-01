@@ -245,6 +245,7 @@ jobs:
       GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
       INVENTORY_CORS_ORIGINS: ${{ vars.INVENTORY_CORS_ORIGINS }}
       DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
+      DEPLOY_REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD || 'flashmarket_redis_pass_2026' }}
       DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
     steps:
       - name: Check out repository
@@ -258,6 +259,7 @@ jobs:
           INVENTORY_DOMAIN="inventory.${GATEWAY_DOMAIN}"
           INFRA_USER="${INFRA_USER:-shide}"
           DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
+          DEPLOY_REDIS_PASSWORD="${DEPLOY_REDIS_PASSWORD:-flashmarket_redis_pass_2026}"
           DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"
 
           if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
@@ -316,6 +318,7 @@ jobs:
             printf 'INVENTORY_ENVIRONMENT=production\n'
             printf 'INVENTORY_DOMAIN=%s\n' "$INVENTORY_DOMAIN"
             printf 'INVENTORY_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/inventory\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'INVENTORY_REDIS_URL=redis://:%s@shide-redis:6379/2\n' "$DEPLOY_REDIS_PASSWORD"
             printf 'INVENTORY_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//inventory\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'INVENTORY_DEBUG=false\n'
@@ -325,6 +328,7 @@ jobs:
             printf 'INVENTORY_RESERVATION_TTL_SECONDS=300\n'
             printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'REDIS_PASSWORD=%s\n' "$DEPLOY_REDIS_PASSWORD"
             printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"
           } > "$environment_file"
           chmod 600 "$environment_file"
