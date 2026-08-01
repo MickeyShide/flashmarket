@@ -1,33 +1,74 @@
 import React from 'react';
 
-const STATUS_LABELS = { operational: 'Operational', unavailable: 'Unavailable', unknown: 'Unknown' };
+const STATUS_LABELS = { operational: 'Работает', unavailable: 'Недоступен', unknown: 'Проверка' };
 
 export const ServiceGrid = ({ services, statuses, onSelectService, selectedServiceId }) => (
-  <section className="border-b border-zinc-800 bg-[#0E0E0F] py-16">
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div className="mb-9 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div><div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#BFF532]">Service index</div><h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">One gateway. Nine boundaries.</h2></div>
-        <p className="max-w-md text-sm leading-6 text-zinc-400">Counts and prefixes come from the generated FastAPI contracts and current gateway configuration.</p>
+  <section className="bg-[#121212] border-b border-[#27272A] py-8 md:py-12">
+    <div className="max-w-[1280px] mx-auto px-3.5 md:px-6">
+      
+      {/* Section Header matching store style */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-6 md:mb-8">
+        <div>
+          <div className="font-mono text-[9.5px] md:text-[10.5px] tracking-[1.5px] uppercase font-bold text-accent-lime mb-1">
+            СЕРВИСЫ ПЛАТФОРМЫ
+          </div>
+          <h2 className="font-sans font-black text-lg md:text-2xl tracking-[1px] md:tracking-[2.5px] uppercase text-white">
+            МИКРОСЕРВИСЫ API
+          </h2>
+        </div>
+        <p className="text-xs text-zinc-400 font-sans max-w-md">
+          Официальные контракты микросервисов FlashMarket. Выберите сервис для фильтрации API-эндпоинтов.
+        </p>
       </div>
-      <div className="grid gap-px border border-zinc-800 bg-zinc-800 md:grid-cols-2 lg:grid-cols-3">
-        {services.map((service) => {
+
+      {/* Grid matching store product cards spacing */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+        {services.map((service, idx) => {
           const status = statuses[service.id] || 'unknown';
-          const selected = selectedServiceId === service.id;
+          const isSelected = selectedServiceId === service.id;
+
           return (
-            <button key={service.id} onClick={() => onSelectService(service.id)} className={`group min-h-44 bg-zinc-950 p-6 text-left transition-colors hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#BFF532] ${selected ? 'bg-zinc-900' : ''}`}>
-              <div className="flex items-start justify-between gap-3 font-mono text-[9px] uppercase tracking-widest">
-                <span className="text-zinc-500">{String(services.indexOf(service) + 1).padStart(2, '0')} / {service.id}</span>
-                <span className={status === 'operational' ? 'text-[#BFF532]' : status === 'unavailable' ? 'text-rose-400' : 'text-amber-300'}>● {STATUS_LABELS[status]}</span>
+            <button
+              key={service.id}
+              onClick={() => onSelectService(service.id)}
+              className={`group p-5 rounded-md border text-left transition-all cursor-pointer focus:outline-none ${
+                isSelected
+                  ? 'bg-[#27272A] border-accent-lime shadow-[0_0_15px_rgba(191,245,50,0.15)] ring-1 ring-accent-lime'
+                  : 'bg-[#18181B] border-[#27272A] hover:border-[#3F3F46] hover:bg-[#202023]'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 font-mono text-[10px] tracking-wider uppercase mb-3">
+                <span className="text-zinc-400 font-bold">
+                  {String(idx + 1).padStart(2, '0')} / {service.id}
+                </span>
+                <span className={`font-bold flex items-center gap-1.5 ${
+                  status === 'operational' ? 'text-accent-lime' : status === 'unavailable' ? 'text-red-400' : 'text-amber-400'
+                }`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                  {STATUS_LABELS[status]}
+                </span>
               </div>
-              <div className="mt-7 flex items-end justify-between gap-4">
-                <h3 className="text-2xl font-black uppercase text-white group-hover:text-[#BFF532]">{service.name}</h3>
-                <span className="font-mono text-xl font-bold text-zinc-600">{service.operationCount}</span>
+
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <h3 className="font-sans font-black text-base md:text-lg tracking-[0.5px] uppercase text-white group-hover:text-accent-lime transition-colors">
+                  {service.name}
+                </h3>
+                <span className="font-mono text-[11px] font-black px-2 py-0.5 rounded bg-[#27272A] text-zinc-300 border border-[#3F3F46]">
+                  {service.operationCount} эндпоинтов
+                </span>
               </div>
-              <div className="mt-5 truncate border-t border-zinc-800 pt-3 font-mono text-[10px] text-zinc-500">{service.prefixes[0]}</div>
+
+              <div className="border-t border-[#27272A] pt-3 mt-3 flex items-center justify-between font-mono text-[10.5px] text-zinc-400 truncate">
+                <span className="truncate">{service.prefixes[0]}</span>
+                <span className="text-accent-lime opacity-0 group-hover:opacity-100 transition-opacity font-bold ml-2">
+                  ВЫБРАТЬ →
+                </span>
+              </div>
             </button>
           );
         })}
       </div>
+
     </div>
   </section>
 );

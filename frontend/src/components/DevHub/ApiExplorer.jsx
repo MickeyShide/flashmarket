@@ -41,20 +41,41 @@ export const ApiExplorer = ({
   }, [selectedEndpoint, selectedEndpointId, onSelectedEndpointIdChange]);
 
   return (
-    <section id="api-explorer" className="scroll-mt-16 border-b border-zinc-800 bg-[#0B0B0C] py-16">
-      <div className="mx-auto max-w-[1500px] px-4 sm:px-6 lg:px-8">
-        <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-          <div><div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#BFF532]">Live contract / real requests</div><h2 className="mt-2 text-3xl font-black uppercase text-white sm:text-4xl">API Explorer</h2></div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">{filteredEndpoints.length} of {endpoints.length} operations</div>
+    <section id="api-explorer" className="scroll-mt-16 bg-[#121212] border-b border-[#27272A] py-8 md:py-12">
+      <div className="max-w-[1280px] mx-auto px-3.5 md:px-6">
+        
+        {/* Section Header matching FlashMarket store design */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-6">
+          <div>
+            <div className="font-mono text-[9.5px] md:text-[10.5px] tracking-[1.5px] uppercase font-bold text-accent-lime mb-1">
+              ИНТЕРАКТИВНЫЙ EXPLORER
+            </div>
+            <h2 className="font-sans font-black text-lg md:text-2xl tracking-[1px] md:tracking-[2.5px] uppercase text-white">
+              API EXPLORER
+            </h2>
+          </div>
+          <div className="font-mono text-[10.5px] uppercase tracking-wider text-zinc-400 font-extrabold">
+            {filteredEndpoints.length} из {endpoints.length} операций
+          </div>
         </div>
 
-        <div className="mb-3 grid grid-cols-3 gap-px border border-zinc-800 bg-zinc-800 font-mono text-[10px] uppercase lg:hidden">
+        {/* Mobile View Switcher Tabs */}
+        <div className="grid grid-cols-3 gap-1 bg-[#18181B] border border-[#27272A] p-1 rounded font-mono text-[10px] uppercase font-bold lg:hidden mb-3">
           {['list', 'details', 'playground'].map((tab) => (
-            <button key={tab} onClick={() => setMobileTab(tab)} className={`bg-zinc-950 px-2 py-3 ${mobileTab === tab ? 'text-[#BFF532]' : 'text-zinc-500'}`}>{tab}</button>
+            <button
+              key={tab}
+              onClick={() => setMobileTab(tab)}
+              className={`py-2 rounded transition-colors text-center ${
+                mobileTab === tab ? 'bg-accent-lime text-black' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              {tab === 'list' ? 'Список' : tab === 'details' ? 'Схема' : 'Консоль'}
+            </button>
           ))}
         </div>
 
-        <div className="grid min-h-[720px] overflow-hidden border border-zinc-800 bg-zinc-950 lg:grid-cols-[300px_minmax(360px,1fr)_390px]">
+        {/* Main Explorer Unified Frame */}
+        <div className="grid min-h-[700px] overflow-hidden border border-[#27272A] bg-[#141414] rounded-md shadow-2xl lg:grid-cols-[300px_minmax(340px,1fr)_380px]">
           <div className={`${mobileTab === 'list' ? 'block' : 'hidden'} lg:block`}>
             <EndpointSidebar
               endpoints={filteredEndpoints}
@@ -76,6 +97,7 @@ export const ApiExplorer = ({
             <RequestPlayground endpoint={selectedEndpoint} user={user} accessToken={accessToken} />
           </div>
         </div>
+
       </div>
     </section>
   );

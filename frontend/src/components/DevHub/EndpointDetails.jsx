@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
 
-const ACCESS_LABELS = { anonymous: 'Public', authenticated: 'Signed in', admin: 'Admin only' };
+const ACCESS_LABELS = { anonymous: 'Публичный (Public)', authenticated: 'Авторизация (Signed In)', admin: 'Только Админ (Admin)' };
 
 function ParameterTable({ title, parameters }) {
   if (!parameters.length) return null;
   return (
-    <section className="mt-8">
-      <h3 className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">{title}</h3>
-      <div className="mt-3 border-t border-zinc-800">
+    <section className="mt-6">
+      <h3 className="font-mono text-[10px] font-extrabold uppercase tracking-[1.5px] text-zinc-400">
+        {title}
+      </h3>
+      <div className="mt-2.5 border-t border-[#27272A]">
         {parameters.map((parameter) => (
-          <div key={`${parameter.location}:${parameter.name}`} className="grid gap-2 border-b border-zinc-800 py-4 sm:grid-cols-[150px_1fr]">
-            <div className="font-mono text-xs text-[#BFF532]">{parameter.name}<div className="mt-1 text-[9px] uppercase text-zinc-600">{parameter.type}{parameter.required ? ' · required' : ''}</div></div>
-            <p className="text-xs leading-5 text-zinc-400">{parameter.description || 'No additional description in the service contract.'}</p>
+          <div key={`${parameter.location}:${parameter.name}`} className="grid gap-2 border-b border-[#27272A] py-3.5 sm:grid-cols-[160px_1fr]">
+            <div className="font-mono text-xs text-accent-lime font-bold">
+              {parameter.name}
+              <div className="mt-0.5 text-[9px] uppercase text-zinc-500">
+                {parameter.type}{parameter.required ? ' · обязательно' : ''}
+              </div>
+            </div>
+            <p className="text-xs leading-relaxed text-zinc-300 font-sans">
+              {parameter.description || 'Описание не указано в OpenAPI спецификации.'}
+            </p>
           </div>
         ))}
       </div>
@@ -21,47 +30,104 @@ function ParameterTable({ title, parameters }) {
 
 export const EndpointDetails = ({ endpoint }) => {
   const [tab, setTab] = useState('contract');
-  if (!endpoint) return <div className="flex h-full items-center justify-center p-8 text-sm text-zinc-500">Select an API operation.</div>;
+
+  if (!endpoint) {
+    return (
+      <div className="flex h-full items-center justify-center p-8 text-xs font-mono text-zinc-500">
+        Выберите операцию API из списка слева.
+      </div>
+    );
+  }
+
   const responseEntries = Object.entries(endpoint.responses);
+
   return (
-    <article className="h-[720px] overflow-y-auto bg-[#0D0D0E] p-6 sm:p-8">
-      <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-widest">
-        <span className="bg-white px-2 py-1 font-black text-black">{endpoint.method}</span>
-        <span className={endpoint.access === 'admin' ? 'border border-rose-500/40 px-2 py-1 text-rose-400' : 'border border-zinc-700 px-2 py-1 text-zinc-400'}>{ACCESS_LABELS[endpoint.access]}</span>
-        <span className="text-zinc-600">{endpoint.serviceId}</span>
+    <article className="h-[700px] overflow-y-auto bg-[#141414] p-5 sm:p-7 text-zinc-100 font-sans">
+      
+      {/* Top Badges */}
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wider font-extrabold">
+        <span className="bg-white text-black px-2.5 py-1 rounded-sm">{endpoint.method}</span>
+        <span className={`px-2.5 py-1 rounded-sm border ${
+          endpoint.access === 'admin'
+            ? 'border-rose-500/40 text-rose-400 bg-rose-500/10'
+            : endpoint.access === 'authenticated'
+            ? 'border-cyan-500/40 text-cyan-400 bg-cyan-500/10'
+            : 'border-zinc-700 text-zinc-300 bg-[#1A1A1A]'
+        }`}>
+          {ACCESS_LABELS[endpoint.access]}
+        </span>
+        <span className="text-zinc-500 ml-auto">{endpoint.serviceId}</span>
       </div>
-      <h2 className="mt-5 text-2xl font-black text-white sm:text-3xl">{endpoint.summary}</h2>
-      <div className="mt-4 overflow-x-auto border-y border-zinc-800 py-4 font-mono text-sm text-[#BFF532]">{endpoint.path}</div>
-      {endpoint.description ? <p className="mt-5 whitespace-pre-line text-sm leading-6 text-zinc-400">{endpoint.description}</p> : null}
 
-      <div className="mt-8 flex gap-5 border-b border-zinc-800 font-mono text-[10px] uppercase tracking-wider">
-        {['contract', 'responses'].map((item) => <button key={item} onClick={() => setTab(item)} className={`border-b-2 pb-3 ${tab === item ? 'border-[#BFF532] text-[#BFF532]' : 'border-transparent text-zinc-600'}`}>{item}</button>)}
+      {/* Operation Summary Header */}
+      <h2 className="mt-4 font-sans font-black text-xl sm:text-2xl tracking-[0.5px] uppercase text-white">
+        {endpoint.summary}
+      </h2>
+
+      {/* HTTP Path Box */}
+      <div className="mt-3 overflow-x-auto border border-[#27272A] bg-[#1A1A1A] p-3 rounded-sm font-mono text-xs sm:text-sm text-accent-lime font-bold">
+        {endpoint.path}
       </div>
 
+      {endpoint.description && (
+        <p className="mt-4 text-xs leading-relaxed text-zinc-300 whitespace-pre-line font-sans">
+          {endpoint.description}
+        </p>
+      )}
+
+      {/* Navigation Tabs */}
+      <div className="mt-6 flex gap-6 border-b border-[#27272A] font-mono text-[10.5px] font-extrabold uppercase tracking-wider">
+        {['contract', 'responses'].map((item) => (
+          <button
+            key={item}
+            onClick={() => setTab(item)}
+            className={`border-b-2 pb-2.5 transition-colors cursor-pointer ${
+              tab === item ? 'border-accent-lime text-accent-lime' : 'border-transparent text-zinc-400 hover:text-white'
+            }`}
+          >
+            {item === 'contract' ? 'Параметры и Body' : 'HTTP Ответы (Responses)'}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab 1: Contract Details */}
       {tab === 'contract' ? (
         <>
-          <ParameterTable title="Path parameters" parameters={endpoint.pathParams} />
-          <ParameterTable title="Query parameters" parameters={endpoint.queryParams} />
-          <ParameterTable title="Header parameters" parameters={endpoint.headerParams} />
-          {endpoint.requestBody ? (
-            <section className="mt-8">
-              <h3 className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">Request body · {endpoint.requestBody.contentType}</h3>
-              {endpoint.requestBody.description ? <p className="mt-3 text-xs leading-5 text-zinc-400">{endpoint.requestBody.description}</p> : null}
-              <pre className="mt-3 max-h-72 overflow-auto border border-zinc-800 bg-black p-4 font-mono text-[11px] leading-5 text-zinc-300">{JSON.stringify(endpoint.requestBody.schema, null, 2)}</pre>
+          <ParameterTable title="Path параметры" parameters={endpoint.pathParams} />
+          <ParameterTable title="Query параметры" parameters={endpoint.queryParams} />
+          <ParameterTable title="Header параметры" parameters={endpoint.headerParams} />
+
+          {endpoint.requestBody && (
+            <section className="mt-6">
+              <h3 className="font-mono text-[10px] font-extrabold uppercase tracking-[1.5px] text-zinc-400 mb-2">
+                Тело запроса (Request Body) · {endpoint.requestBody.contentType}
+              </h3>
+              {endpoint.requestBody.description && (
+                <p className="text-xs text-zinc-300 mb-2 font-sans">{endpoint.requestBody.description}</p>
+              )}
+              <pre className="max-h-72 overflow-auto border border-[#27272A] bg-[#1A1A1A] p-3.5 font-mono text-[11px] leading-relaxed text-emerald-300 rounded-sm">
+                {JSON.stringify(endpoint.requestBody.schema, null, 2)}
+              </pre>
             </section>
-          ) : null}
+          )}
         </>
       ) : (
-        <section className="mt-6 space-y-3">
+        /* Tab 2: Responses */
+        <section className="mt-6 space-y-3 font-mono">
           {responseEntries.map(([status, response]) => (
-            <div key={status} className="border border-zinc-800 bg-black p-4">
-              <div className="font-mono text-xs font-bold text-[#BFF532]">HTTP {status}</div>
-              <div className="mt-2 text-xs text-zinc-400">{response.description || 'Declared response'}</div>
-              {response.content ? <pre className="mt-3 max-h-56 overflow-auto text-[10px] leading-5 text-zinc-500">{JSON.stringify(response.content, null, 2)}</pre> : null}
+            <div key={status} className="border border-[#27272A] bg-[#1A1A1A] p-4 rounded-sm">
+              <div className="text-xs font-black text-accent-lime">HTTP {status}</div>
+              <div className="mt-1 text-xs text-zinc-300 font-sans">{response.description || 'Объявленный ответ'}</div>
+              {response.content && (
+                <pre className="mt-2.5 max-h-56 overflow-auto border border-[#27272A] bg-[#111111] p-3 text-[10.5px] leading-relaxed text-zinc-300 rounded-sm">
+                  {JSON.stringify(response.content, null, 2)}
+                </pre>
+              )}
             </div>
           ))}
         </section>
       )}
+
     </article>
   );
 };

@@ -1,11 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ApiExplorer } from './ApiExplorer';
-import { ArchitectureOverview } from './ArchitectureOverview';
-import { DemoFlows } from './DemoFlows';
 import { DevHubFooter } from './DevHubFooter';
 import { DevHubHeader } from './DevHubHeader';
-import { DevHubHero } from './DevHubHero';
 import { describeSystemStatus } from './openapi';
 import { ServiceGrid } from './ServiceGrid';
 import { useDeveloperHubData } from './useDeveloperHubData';
@@ -66,12 +63,6 @@ export const DevHub = ({ onBackToStore }) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const selectEndpoint = (endpoint) => {
-    setSelectedServiceId(endpoint.serviceId);
-    setSelectedEndpointId(endpoint.id);
-    scrollTo('api-explorer');
-  };
-
   return (
     <div className="min-h-screen bg-[#0B0B0C] text-zinc-100 selection:bg-[#BFF532] selection:text-black">
       <DevHubHeader user={user} accessToken={accessToken} systemStatus={systemStatus} onBackToStore={onBackToStore} />
@@ -79,12 +70,6 @@ export const DevHub = ({ onBackToStore }) => {
       {!loading && error ? <ContractError message={error} onBackToStore={onBackToStore} /> : null}
       {!loading && data ? (
         <>
-          <DevHubHero
-            metadata={data.metadata}
-            endpoints={data.endpoints}
-            onExploreClick={() => scrollTo('api-explorer')}
-            onArchitectureClick={() => scrollTo('architecture-overview')}
-          />
           <ServiceGrid
             services={data.metadata.services}
             statuses={statuses}
@@ -105,8 +90,6 @@ export const DevHub = ({ onBackToStore }) => {
             selectedEndpointId={selectedEndpointId}
             onSelectedEndpointIdChange={setSelectedEndpointId}
           />
-          <ArchitectureOverview services={data.metadata.services} />
-          <DemoFlows endpoints={data.endpoints} onSelectEndpoint={selectEndpoint} />
           <DevHubFooter onBackToTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })} onBackToStore={onBackToStore} />
         </>
       ) : null}

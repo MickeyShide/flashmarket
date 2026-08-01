@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const proxyTarget = process.env.DEV_PROXY_TARGET || 'http://localhost:8000';
+const usePolling = process.env.DEV_USE_POLLING === 'true';
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -10,22 +13,27 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    host: true,
+    host: '0.0.0.0',
+    strictPort: true,
+    watch: {
+      usePolling,
+      interval: usePolling ? 100 : undefined,
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: proxyTarget,
         changeOrigin: true,
       },
       '/auth': {
-        target: 'http://localhost:8000',
+        target: proxyTarget,
         changeOrigin: true,
       },
       '/users': {
-        target: 'http://localhost:8000',
+        target: proxyTarget,
         changeOrigin: true,
       },
       '/sessions': {
-        target: 'http://localhost:8000',
+        target: proxyTarget,
         changeOrigin: true,
       },
     },

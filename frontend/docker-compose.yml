@@ -5,9 +5,30 @@ services:
     image: flashmarket-frontend:local
     build:
       context: .
+      target: dev
+    environment:
+      NODE_ENV: development
+      DEV_PROXY_TARGET: http://gateway
+      DEV_USE_POLLING: "true"
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - .:/app
+      - frontend-node-modules:/app/node_modules
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
     restart: unless-stopped
+
+volumes:
+  frontend-node-modules:
 
 networks:
   default:
