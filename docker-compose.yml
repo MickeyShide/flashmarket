@@ -4,11 +4,18 @@ services:
   # -----------------------------------------------------------
   # AUTH MICROSERVICE
   # -----------------------------------------------------------
+  auth-keygen:
+    extends:
+      file: auth/docker-compose.yml
+      service: keygen
+
   auth:
     extends:
       file: auth/docker-compose.yml
       service: api
-    depends_on: !reset {}
+    depends_on: !override
+      auth-keygen:
+        condition: service_completed_successfully
 
   auth-outbox:
     extends:
@@ -29,7 +36,9 @@ services:
     extends:
       file: catalog/docker-compose.yml
       service: api
-    depends_on: !reset {}
+    depends_on:
+      auth-keygen:
+        condition: service_completed_successfully
 
   # -----------------------------------------------------------
   # INVENTORY MICROSERVICE
@@ -38,7 +47,9 @@ services:
     extends:
       file: inventory/docker-compose.yml
       service: api
-    depends_on: !reset {}
+    depends_on:
+      auth-keygen:
+        condition: service_completed_successfully
 
   inventory-consumer:
     extends:
@@ -59,7 +70,9 @@ services:
     extends:
       file: orders/docker-compose.yml
       service: api
-    depends_on: !reset {}
+    depends_on:
+      auth-keygen:
+        condition: service_completed_successfully
 
   orders-consumer:
     extends:
@@ -80,7 +93,9 @@ services:
     extends:
       file: payments/docker-compose.yml
       service: api
-    depends_on: !reset {}
+    depends_on:
+      auth-keygen:
+        condition: service_completed_successfully
 
   payments-consumer:
     extends:
@@ -101,7 +116,9 @@ services:
     extends:
       file: notifications/docker-compose.yml
       service: api
-    depends_on: !reset {}
+    depends_on:
+      auth-keygen:
+        condition: service_completed_successfully
 
   notifications-consumer:
     extends:
@@ -122,7 +139,9 @@ services:
     extends:
       file: wishlist/docker-compose.yml
       service: api
-    depends_on: !reset {}
+    depends_on:
+      auth-keygen:
+        condition: service_completed_successfully
 
   # -----------------------------------------------------------
   # DROPS MICROSERVICE
@@ -131,7 +150,9 @@ services:
     extends:
       file: drops/docker-compose.yml
       service: api
-    depends_on: !reset {}
+    depends_on:
+      auth-keygen:
+        condition: service_completed_successfully
 
   drops-scheduler:
     extends:

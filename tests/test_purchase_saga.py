@@ -48,6 +48,7 @@ async def _poll_until(
 
 async def test_purchase_saga_happy_path(
     api_client: httpx.AsyncClient,
+    admin_api_client: httpx.AsyncClient,
     unique_user: uuid.UUID,
 ) -> None:
     """Complete a purchase from catalog product to notification."""
@@ -55,7 +56,7 @@ async def test_purchase_saga_happy_path(
 
     # 1. Create category and product in catalog.
     category_slug = f"test-category-{uuid.uuid4().hex[:8]}"
-    category_resp = await api_client.post(
+    category_resp = await admin_api_client.post(
         "/api/v1/categories",
         json={"name": "Test Category", "slug": category_slug},
     )
@@ -63,7 +64,7 @@ async def test_purchase_saga_happy_path(
     category_id = category_resp.json()["id"]
 
     product_name = f"Flash Sneakers {uuid.uuid4().hex[:8]}"
-    product_resp = await api_client.post(
+    product_resp = await admin_api_client.post(
         "/api/v1/products",
         json={
             "name": product_name,
@@ -79,7 +80,7 @@ async def test_purchase_saga_happy_path(
     product_id = product_data["id"]
 
     # 2. Initialize stock.
-    stock_resp = await api_client.post(
+    stock_resp = await admin_api_client.post(
         "/api/v1/stocks",
         json={"product_id": product_id, "total": 10},
     )
@@ -153,7 +154,10 @@ async def test_purchase_saga_happy_path(
         )
         if resp.status_code != 200:
             return False
-        return len(resp.json()["items"]) > 0
+        return any(
+            notification["subject"] == "Order confirmed"
+            for notification in resp.json()["items"]
+        )
 
     await _poll_until(_notification_created, timeout=30.0)
 
@@ -178,13 +182,14 @@ async def test_purchase_saga_happy_path(
 
 async def test_purchase_saga_payment_failure_cancels_order(
     api_client: httpx.AsyncClient,
+    admin_api_client: httpx.AsyncClient,
     unique_user: uuid.UUID,
 ) -> None:
     """Failed payment cancels the order and releases stock."""
     user_id = unique_user
 
     category_slug = f"test-category-{uuid.uuid4().hex[:8]}"
-    category_resp = await api_client.post(
+    category_resp = await admin_api_client.post(
         "/api/v1/categories",
         json={"name": "Test Category", "slug": category_slug},
     )
@@ -192,7 +197,7 @@ async def test_purchase_saga_payment_failure_cancels_order(
     category_id = category_resp.json()["id"]
 
     product_name = f"Flash Sneakers {uuid.uuid4().hex[:8]}"
-    product_resp = await api_client.post(
+    product_resp = await admin_api_client.post(
         "/api/v1/products",
         json={
             "name": product_name,
@@ -206,10 +211,11 @@ async def test_purchase_saga_payment_failure_cancels_order(
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
 
-    await api_client.post(
+    stock_resp = await admin_api_client.post(
         "/api/v1/stocks",
         json={"product_id": product_id, "total": 10},
     )
+    assert stock_resp.status_code == 201, stock_resp.text
 
     reserve_resp = await api_client.post(
         f"/api/v1/stocks/{product_id}/reserve",

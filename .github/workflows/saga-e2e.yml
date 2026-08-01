@@ -22,6 +22,9 @@ jobs:
   saga-e2e:
     name: Purchase Saga End-to-End
     runs-on: ubuntu-latest
+    env:
+      SAGA_ADMIN_EMAIL: saga-admin@example.com
+      SAGA_ADMIN_PASSWORD: SagaAdminPassword123!
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -36,8 +39,10 @@ jobs:
         run: |
           docker network create shide-observability || true
           docker volume create shide-backend-logs-local || true
-          docker volume create auth-jwt-keys-private || true
-          docker volume create auth-jwt-keys-public || true
+          docker run --rm \
+            --volume shide-backend-logs-local:/var/log/shide \
+            alpine:3.21 \
+            chmod 0777 /var/log/shide
 
           docker run -d --name shide-postgres \
             --network shide-observability \
@@ -101,10 +106,18 @@ jobs:
           echo "Waiting for services to become healthy..."
           SERVICES="gateway catalog auth inventory orders payments notifications"
           DEADLINE=$((SECONDS + 120))
+          ALL_HEALTHY=false
           while [ $SECONDS -lt $DEADLINE ]; do
             ALL_HEALTHY=true
             for svc in $SERVICES; do
-              STATUS=$(docker compose ps --format json "$svc" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('Health',''))" 2>/dev/null || echo "")
+              CONTAINER=$(docker compose ps -q "$svc")
+              if [ -z "$CONTAINER" ]; then
+                ALL_HEALTHY=false
+                break
+              fi
+              STATUS=$(docker inspect \
+                --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+                "$CONTAINER")
               if [ "$STATUS" != "healthy" ]; then
                 ALL_HEALTHY=false
                 break
@@ -117,6 +130,10 @@ jobs:
             sleep 3
           done
           docker compose ps -a
+          if ! $ALL_HEALTHY; then
+            echo "Required services did not become healthy before the deadline"
+            exit 1
+          fi
 
       - name: Debug - Container Status and Logs
         if: always()
@@ -149,6 +166,14 @@ jobs:
           docker compose exec -T gateway wget -qO- http://127.0.0.1/health 2>&1 || echo "Gateway health FAILED"
           docker compose exec -T gateway wget -qO- http://catalog:8000/health/ready 2>&1 || echo "Catalog health from gateway FAILED"
           docker compose exec -T gateway wget -qO- http://auth:8000/health/ready 2>&1 || echo "Auth health from gateway FAILED"
+
+      - name: Bootstrap E2E Administrator
+        run: |
+          docker compose exec -T auth \
+            .venv/bin/python -m auth_service.cli create-admin \
+            --email "$SAGA_ADMIN_EMAIL" \
+            --password "$SAGA_ADMIN_PASSWORD" \
+            --full-name "Saga E2E Administrator"
 
       - name: Run Purchase Saga E2E Integration Suite
         run: |

@@ -3,9 +3,6 @@
 import re
 from pathlib import Path
 
-import pytest
-
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 NGINX_CONF_PATH = PROJECT_ROOT / "gateway" / "nginx.conf"
 
@@ -41,12 +38,27 @@ def test_gw_002_admin_drops_priority_modifier() -> None:
     """GW-002: Verify admin drops route uses priority modifier ^~ to prevent falling through to /api/v1/admin."""
     content = NGINX_CONF_PATH.read_text(encoding="utf-8")
     assert "location ^~ /api/v1/admin/drops" in content
-    assert "proxy_pass http://drops;" in content
+    assert "set $upstream_drops http://drops:8000;" in content
+    assert "proxy_pass $upstream_drops$request_uri;" in content
 
 
-def test_gw_003_upstream_definitions() -> None:
-    """GW-003: Verify all 8 microservices, frontend, and prometheus upstreams are defined."""
+def test_gw_003_dynamic_upstream_targets() -> None:
+    """GW-003: Verify every routed service has a request-time Docker DNS target."""
     content = NGINX_CONF_PATH.read_text(encoding="utf-8")
-    upstreams = ["auth", "catalog", "inventory", "orders", "payments", "notifications", "wishlist", "drops", "frontend"]
-    for service in upstreams:
-        assert f"upstream {service}" in content, f"Missing upstream definition for {service}"
+    targets = {
+        "auth": 8000,
+        "catalog": 8000,
+        "inventory": 8000,
+        "orders": 8000,
+        "payments": 8000,
+        "notifications": 8000,
+        "wishlist": 8000,
+        "drops": 8000,
+        "frontend": 3000,
+        "prometheus": 9090,
+    }
+    for service, port in targets.items():
+        expected = f"set $upstream_{service} http://{service}:{port};"
+        if service == "prometheus":
+            expected = "set $upstream_prometheus http://shide-prometheus:9090;"
+        assert expected in content, f"Missing dynamic upstream target: {expected}"
