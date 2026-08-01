@@ -11,5 +11,5 @@ services:
 
 networks:
   default:
-    name: flashmarket
+    name: shide-observability
     external: true
