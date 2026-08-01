@@ -2,12 +2,22 @@
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import text
+
+from wishlist.api.dependencies import DbSession
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/health/ready", summary="Readiness probe")
-async def health_ready() -> dict[str, Any]:
-    """Return status ok for readiness probe."""
+async def health_ready(db: DbSession) -> dict[str, Any]:
+    """Return status ok for readiness probe if DB is reachable."""
+    try:
+        await db.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        ) from exc
     return {"status": "ok"}

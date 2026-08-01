@@ -1,6 +1,6 @@
 """Health-check endpoint."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -20,6 +20,9 @@ async def readiness(db: DbSession) -> dict[str, str]:
     """Report service readiness by pinging the database."""
     try:
         await db.execute(text("SELECT 1"))
-    except SQLAlchemyError:
-        return dict(status="unavailable")
-    return dict(status="ok")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        ) from exc
+    return {"status": "ok"}
