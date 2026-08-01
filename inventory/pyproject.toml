@@ -10,6 +10,7 @@ dependencies = [
     "fastapi>=0.140,<1",
     "prometheus-client>=0.26,<1",
     "pydantic-settings>=2.14,<3",
+    "redis>=8,<9",
     "sqlalchemy>=2.0,<3",
     "uvicorn[standard]>=0.51,<1",
     "aio-pika>=9.5,<10",

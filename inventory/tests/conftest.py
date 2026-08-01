@@ -16,11 +16,13 @@ os.environ.setdefault("INVENTORY_ENVIRONMENT", "test")
 
 from pathlib import Path
 
-from inventory.api.dependencies import get_verifier
+from jwt_verifier.testing import TestKeyStore
+
+from inventory.api.dependencies import get_stock_cache, get_verifier
+from inventory.application.contracts import NoOpStockCache
 from inventory.config import get_settings
 from inventory.infrastructure.database import Base, get_db  # noqa: E402
 from inventory.main import app  # noqa: E402
-from jwt_verifier.testing import TestKeyStore
 
 
 @pytest.fixture(autouse=True)
@@ -52,6 +54,7 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
                 await session.rollback()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_stock_cache] = NoOpStockCache
     yield factory
     app.dependency_overrides.clear()
     await test_engine.dispose()
@@ -67,7 +70,9 @@ async def client(
     admin_token = jwt_keystore.create_token(role="ADMIN")
     headers = {"Authorization": f"Bearer {admin_token}"}
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://localhost", headers=headers) as test_client:
+    async with AsyncClient(
+        transport=transport, base_url="http://localhost", headers=headers
+    ) as test_client:
         yield test_client
 
 

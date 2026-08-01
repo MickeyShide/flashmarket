@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from inventory.application.contracts import StockCache
 from inventory.application.schemas import (
     CommitRequest,
     ReleaseRequest,
     ReserveRequest,
     StockCreateRequest,
+    StockResponse,
     StockUpdateRequest,
 )
 from inventory.config import get_settings
@@ -41,25 +43,38 @@ class InventoryService:
         stock_repo: StockRepository,
         reservation_repo: ReservationRepository,
         outbox_repo: OutboxRepository,
+        stock_cache: StockCache,
     ) -> None:
         self._session = session
         self._stock_repo = stock_repo
         self._reservation_repo = reservation_repo
         self._outbox_repo = outbox_repo
+        self._stock_cache = stock_cache
+
+    async def _cache_stock(self, stock: StockModel) -> StockResponse:
+        """Store and return the public snapshot of a committed stock row."""
+        snapshot = StockResponse.model_validate(stock)
+        await self._stock_cache.store_stock(snapshot, stock.revision)
+        return snapshot
 
     async def create_stock(self, data: StockCreateRequest) -> StockModel:
         """Initialize stock for a product or variant."""
         variant_id = getattr(data, "variant_id", None)
-        existing = await self._stock_repo.get_by_product_and_variant(data.product_id, variant_id)
+        existing = await self._stock_repo.get_by_product_and_variant_for_update(
+            data.product_id,
+            variant_id,
+        )
         if existing is not None:
             reserved_plus_sold = existing.reserved + existing.sold
             if data.total < reserved_plus_sold:
                 raise OutOfStock(f"Cannot reset total below reserved + sold ({reserved_plus_sold})")
             existing.total = data.total
             existing.available = data.total - reserved_plus_sold
+            existing.revision += 1
             await self._stock_repo.update(existing)
             await self._session.commit()
             await self._session.refresh(existing)
+            await self._cache_stock(existing)
             return existing
 
         stock = StockModel(
@@ -67,10 +82,12 @@ class InventoryService:
             variant_id=data.variant_id,
             total=data.total,
             available=data.total,
+            revision=1,
         )
         await self._stock_repo.create(stock)
         await self._session.commit()
         await self._session.refresh(stock)
+        await self._cache_stock(stock)
         return stock
 
     async def update_total(
@@ -87,17 +104,27 @@ class InventoryService:
 
         stock.total = data.total
         stock.available = data.total - reserved_plus_sold
+        stock.revision += 1
         await self._stock_repo.update(stock)
         await self._session.commit()
         await self._session.refresh(stock)
+        await self._cache_stock(stock)
         return stock
 
-    async def get_stock(self, product_id: UUID, variant_id: UUID | None = None) -> StockModel:
+    async def get_stock(
+        self,
+        product_id: UUID,
+        variant_id: UUID | None = None,
+    ) -> StockResponse:
         """Return stock for a product or variant."""
+        cached = await self._stock_cache.get_stock(product_id, variant_id)
+        if cached is not None:
+            return cached
+
         stock = await self._stock_repo.get_by_product_and_variant(product_id, variant_id)
         if stock is None:
             raise StockNotFound
-        return stock
+        return await self._cache_stock(stock)
 
     async def reserve(
         self,
@@ -116,6 +143,7 @@ class InventoryService:
 
         stock.available -= data.quantity
         stock.reserved += data.quantity
+        stock.revision += 1
         await self._stock_repo.update(stock)
 
         settings = get_settings()
@@ -148,6 +176,7 @@ class InventoryService:
         await self._session.commit()
         await self._session.refresh(reservation)
         await self._session.refresh(stock)
+        await self._cache_stock(stock)
         return reservation
 
     async def commit(self, product_id: UUID, data: CommitRequest) -> ReservationModel:
@@ -166,6 +195,7 @@ class InventoryService:
         reservation.status = ReservationStatus.COMMITTED
         stock.reserved -= reservation.quantity
         stock.sold += reservation.quantity
+        stock.revision += 1
 
         await self._reservation_repo.update(reservation)
         await self._stock_repo.update(stock)
@@ -183,6 +213,8 @@ class InventoryService:
 
         await self._session.commit()
         await self._session.refresh(reservation)
+        await self._session.refresh(stock)
+        await self._cache_stock(stock)
         return reservation
 
     async def release(self, product_id: UUID, data: ReleaseRequest) -> ReservationModel:
@@ -201,6 +233,7 @@ class InventoryService:
         reservation.status = ReservationStatus.RELEASED
         stock.reserved -= reservation.quantity
         stock.available += reservation.quantity
+        stock.revision += 1
 
         await self._reservation_repo.update(reservation)
         await self._stock_repo.update(stock)
@@ -219,6 +252,8 @@ class InventoryService:
 
         await self._session.commit()
         await self._session.refresh(reservation)
+        await self._session.refresh(stock)
+        await self._cache_stock(stock)
         return reservation
 
     async def expire_reservations(self, batch_size: int = 100) -> int:
@@ -226,16 +261,19 @@ class InventoryService:
         now = utc_now()
         expired = await self._reservation_repo.list_expired(now)
         count = 0
+        changed_stocks: dict[UUID, StockModel] = {}
         for reservation in expired[:batch_size]:
-            stock = await self._stock_repo.get_by_id(reservation.stock_id)
+            stock = await self._stock_repo.get_by_id_for_update(reservation.stock_id)
             if stock is None:
                 continue
 
             reservation.status = ReservationStatus.EXPIRED
             stock.reserved -= reservation.quantity
             stock.available += reservation.quantity
+            stock.revision += 1
             await self._reservation_repo.update(reservation)
             await self._stock_repo.update(stock)
+            changed_stocks[stock.id] = stock
 
             payload = {
                 "reservation_id": str(reservation.id),
@@ -252,4 +290,7 @@ class InventoryService:
 
         if count:
             await self._session.commit()
+            for stock in changed_stocks.values():
+                await self._session.refresh(stock)
+                await self._cache_stock(stock)
         return count

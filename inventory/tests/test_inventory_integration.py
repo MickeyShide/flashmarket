@@ -1,29 +1,26 @@
 """Comprehensive integration tests for Inventory microservice (INV-001 through INV-017)."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from inventory.domain.entities import InventoryEventType, ReservationStatus
+from inventory.application.contracts import NoOpStockCache
 from inventory.event_consumer import (
-    handle_order_cancelled,
     handle_payment_failed,
     handle_payment_succeeded,
 )
-from inventory.infrastructure.models import OutboxEventModel, ReservationModel, StockModel
+from inventory.infrastructure.models import OutboxEventModel, ReservationModel
 from inventory.outbox_worker import publish_outbox_batch
-from jwt_verifier.testing import TestKeyStore
 
 
 @pytest.mark.asyncio
 async def test_inv_001_and_002_create_and_reset_stock_invariants(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """INV-001 & INV-002: Create stock and verify reset invariant available = total - reserved - sold."""
+    """INV-001 & INV-002: Verify the stock reset counter invariant."""
     product_id = uuid.uuid4()
 
     # 1. Create initial stock total=10
@@ -162,7 +159,12 @@ async def test_inv_008_variant_stock_reserve_commit_release(
     # Reserve variant stock
     res_resp = await client.post(
         f"/api/v1/stocks/{product_id}/reserve",
-        json={"user_id": str(user_id), "quantity": 2, "variant_id": str(variant_id), "order_id": str(order_id)},
+        json={
+            "user_id": str(user_id),
+            "quantity": 2,
+            "variant_id": str(variant_id),
+            "order_id": str(order_id),
+        },
     )
     assert res_resp.status_code == 201
 
@@ -174,7 +176,9 @@ async def test_inv_008_variant_stock_reserve_commit_release(
     assert commit_resp.status_code == 200
 
     # Verify variant stock updated
-    v_after = await client.get(f"/api/v1/stocks/{product_id}", params={"variant_id": str(variant_id)})
+    v_after = await client.get(
+        f"/api/v1/stocks/{product_id}", params={"variant_id": str(variant_id)}
+    )
     assert v_after.json()["sold"] == 2
     assert v_after.json()["reserved"] == 0
     assert v_after.json()["available"] == 6
@@ -202,11 +206,15 @@ async def test_inv_010_expire_reservations(
     async with session_factory() as db, db.begin():
         res = await db.get(ReservationModel, res_id)
         assert res is not None
-        res.expires_at = datetime.now(timezone.utc) - timedelta(minutes=10)
+        res.expires_at = datetime.now(UTC) - timedelta(minutes=10)
 
     # Call service expire_reservations
-    from inventory.infrastructure.repositories.stock import OutboxRepository, ReservationRepository, StockRepository
     from inventory.application.services.stock import InventoryService
+    from inventory.infrastructure.repositories.stock import (
+        OutboxRepository,
+        ReservationRepository,
+        StockRepository,
+    )
 
     async with session_factory() as db:
         service = InventoryService(
@@ -214,6 +222,7 @@ async def test_inv_010_expire_reservations(
             stock_repo=StockRepository(db),
             reservation_repo=ReservationRepository(db),
             outbox_repo=OutboxRepository(db),
+            stock_cache=NoOpStockCache(),
         )
         expired_count = await service.expire_reservations()
         assert expired_count >= 1
@@ -228,7 +237,7 @@ async def test_inv_010_expire_reservations(
 async def test_inv_011_and_012_consumer_saga_handlers(
     session_factory: async_sessionmaker[AsyncSession], client: AsyncClient
 ) -> None:
-    """INV-011 & INV-012: Inbound saga event handlers for PaymentSucceeded, PaymentFailed, OrderCancelled."""
+    """INV-011 & INV-012: Handle inbound payment and cancellation saga events."""
     product_id = uuid.uuid4()
     user_id = uuid.uuid4()
     order_id = uuid.uuid4()
@@ -274,7 +283,7 @@ async def test_inv_011_and_012_consumer_saga_handlers(
 
 @pytest.mark.asyncio
 async def test_inv_014_outbox_worker_retries_failed_events(
-    session_factory: async_sessionmaker[AsyncSession]
+    session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """INV-014: Outbox worker retries failed events."""
     async with session_factory() as session, session.begin():

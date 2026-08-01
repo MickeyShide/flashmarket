@@ -5,6 +5,7 @@ Revises: 20260729_0001
 Create Date: 2026-07-31
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -33,9 +34,7 @@ def upgrade() -> None:
     op.create_index("ix_stocks_variant_id", "stocks", ["variant_id"])
 
     # 3. Add composite unique constraint for product_id + variant_id
-    op.create_unique_constraint(
-        "uq_stocks_product_variant", "stocks", ["product_id", "variant_id"]
-    )
+    op.create_unique_constraint("uq_stocks_product_variant", "stocks", ["product_id", "variant_id"])
 
 
 def downgrade() -> None:

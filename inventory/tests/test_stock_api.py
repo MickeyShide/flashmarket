@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from inventory.infrastructure.models import OutboxEventModel, ReservationModel, StockModel
+from inventory.infrastructure.models import OutboxEventModel, StockModel
 
 
 async def _create_stock(
@@ -38,6 +38,7 @@ async def test_create_stock_201(client: AsyncClient) -> None:
     assert data["available"] == 100
     assert data["reserved"] == 0
     assert data["sold"] == 0
+    assert "revision" not in data
 
 
 async def test_get_stock_200(client: AsyncClient) -> None:
@@ -148,8 +149,6 @@ async def test_release_200(client: AsyncClient, db_session: AsyncSession) -> Non
     assert stock_result is not None
     assert stock_result.reserved == 0
     assert stock_result.available == 10
-
-
 
 
 async def test_serial_reservations_no_oversell(

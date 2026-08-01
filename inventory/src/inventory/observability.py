@@ -39,6 +39,11 @@ HTTP_IN_PROGRESS = Gauge(
     "inventory_http_requests_in_progress",
     "HTTP requests currently in progress",
 )
+STOCK_CACHE_OPERATIONS = Counter(
+    "inventory_stock_cache_operations_total",
+    "Inventory stock cache operations",
+    labelnames=("operation", "result"),
+)
 
 SENSITIVE_KEYS = {
     "password",

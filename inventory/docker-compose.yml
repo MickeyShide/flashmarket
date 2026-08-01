@@ -7,6 +7,8 @@ x-inventory-runtime: &inventory-runtime
 x-inventory-environment: &inventory-environment
   INVENTORY_ENVIRONMENT: development
   INVENTORY_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/inventory
+  INVENTORY_REDIS_URL: redis://shide-redis:6379/2
+  INVENTORY_STOCK_CACHE_TTL_SECONDS: 30
   INVENTORY_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   INVENTORY_CORS_ORIGINS: '["http://localhost:3000"]'
   INVENTORY_LOG_FILE_PATH: /var/log/shide/inventory-api.log

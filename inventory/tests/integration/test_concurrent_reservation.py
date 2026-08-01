@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from inventory.application.contracts import NoOpStockCache
 from inventory.application.schemas import ReserveRequest
 from inventory.application.services.stock import InventoryService
 from inventory.infrastructure.database import Base
@@ -78,8 +79,11 @@ async def test_concurrent_reservations_no_oversell(
             stock_repo=StockRepository(db),
             reservation_repo=ReservationRepository(db),
             outbox_repo=OutboxRepository(db),
+            stock_cache=NoOpStockCache(),
         )
-        await service.create_stock(type("Data", (), {"product_id": product_id, "variant_id": None, "total": 100})())
+        await service.create_stock(
+            type("Data", (), {"product_id": product_id, "variant_id": None, "total": 100})()
+        )
 
     semaphore = asyncio.Semaphore(20)
 
@@ -91,6 +95,7 @@ async def test_concurrent_reservations_no_oversell(
                     stock_repo=StockRepository(db),
                     reservation_repo=ReservationRepository(db),
                     outbox_repo=OutboxRepository(db),
+                    stock_cache=NoOpStockCache(),
                 )
                 try:
                     await service.reserve(

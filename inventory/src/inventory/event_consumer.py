@@ -14,18 +14,22 @@ from aio_pika import ExchangeType
 from aio_pika.abc import AbstractIncomingMessage
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from inventory.application.contracts import StockCache
+from inventory.application.schemas import StockResponse
 from inventory.config import get_settings
 from inventory.domain.entities import InventoryEventType, ReservationStatus
 from inventory.infrastructure.database import SessionFactory, engine
+from inventory.infrastructure.models import ReservationModel, StockModel
 from inventory.infrastructure.repositories.stock import (
     OutboxRepository,
     ReservationRepository,
     StockRepository,
 )
+from inventory.infrastructure.stock_cache import redis_client, stock_cache
 
 logger = logging.getLogger(__name__)
 
-Handler = Callable[[AsyncSession, dict[str, Any]], Awaitable[None]]
+Handler = Callable[[AsyncSession, dict[str, Any]], Awaitable[StockModel | None]]
 
 
 async def _emit_inventory_event(
@@ -44,7 +48,7 @@ async def _emit_inventory_event(
 async def _find_active_reservation(
     session: AsyncSession,
     payload: dict[str, Any],
-) -> tuple[Any, Any] | None:
+) -> tuple[ReservationModel, StockModel] | None:
     """Return (reservation, stock) for an active reservation bound to order_id or reservation_id."""
     reservation_repo = ReservationRepository(session)
     reservation = None
@@ -52,21 +56,21 @@ async def _find_active_reservation(
         try:
             order_id = uuid.UUID(str(payload["order_id"]))
             reservation = await reservation_repo.get_by_order_id(order_id)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
 
     if reservation is None and "reservation_id" in payload and payload["reservation_id"]:
         try:
             res_id = uuid.UUID(str(payload["reservation_id"]))
             reservation = await reservation_repo.get_by_id(res_id)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
 
     if reservation is None:
         return None
 
     stock_repo = StockRepository(session)
-    stock = await stock_repo.get_by_id(reservation.stock_id)
+    stock = await stock_repo.get_by_id_for_update(reservation.stock_id)
     if stock is None:
         return None
 
@@ -76,14 +80,14 @@ async def _find_active_reservation(
 async def handle_payment_succeeded(
     session: AsyncSession,
     payload: dict[str, Any],
-) -> None:
+) -> StockModel | None:
     """Commit reservation after successful payment."""
     order_id = payload.get("order_id")
 
     result = await _find_active_reservation(session, payload)
     if result is None:
         logger.warning("No active reservation for order/payload %s to commit", payload)
-        return
+        return None
     reservation, stock = result
 
     if reservation.status != ReservationStatus.RESERVED:
@@ -92,11 +96,12 @@ async def handle_payment_succeeded(
             reservation.id,
             reservation.status,
         )
-        return
+        return None
 
     reservation.status = ReservationStatus.COMMITTED
     stock.reserved -= reservation.quantity
     stock.sold += reservation.quantity
+    stock.revision += 1
 
     reservation_repo = ReservationRepository(session)
     stock_repo = StockRepository(session)
@@ -119,19 +124,20 @@ async def handle_payment_succeeded(
         order_id,
         reservation.quantity,
     )
+    return stock
 
 
 async def handle_payment_failed(
     session: AsyncSession,
     payload: dict[str, Any],
-) -> None:
+) -> StockModel | None:
     """Release reservation after failed payment."""
     order_id = payload.get("order_id")
 
     result = await _find_active_reservation(session, payload)
     if result is None:
         logger.warning("No active reservation for order/payload %s to release", payload)
-        return
+        return None
     reservation, stock = result
 
     if reservation.status != ReservationStatus.RESERVED:
@@ -140,11 +146,12 @@ async def handle_payment_failed(
             reservation.id,
             reservation.status,
         )
-        return
+        return None
 
     reservation.status = ReservationStatus.RELEASED
     stock.reserved -= reservation.quantity
     stock.available += reservation.quantity
+    stock.revision += 1
 
     reservation_repo = ReservationRepository(session)
     stock_repo = StockRepository(session)
@@ -168,19 +175,20 @@ async def handle_payment_failed(
         order_id,
         reservation.quantity,
     )
+    return stock
 
 
 async def handle_order_cancelled(
     session: AsyncSession,
     payload: dict[str, Any],
-) -> None:
+) -> StockModel | None:
     """Release reservation when order is cancelled."""
     order_id = payload.get("order_id")
 
     result = await _find_active_reservation(session, payload)
     if result is None:
         logger.warning("No active reservation for order %s to release", order_id)
-        return
+        return None
     reservation, stock = result
 
     if reservation.status != ReservationStatus.RESERVED:
@@ -189,11 +197,12 @@ async def handle_order_cancelled(
             reservation.id,
             reservation.status,
         )
-        return
+        return None
 
     reservation.status = ReservationStatus.RELEASED
     stock.reserved -= reservation.quantity
     stock.available += reservation.quantity
+    stock.revision += 1
 
     reservation_repo = ReservationRepository(session)
     stock_repo = StockRepository(session)
@@ -216,22 +225,23 @@ async def handle_order_cancelled(
         reservation.id,
         order_id,
     )
+    return stock
 
 
 async def handle_order_created(
     session: AsyncSession,
     payload: dict[str, Any],
-) -> None:
+) -> StockModel | None:
     """Bind reservation to order_id when order is created."""
     reservation_id_str = payload.get("reservation_id")
     order_id_str = payload.get("order_id")
     if not reservation_id_str or not order_id_str:
-        return
+        return None
     try:
         res_id = uuid.UUID(str(reservation_id_str))
         order_id = uuid.UUID(str(order_id_str))
-    except (ValueError, TypeError):
-        return
+    except ValueError, TypeError:
+        return None
 
     reservation_repo = ReservationRepository(session)
     reservation = await reservation_repo.get_by_id(res_id)
@@ -239,6 +249,7 @@ async def handle_order_created(
         reservation.order_id = order_id
         await reservation_repo.update(reservation)
         logger.info("Bound reservation %s to order %s", res_id, order_id)
+    return None
 
 
 HANDLERS: dict[str, Handler] = {
@@ -253,6 +264,7 @@ async def process_message(
     message: AbstractIncomingMessage,
     *,
     session_factory: async_sessionmaker[AsyncSession] = SessionFactory,
+    cache: StockCache = stock_cache,
 ) -> None:
     """Route an incoming message to its handler."""
     async with message.process(reject_on_redelivered=False):
@@ -263,8 +275,13 @@ async def process_message(
             logger.warning("No handler for routing key %s", routing_key)
             return
 
-        async with session_factory() as session, session.begin():
-            await handler(session, body)
+        changed_stock: StockModel | None = None
+        async with session_factory() as session:
+            async with session.begin():
+                changed_stock = await handler(session, body)
+            if changed_stock is not None:
+                snapshot = StockResponse.model_validate(changed_stock)
+                await cache.store_stock(snapshot, changed_stock.revision)
 
 
 async def run_consumer() -> None:
@@ -301,6 +318,7 @@ async def run() -> None:
     try:
         await run_consumer()
     finally:
+        await redis_client.aclose()
         await engine.dispose()
 
 

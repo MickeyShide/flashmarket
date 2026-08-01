@@ -7,18 +7,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from inventory.api.dependencies import get_verifier
 from inventory.api.error_handlers import inventory_error_handler
 from inventory.api.routes import health, metrics, stock
 from inventory.config import get_settings
 from inventory.domain.exceptions import InventoryError
 from inventory.infrastructure.database import engine
+from inventory.infrastructure.stock_cache import redis_client
 from inventory.observability import (
     request_observability_middleware,
     setup_metrics,
 )
-
-
-from inventory.api.dependencies import get_verifier
 
 
 @asynccontextmanager
@@ -26,6 +25,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application-wide resources."""
     get_verifier().validate_startup()
     yield
+    await redis_client.aclose()
     await engine.dispose()
 
 

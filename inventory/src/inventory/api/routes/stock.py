@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
 from inventory.api.dependencies import (
     AdminPrincipal,
@@ -24,7 +24,7 @@ from inventory.infrastructure.models import ReservationModel, StockModel
 router = APIRouter(prefix="/api/v1/stocks", tags=["stocks"])
 
 
-def _stock_response(stock: StockModel) -> StockResponse:
+def _stock_response(stock: StockModel | StockResponse) -> StockResponse:
     return StockResponse.model_validate(stock)
 
 

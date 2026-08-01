@@ -14,9 +14,11 @@ def resolve_url_ipv4(url_str: str) -> str:
         parsed = urlsplit(url_str)
         if parsed.hostname and not parsed.hostname.replace(".", "").isdigit():
             port = parsed.port or 5432
-            infos = socket.getaddrinfo(parsed.hostname, port, family=socket.AF_INET, type=socket.SOCK_STREAM)
+            infos = socket.getaddrinfo(
+                parsed.hostname, port, family=socket.AF_INET, type=socket.SOCK_STREAM
+            )
             if infos:
-                ip = infos[0][4][0]
+                ip = str(infos[0][4][0])
                 netloc = parsed.netloc.replace(parsed.hostname, ip, 1)
                 return urlunsplit(parsed._replace(netloc=netloc))
     except Exception:
@@ -43,6 +45,9 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
     database_url: str = "postgresql+asyncpg://shide:shide@shide-postgres:5432/inventory"
+    redis_url: str = "redis://shide-redis:6379/2"
+    stock_cache_ttl_seconds: int = Field(default=30, gt=0)
+    redis_socket_timeout_seconds: float = Field(default=0.2, gt=0)
     log_file_path: str | None = None
     prometheus_multiproc_dir: str | None = None
     docs_enabled: bool = True
@@ -60,7 +65,7 @@ class Settings(BaseSettings):
     jwt_audience: str = "flashmarket-api"
 
     @model_validator(mode="after")
-    def validate_production_settings(self) -> "Settings":
+    def validate_production_settings(self) -> Settings:
         """Enforce strict settings in production."""
         if self.environment != "production":
             return self
@@ -70,22 +75,32 @@ class Settings(BaseSettings):
             errors.append("INVENTORY_DEBUG must be false")
         if self.docs_enabled:
             errors.append("INVENTORY_DOCS_ENABLED must be false")
-        if "flashmarket:flashmarket@" in self.database_url or (":shide@" in self.database_url and "shide-postgres" in self.database_url):
+        if "flashmarket:flashmarket@" in self.database_url or (
+            ":shide@" in self.database_url and "shide-postgres" in self.database_url
+        ):
             errors.append("default database credentials are forbidden")
         if "localhost" in self.database_url or "127.0.0.1" in self.database_url:
             errors.append("INVENTORY_DATABASE_URL must point to production database")
         db_is_internal = self.allow_insecure_internal_services
         if "sslmode" not in self.database_url and not db_is_internal:
             errors.append("INVENTORY_DATABASE_URL must use TLS (sslmode)")
+        if "localhost" in self.redis_url or "127.0.0.1" in self.redis_url:
+            errors.append("INVENTORY_REDIS_URL must point to production Redis")
+        redis_is_internal = self.allow_insecure_internal_services and urlsplit(
+            self.redis_url
+        ).hostname in {"redis", "shide-redis"}
+        if not self.redis_url.startswith("rediss://") and not redis_is_internal:
+            errors.append("INVENTORY_REDIS_URL must use TLS (rediss://)")
         if "localhost" in self.rabbitmq_url or "127.0.0.1" in self.rabbitmq_url:
             errors.append("INVENTORY_RABBITMQ_URL must point to production RabbitMQ")
-        rabbitmq_is_internal = (
-            self.allow_insecure_internal_services
-            and urlsplit(self.rabbitmq_url).hostname in {"rabbitmq", "shide-rabbitmq"}
-        )
+        rabbitmq_is_internal = self.allow_insecure_internal_services and urlsplit(
+            self.rabbitmq_url
+        ).hostname in {"rabbitmq", "shide-rabbitmq"}
         if not self.rabbitmq_url.startswith("amqps://") and not rabbitmq_is_internal:
             errors.append("INVENTORY_RABBITMQ_URL must use TLS (amqps://)")
-        if "flashmarket:flashmarket@" in self.rabbitmq_url or (":shide@" in self.rabbitmq_url and "shide-rabbitmq" in self.rabbitmq_url):
+        if "flashmarket:flashmarket@" in self.rabbitmq_url or (
+            ":shide@" in self.rabbitmq_url and "shide-rabbitmq" in self.rabbitmq_url
+        ):
             errors.append("default RabbitMQ credentials are forbidden")
         if "*" in self.cors_origins:
             errors.append("wildcard CORS origins are forbidden")
@@ -96,7 +111,7 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def resolve_dns_ipv4(self) -> "Settings":
+    def resolve_dns_ipv4(self) -> Settings:
         if self.database_url:
             self.database_url = resolve_url_ipv4(self.database_url)
         return self
