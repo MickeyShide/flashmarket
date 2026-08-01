@@ -63,6 +63,12 @@ services:
       service: outbox
     depends_on: !reset {}
 
+  inventory-expiry:
+    extends:
+      file: inventory/docker-compose.yml
+      service: expiry
+    depends_on: !reset {}
+
   # -----------------------------------------------------------
   # ORDERS MICROSERVICE
   # -----------------------------------------------------------
@@ -143,6 +149,12 @@ services:
       auth-keygen:
         condition: service_completed_successfully
 
+  wishlist-consumer:
+    extends:
+      file: wishlist/docker-compose.yml
+      service: consumer
+    depends_on: !reset {}
+
   # -----------------------------------------------------------
   # DROPS MICROSERVICE
   # -----------------------------------------------------------
@@ -213,6 +225,7 @@ networks:
     external: true
 
 volumes:
+  frontend-node-modules:
   auth-jwt-keys-private:
   auth-jwt-keys-public:
   auth-metrics-data:
