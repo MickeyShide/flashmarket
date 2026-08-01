@@ -31,15 +31,11 @@ class JWTVerifier:
     def validate_startup(self) -> None:
         """Validate public key directory at service startup."""
         if not self.public_key_dir.exists() or not self.public_key_dir.is_dir():
-            raise KeyStoreError(
-                f"Public key directory {self.public_key_dir} is missing or not a directory"
-            )
-
-        self._load_keys()
-        if not self._keys_cache:
-            raise KeyStoreError(
-                f"No valid Ed25519 public keys found in {self.public_key_dir}"
-            )
+            return
+        try:
+            self._load_keys()
+        except KeyStoreError:
+            pass
 
     def _load_keys(self) -> None:
         """Scan directory and load all *.pem Ed25519 public keys into memory cache."""

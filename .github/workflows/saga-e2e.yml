@@ -32,6 +32,13 @@ jobs:
           version: "0.11.32"
           enable-cache: true
 
+      - name: Create External Docker Infrastructure Resources
+        run: |
+          docker network create shide-observability || true
+          docker volume create shide-backend-logs-local || true
+          docker volume create auth-jwt-keys-private || true
+          docker volume create auth-jwt-keys-public || true
+
       - name: Start Full Docker Compose Stack
         run: |
           docker compose up -d --build
