@@ -112,6 +112,17 @@ async def test_purchase_saga_happy_path(
     assert order_data["status"] == "AWAITING_PAYMENT"
 
     # 5. Payment service should have created a pending payment.
+    async def _payment_created() -> bool:
+        resp = await api_client.get(
+            f"/api/v1/payments/users/{user_id}",
+            params={"limit": 10},
+        )
+        if resp.status_code != 200:
+            return False
+        return len(resp.json()["items"]) > 0
+
+    await _poll_until(_payment_created, timeout=30.0)
+
     payments_resp = await api_client.get(
         f"/api/v1/payments/users/{user_id}",
         params={"limit": 10},
@@ -221,6 +232,17 @@ async def test_purchase_saga_payment_failure_cancels_order(
     )
     assert order_resp.status_code == 201
     order_id = order_resp.json()["id"]
+
+    async def _payment_created_for_fail() -> bool:
+        resp = await api_client.get(
+            f"/api/v1/payments/users/{user_id}",
+            params={"limit": 10},
+        )
+        if resp.status_code != 200:
+            return False
+        return len(resp.json()["items"]) > 0
+
+    await _poll_until(_payment_created_for_fail, timeout=30.0)
 
     payments_resp = await api_client.get(
         f"/api/v1/payments/users/{user_id}",

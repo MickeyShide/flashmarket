@@ -218,7 +218,31 @@ async def handle_order_cancelled(
     )
 
 
+async def handle_order_created(
+    session: AsyncSession,
+    payload: dict[str, Any],
+) -> None:
+    """Bind reservation to order_id when order is created."""
+    reservation_id_str = payload.get("reservation_id")
+    order_id_str = payload.get("order_id")
+    if not reservation_id_str or not order_id_str:
+        return
+    try:
+        res_id = uuid.UUID(str(reservation_id_str))
+        order_id = uuid.UUID(str(order_id_str))
+    except (ValueError, TypeError):
+        return
+
+    reservation_repo = ReservationRepository(session)
+    reservation = await reservation_repo.get_by_id(res_id)
+    if reservation is not None and reservation.order_id is None:
+        reservation.order_id = order_id
+        await reservation_repo.update(reservation)
+        logger.info("Bound reservation %s to order %s", res_id, order_id)
+
+
 HANDLERS: dict[str, Handler] = {
+    "orders.OrderCreated": handle_order_created,
     "payments.PaymentSucceeded": handle_payment_succeeded,
     "payments.PaymentFailed": handle_payment_failed,
     "orders.OrderCancelled": handle_order_cancelled,
