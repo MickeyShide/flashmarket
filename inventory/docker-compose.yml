@@ -7,11 +7,15 @@ x-inventory-runtime: &inventory-runtime
 x-inventory-environment: &inventory-environment
   INVENTORY_ENVIRONMENT: development
   INVENTORY_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/inventory
-  INVENTORY_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672//inventory
+  INVENTORY_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   INVENTORY_CORS_ORIGINS: '["http://localhost:3000"]'
   INVENTORY_LOG_FILE_PATH: /var/log/shide/inventory-api.log
   INVENTORY_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
   INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
+  INVENTORY_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  INVENTORY_JWT_ALGORITHM: EdDSA
+  INVENTORY_JWT_ISSUER: flashmarket-auth
+  INVENTORY_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
@@ -20,8 +24,9 @@ services:
       context: .
     environment: *inventory-environment
     ports:
-      - "127.0.0.1:${INVENTORY_PORT:-4919}:8000"
+      - "127.0.0.1:${INVENTORY_PORT:-4923}:8000"
     volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
       - backend-logs-local:/var/log/shide
       - inventory-metrics-data:/tmp/prometheus
     healthcheck:

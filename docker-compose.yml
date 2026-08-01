@@ -166,7 +166,8 @@ networks:
     external: true
 
 volumes:
-  auth-jwt-keys:
+  auth-jwt-keys-private:
+  auth-jwt-keys-public:
   auth-metrics-data:
   catalog-metrics-data:
   inventory-metrics-data:

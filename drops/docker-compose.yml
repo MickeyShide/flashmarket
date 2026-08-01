@@ -7,9 +7,13 @@ x-drops-runtime: &drops-runtime
 x-drops-environment: &drops-environment
   DROPS_ENVIRONMENT: development
   DROPS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/drops
-  DROPS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/drop
+  DROPS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   DROPS_CORS_ORIGINS: '["http://localhost:3000"]'
   DROPS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
+  DROPS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  DROPS_JWT_ALGORITHM: EdDSA
+  DROPS_JWT_ISSUER: flashmarket-auth
+  DROPS_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
@@ -18,7 +22,9 @@ services:
       context: .
     environment: *drops-environment
     ports:
-      - "127.0.0.1:${DROPS_PORT:-4922}:8000"
+      - "127.0.0.1:${DROPS_PORT:-4925}:8000"
+    volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
     healthcheck:
       test:
         - CMD
@@ -46,6 +52,9 @@ services:
       - outbox
       - drops.outbox_worker
     restart: unless-stopped
+
+volumes:
+  auth-jwt-keys-public:
 
 networks:
   default:

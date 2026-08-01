@@ -7,11 +7,15 @@ x-orders-runtime: &orders-runtime
 x-orders-environment: &orders-environment
   ORDERS_ENVIRONMENT: development
   ORDERS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/orders
-  ORDERS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672//orders
+  ORDERS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   ORDERS_CORS_ORIGINS: '["http://localhost:3000"]'
   ORDERS_LOG_FILE_PATH: /var/log/shide/orders-api.log
   ORDERS_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
   ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
+  ORDERS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  ORDERS_JWT_ALGORITHM: EdDSA
+  ORDERS_JWT_ISSUER: flashmarket-auth
+  ORDERS_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
@@ -22,6 +26,7 @@ services:
     ports:
       - "127.0.0.1:${ORDERS_PORT:-4920}:8000"
     volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
       - backend-logs-local:/var/log/shide
       - orders-metrics-data:/tmp/prometheus
     healthcheck:

@@ -11,6 +11,10 @@ x-catalog-environment: &catalog-environment
   CATALOG_LOG_FILE_PATH: /var/log/shide/catalog-api.log
   CATALOG_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
   CATALOG_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
+  CATALOG_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  CATALOG_JWT_ALGORITHM: EdDSA
+  CATALOG_JWT_ISSUER: flashmarket-auth
+  CATALOG_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
@@ -21,6 +25,7 @@ services:
     ports:
       - "127.0.0.1:${CATALOG_PORT:-4919}:8000"
     volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
       - backend-logs-local:/var/log/shide
       - catalog-metrics-data:/tmp/prometheus
     healthcheck:

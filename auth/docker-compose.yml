@@ -8,7 +8,7 @@ x-auth-environment: &auth-environment
   AUTH_ENVIRONMENT: development
   AUTH_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/auth
   AUTH_REDIS_URL: redis://shide-redis:6379/0
-  AUTH_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672//auth
+  AUTH_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   AUTH_JWT_KEYS_DIRECTORY: /var/lib/flashmarket-auth/keys
   AUTH_JWT_KEY_ID: ${AUTH_JWT_KEY_ID:-flashmarket-auth-ed25519-v1}
   AUTH_CORS_ORIGINS: '["http://localhost:3000","http://localhost:8080"]'
@@ -30,7 +30,8 @@ services:
       - --key-id
       - ${AUTH_JWT_KEY_ID:-flashmarket-auth-ed25519-v1}
     volumes:
-      - auth-jwt-keys:/var/lib/flashmarket-auth/keys
+      - auth-jwt-keys-private:/var/lib/flashmarket-auth/keys/private
+      - auth-jwt-keys-public:/var/lib/flashmarket-auth/keys/public
     restart: "no"
 
   api:
@@ -44,7 +45,8 @@ services:
       keygen:
         condition: service_completed_successfully
     volumes:
-      - auth-jwt-keys:/var/lib/flashmarket-auth/keys:ro
+      - auth-jwt-keys-private:/var/lib/flashmarket-auth/keys/private:ro
+      - auth-jwt-keys-public:/var/lib/flashmarket-auth/keys/public:ro
       - backend-logs-local:/var/log/shide
       - auth-metrics-data:/tmp/prometheus
     healthcheck:
@@ -84,7 +86,8 @@ services:
     restart: unless-stopped
 
 volumes:
-  auth-jwt-keys:
+  auth-jwt-keys-private:
+  auth-jwt-keys-public:
   auth-metrics-data:
   backend-logs-local:
     external: true

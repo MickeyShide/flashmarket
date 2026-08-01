@@ -7,11 +7,15 @@ x-payments-runtime: &payments-runtime
 x-payments-environment: &payments-environment
   PAYMENTS_ENVIRONMENT: development
   PAYMENTS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/payments
-  PAYMENTS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672//payments
+  PAYMENTS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   PAYMENTS_CORS_ORIGINS: '["http://localhost:3000"]'
   PAYMENTS_LOG_FILE_PATH: /var/log/shide/payments-api.log
   PAYMENTS_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
   PAYMENTS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
+  PAYMENTS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  PAYMENTS_JWT_ALGORITHM: EdDSA
+  PAYMENTS_JWT_ISSUER: flashmarket-auth
+  PAYMENTS_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
@@ -22,6 +26,7 @@ services:
     ports:
       - "127.0.0.1:${PAYMENTS_PORT:-4921}:8000"
     volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
       - backend-logs-local:/var/log/shide
       - payments-metrics-data:/tmp/prometheus
     healthcheck:

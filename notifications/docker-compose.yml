@@ -7,11 +7,15 @@ x-notifications-runtime: &notifications-runtime
 x-notifications-environment: &notifications-environment
   NOTIFICATIONS_ENVIRONMENT: development
   NOTIFICATIONS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/notifications
-  NOTIFICATIONS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672//notifications
+  NOTIFICATIONS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   NOTIFICATIONS_CORS_ORIGINS: '["http://localhost:3000"]'
   NOTIFICATIONS_LOG_FILE_PATH: /var/log/shide/notifications-api.log
   NOTIFICATIONS_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
   NOTIFICATIONS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
+  NOTIFICATIONS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+  NOTIFICATIONS_JWT_ALGORITHM: EdDSA
+  NOTIFICATIONS_JWT_ISSUER: flashmarket-auth
+  NOTIFICATIONS_JWT_AUDIENCE: flashmarket-api
 
 services:
   api:
@@ -22,6 +26,7 @@ services:
     ports:
       - "127.0.0.1:${NOTIFICATIONS_PORT:-4922}:8000"
     volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
       - backend-logs-local:/var/log/shide
       - notifications-metrics-data:/tmp/prometheus
     healthcheck:
