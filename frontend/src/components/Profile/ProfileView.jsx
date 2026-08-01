@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { formatDate } from '../../utils/formatters';
+import { uploadMediaAsset } from '../../services/media';
 import { AuthForms } from './AuthForms';
 import { OrdersTab } from './OrdersTab';
 import { NotificationsTab } from './NotificationsTab';
+import { WishlistView } from '../Wishlist/WishlistView';
 
-export const ProfileView = ({ activeTab = 'profile', setActiveTab, onSelectOrder, onBack }) => {
-  const { user, sessions, logout, closeSession } = useAuth();
+export const ProfileView = ({ activeTab = 'profile', setActiveTab, onSelectOrder, onOpenProduct, onBack }) => {
+  const { user, userAvatar, sessions, logout, closeSession, updateAvatarUrl } = useAuth();
+  const { triggerToast } = useToast();
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   if (!user) {
     return (
@@ -21,8 +26,30 @@ export const ProfileView = ({ activeTab = 'profile', setActiveTab, onSelectOrder
 
   const initial = (user.full_name || user.email || 'U').charAt(0).toUpperCase();
   const roleLabel = user.role === 'CUSTOMER' ? 'ПОКУПАТЕЛЬ' : (user.role === 'ADMIN' ? 'АДМИНИСТРАТОР' : user.role);
-
   const activeSessions = (sessions || []).filter(s => (s.active !== false) && !s.revoked_at);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      triggerToast('Выберите файл изображения (PNG, JPG, WEBP)', true);
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const asset = await uploadMediaAsset(file, 'user_avatar', 'user', user.id);
+      if (asset?.public_url) {
+        updateAvatarUrl(asset.public_url);
+        triggerToast('Аватар успешно обновлен!');
+      }
+    } catch (err) {
+      triggerToast(err.message || 'Ошибка загрузки аватара', true);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   return (
     <div className="max-w-[1040px] mx-auto my-6 md:my-8 px-3.5 md:px-6">
@@ -30,12 +57,35 @@ export const ProfileView = ({ activeTab = 'profile', setActiveTab, onSelectOrder
         ← Назад в каталог
       </button>
 
-      {/* Main Profile Header */}
+      {/* Main Profile Header Banner */}
       <div className="bg-black text-white rounded-lg p-6 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-white/15 flex items-center justify-center text-xl font-black border border-white/20">
-            {initial}
+          {/* Avatar Upload Container */}
+          <div className="relative group cursor-pointer">
+            <div className="w-16 h-16 rounded-full bg-white/15 overflow-hidden flex items-center justify-center text-xl font-black border-2 border-white/30 relative">
+              {userAvatar ? (
+                <img src={userAvatar} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span>{initial}</span>
+              )}
+              {uploadingAvatar && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[9px] font-bold">
+                  ...
+                </div>
+              )}
+            </div>
+            <label className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[9px] font-bold uppercase tracking-wider text-white transition-opacity cursor-pointer">
+              Изменить
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingAvatar}
+                onChange={handleAvatarChange}
+              />
+            </label>
           </div>
+
           <div>
             <h2 className="text-lg font-black uppercase tracking-wide">
               {user.full_name || 'Пользователь'}
@@ -68,6 +118,15 @@ export const ProfileView = ({ activeTab = 'profile', setActiveTab, onSelectOrder
         >
           ПРОФИЛЬ
           {activeTab === 'profile' && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-black"></span>}
+        </button>
+        <button
+          className={`py-3 text-xs font-black tracking-wider uppercase cursor-pointer whitespace-nowrap relative ${
+            activeTab === 'wishlist' ? 'text-black' : 'text-text-muted hover:text-black'
+          }`}
+          onClick={() => setActiveTab('wishlist')}
+        >
+          ИЗБРАННОЕ
+          {activeTab === 'wishlist' && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-black"></span>}
         </button>
         <button
           className={`py-3 text-xs font-black tracking-wider uppercase cursor-pointer whitespace-nowrap relative ${
@@ -153,6 +212,13 @@ export const ProfileView = ({ activeTab = 'profile', setActiveTab, onSelectOrder
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === 'wishlist' && (
+        <WishlistView
+          onOpenProduct={onOpenProduct || (() => {})}
+          onGoToCatalog={onBack}
+        />
       )}
 
       {activeTab === 'orders' && <OrdersTab onSelectOrder={onSelectOrder} />}

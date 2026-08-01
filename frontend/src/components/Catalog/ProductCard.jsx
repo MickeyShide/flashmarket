@@ -1,7 +1,11 @@
 import React from 'react';
 import { formatPrice } from '../../utils/formatters';
+import { useWishlist } from '../../context/WishlistContext';
 
 export const ProductCard = ({ product, onClick }) => {
+  const { isWished, toggleWishlist } = useWishlist();
+  const wished = isWished(product.id);
+
   const coverStyle = product.cover_image
     ? { background: `url(${product.cover_image}) center/cover no-repeat #000` }
     : {};
@@ -11,6 +15,15 @@ export const ProductCard = ({ product, onClick }) => {
     : (product.category_name ? product.category_name.toUpperCase() : 'FLASH MARKET');
 
   const catSubTag = product.category_name ? product.category_name.toUpperCase() : '';
+
+  const handleHeartClick = (e) => {
+    e.stopPropagation();
+    toggleWishlist(product.id);
+  };
+
+  const displayPrice = product.effective_price !== undefined && product.effective_price !== null
+    ? product.effective_price
+    : product.price;
 
   return (
     <div
@@ -22,12 +35,19 @@ export const ProductCard = ({ product, onClick }) => {
         className="w-full aspect-[3/4] max-h-[320px] bg-black rounded flex flex-col items-center justify-center relative mb-3 overflow-hidden"
         style={coverStyle}
       >
-        {/* Status Badge */}
-        <div className="absolute top-[10px] left-[8px] right-[8px] flex justify-center z-10 pointer-events-none">
-          <span className="bg-[#333333] text-white text-[8.5px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded">
-            {product.status}
-          </span>
-        </div>
+        {/* Heart Wishlist Button */}
+        <button
+          className="absolute top-[8px] right-[8px] z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors"
+          onClick={handleHeartClick}
+          title={wished ? 'Удалить из избранного' : 'Добавить в избранное'}
+        >
+          <svg
+            className={`w-4 h-4 transition-colors ${wished ? 'fill-red-500 stroke-red-500' : 'fill-none stroke-white stroke-2'}`}
+            viewBox="0 0 24 24"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        </button>
 
         {/* Fallback Icon */}
         {!product.cover_image && (
@@ -54,7 +74,7 @@ export const ProductCard = ({ product, onClick }) => {
 
       {/* Price */}
       <div className="text-[12.5px] font-bold text-black flex items-center gap-1.5">
-        {formatPrice(product.price, product.currency, false)}
+        {formatPrice(displayPrice, product.currency || 'RUB', false)}
       </div>
     </div>
   );

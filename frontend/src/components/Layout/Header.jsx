@@ -51,7 +51,18 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
         </div>
 
         {/* Right */}
-        <div className="flex items-center justify-end gap-2 md:gap-[14px] relative" ref={notifRef}>
+        <div className="flex items-center justify-end gap-2 md:gap-[12px] relative" ref={notifRef}>
+          {/* Admin view button if user is ADMIN */}
+          {user?.role === 'ADMIN' && (
+            <button
+              onClick={() => setCurrentView('admin')}
+              className="px-2.5 py-1 text-[10px] font-mono font-extrabold uppercase tracking-wider bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer transition-colors"
+              title="Админ панель"
+            >
+              ADMIN
+            </button>
+          )}
+
           {/* Notifications bell (Desktop) */}
           {user && (
             <div className="hidden md:flex relative">
@@ -65,7 +76,7 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                 </svg>
                 {unreadNotifCount > 0 && (
-                  <span className="absolute -top-[3px] -right-[5px] bg-accent-red text-white text-[9px] font-black min-w-[16px] h-[16px] rounded-full flex items-center justify-center px-1">
+                  <span className="absolute -top-[3px] -right-[5px] bg-red-600 text-white text-[9px] font-black min-w-[16px] h-[16px] rounded-full flex items-center justify-center px-1">
                     {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
                   </span>
                 )}
@@ -82,24 +93,27 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
                     {notifications.length === 0 ? (
                       <div className="p-4 text-center text-text-muted text-[11px]">Нет уведомлений</div>
                     ) : (
-                      notifications.slice(0, 5).map(n => (
-                        <div
-                          key={n.id}
-                          className={`p-3 border-b border-border-color cursor-pointer hover:bg-gray-50 transition-colors ${n.status === 'PENDING' ? 'bg-[#FFFDE7]' : ''}`}
-                          onClick={() => {
-                            if (n.status === 'PENDING') markNotifRead(n.id);
-                          }}
-                        >
-                          <div className="font-extrabold text-[11px]">{n.subject}</div>
-                          <div className="text-[10.5px] text-gray-700 mt-0.5">{n.body}</div>
-                          <div className="text-[9.5px] text-text-muted mt-1">{formatDate(n.created_at)}</div>
-                        </div>
-                      ))
+                      notifications.slice(0, 5).map(n => {
+                        const isUnread = !n.read_at && n.status !== 'READ';
+                        return (
+                          <div
+                            key={n.id}
+                            className={`p-3 border-b border-border-color cursor-pointer hover:bg-gray-50 transition-colors ${isUnread ? 'bg-amber-50' : ''}`}
+                            onClick={() => {
+                              if (isUnread) markNotifRead(n.id);
+                            }}
+                          >
+                            <div className="font-extrabold text-[11px] uppercase">{n.subject}</div>
+                            <div className="text-[10.5px] text-gray-700 mt-0.5 leading-snug">{n.body}</div>
+                            <div className="text-[9.5px] text-text-muted mt-1 font-mono">{formatDate(n.created_at)}</div>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                   <div className="p-2.5 text-center border-t border-border-color text-[10.5px] font-extrabold uppercase">
                     <button
-                      className="hover:text-accent-red cursor-pointer"
+                      className="hover:text-red-600 cursor-pointer"
                       onClick={() => {
                         setShowNotifDrop(false);
                         setCurrentView('auth');

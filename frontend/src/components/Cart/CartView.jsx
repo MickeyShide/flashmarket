@@ -17,11 +17,12 @@ export const CartView = ({ onBack, onGoToCheckout, onGoToCatalog }) => {
       setLoadingValidation(true);
       const map = {};
       await Promise.all(cart.map(async (item) => {
-        let stock = stockCache[item.id];
+        const cacheKey = item.variant_id ? `${item.id}_${item.variant_id}` : item.id;
+        let stock = stockCache[cacheKey];
         if (!stock) {
-          stock = await fetchStock(item.id);
+          stock = await fetchStock(item.id, item.variant_id);
         }
-        map[item.id] = stock;
+        map[cacheKey] = stock;
       }));
       if (isMounted) {
         setStockStatusMap(map);
@@ -67,7 +68,8 @@ export const CartView = ({ onBack, onGoToCheckout, onGoToCatalog }) => {
       ) : (
         <div className="space-y-4 mb-8">
           {cart.map((item, idx) => {
-            const stock = stockStatusMap[item.id] || stockCache[item.id];
+            const cacheKey = item.variant_id ? `${item.id}_${item.variant_id}` : item.id;
+            const stock = stockStatusMap[cacheKey] || stockCache[cacheKey];
             const avail = stock?.available ?? 0;
             let warning = '';
             let isIssue = false;
@@ -88,23 +90,38 @@ export const CartView = ({ onBack, onGoToCheckout, onGoToCatalog }) => {
 
             return (
               <div
-                key={`${item.id}-${item.size}-${idx}`}
+                key={`${item.id}-${item.variant_id || 'novar'}-${item.size}-${idx}`}
                 className={`p-4 border rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
                   isOutOfStock ? 'bg-red-50 border-red-200' : isIssue ? 'bg-amber-50 border-amber-200' : 'bg-white border-border-color'
                 }`}
               >
                 <div className="flex items-center gap-4">
                   {/* Thumbnail Box */}
-                  <div className="w-14 h-14 bg-black rounded shrink-0 flex items-center justify-center">
+                  <div className="w-14 h-14 bg-black rounded shrink-0 flex items-center justify-center relative overflow-hidden">
                     <svg className="w-6 h-6 stroke-white fill-none stroke-2" viewBox="0 0 24 24">
                       <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
                     </svg>
                   </div>
 
                   <div>
-                    <div className="font-extrabold text-[12.5px] uppercase">{item.name}</div>
-                    <div className="text-[10.5px] text-gray-500 mt-1 flex items-center gap-2">
-                      <span>Размер: {item.size}</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-[12.5px] uppercase">{item.name}</span>
+                      {item.drop_id && (
+                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 font-bold text-[9px] uppercase rounded">
+                          DROP
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10.5px] text-gray-500 mt-1 flex flex-wrap items-center gap-2">
+                      {item.variant_sku && <span>SKU: {item.variant_sku}</span>}
+                      {item.variant_sku && <span>|</span>}
+                      <span>Размер: {item.variant_size || item.size}</span>
+                      {item.variant_color && (
+                        <>
+                          <span>|</span>
+                          <span>Цвет: {item.variant_color}</span>
+                        </>
+                      )}
                       <span>|</span>
                       <span>Кол-во:</span>
                       <div className="inline-flex items-center gap-1">

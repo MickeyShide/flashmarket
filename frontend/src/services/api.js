@@ -1,13 +1,12 @@
 import { ACCESS_TOKEN_KEY } from '../config/constants';
 import { getCsrfToken } from '../utils/formatters';
 
-let isRefreshingToken = false;
+let refreshPromise = null;
 let onSessionExpiredCallback = null;
 
 export function setSessionExpiredCallback(cb) {
   onSessionExpiredCallback = cb;
 }
-
 export async function api(path, options = {}, tokenOverride = null) {
   const token = tokenOverride !== null ? tokenOverride : localStorage.getItem(ACCESS_TOKEN_KEY);
   const headers = { 'Accept': 'application/json', ...(options.headers || {}) };
@@ -23,37 +22,45 @@ export async function api(path, options = {}, tokenOverride = null) {
 
   let res = await fetch(path, { ...options, headers, credentials: 'include' });
 
-  // Task 8: Transparent Refresh Token on 401
+  // Transparent Refresh Token on 401
   if (res.status === 401 && token && !path.includes('/auth/login') && !path.includes('/auth/refresh')) {
-    if (!isRefreshingToken) {
-      isRefreshingToken = true;
-      try {
-        const refreshHeaders = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        const currentCsrf = getCsrfToken();
-        if (currentCsrf) {
-          refreshHeaders['X-CSRF-Token'] = currentCsrf;
-        }
-        const refreshRes = await fetch('/auth/refresh', {
-          method: 'POST',
-          headers: refreshHeaders,
-          body: JSON.stringify({}),
-          credentials: 'include'
-        });
-
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          const newToken = refreshData.tokens?.access_token || refreshData.access_token;
-          if (newToken) {
-            localStorage.setItem(ACCESS_TOKEN_KEY, newToken);
-            isRefreshingToken = false;
-            headers['Authorization'] = `Bearer ${newToken}`;
-            return await fetch(path, { ...options, headers, credentials: 'include' });
+    if (!refreshPromise) {
+      refreshPromise = (async () => {
+        try {
+          const refreshHeaders = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+          const currentCsrf = getCsrfToken();
+          if (currentCsrf) {
+            refreshHeaders['X-CSRF-Token'] = currentCsrf;
           }
+          const refreshRes = await fetch('/auth/refresh', {
+            method: 'POST',
+            headers: refreshHeaders,
+            body: JSON.stringify({}),
+            credentials: 'include'
+          });
+
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            const newToken = refreshData.tokens?.access_token || refreshData.access_token;
+            if (newToken) {
+              localStorage.setItem(ACCESS_TOKEN_KEY, newToken);
+              return newToken;
+            }
+          }
+        } catch (err) {
+          console.warn('Token refresh error:', err);
         }
-      } catch (err) {
-        console.warn('Token refresh error:', err);
-      }
-      isRefreshingToken = false;
+        return null;
+      })().finally(() => {
+        refreshPromise = null;
+      });
+    }
+
+    const newToken = await refreshPromise;
+
+    if (newToken) {
+      headers['Authorization'] = `Bearer ${newToken}`;
+      return await fetch(path, { ...options, headers, credentials: 'include' });
     }
 
     localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -72,7 +79,9 @@ export async function apiJson(path, options = {}, tokenOverride = null) {
 
   if (!res.ok) {
     let msg;
-    if (res.status === 403) {
+    if (res.status === 429) {
+      msg = 'Слишком много запросов. Попробуйте позже.';
+    } else if (res.status === 403) {
       if (data.detail === "Valid refresh cookie and CSRF token required") {
         localStorage.removeItem(ACCESS_TOKEN_KEY);
         if (onSessionExpiredCallback) onSessionExpiredCallback();
@@ -96,6 +105,10 @@ export async function apiJson(path, options = {}, tokenOverride = null) {
     const err = new Error(msg);
     err.status = res.status;
     err.data = data;
+    const retryAfter = res.headers.get('Retry-After');
+    if (retryAfter) {
+      err.retryAfter = parseInt(retryAfter, 10) || retryAfter;
+    }
     throw err;
   }
   return data;

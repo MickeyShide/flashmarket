@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const { triggerToast } = useToast();
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem(ACCESS_TOKEN_KEY));
   const [user, setUser] = useState(null);
+  const [userAvatar, setUserAvatar] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
@@ -16,6 +17,7 @@ export const AuthProvider = ({ children }) => {
   const handleSessionExpired = useCallback(() => {
     setAccessToken(null);
     setUser(null);
+    setUserAvatar(null);
     setSessions([]);
     setNotifications([]);
     setUnreadNotifCount(0);
@@ -27,27 +29,44 @@ export const AuthProvider = ({ children }) => {
     setSessionExpiredCallback(handleSessionExpired);
   }, [handleSessionExpired]);
 
+  const loadAvatar = useCallback(async (userId) => {
+    if (!userId) return;
+    try {
+      // Find completed user avatar media asset
+      const assetsData = await apiJson(`/api/v1/media/entities/user/${userId}/assets?purpose=user_avatar`).catch(() => []);
+      const assets = Array.isArray(assetsData) ? assetsData : (assetsData.items || []);
+      const completed = assets.find(a => a.status === 'READY' && a.public_url);
+      if (completed) {
+        setUserAvatar(completed.public_url);
+      }
+    } catch (e) {
+      console.warn('Failed to load user avatar asset:', e);
+    }
+  }, []);
+
   const loadProfile = useCallback(async () => {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (!token) return;
     try {
       const userData = await apiJson('/users/me');
       setUser(userData);
+      loadAvatar(userData.id);
       const sessionData = await apiJson('/sessions');
       setSessions(sessionData || []);
     } catch (err) {
       console.error('profile load failed', err);
     }
-  }, []);
+  }, [loadAvatar]);
 
   const loadNotifications = useCallback(async () => {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (!token || !user) return;
     try {
       const data = await apiJson(`/api/v1/notifications/users/${user.id}`);
-      const notifs = data.items || [];
+      const notifs = Array.isArray(data) ? data : (data.items || []);
       setNotifications(notifs);
-      const unread = notifs.filter(n => n.status === 'PENDING');
+      // Unread count: items missing read_at
+      const unread = notifs.filter(n => !n.read_at && n.status !== 'READ');
       setUnreadNotifCount(unread.length);
     } catch (err) {
       console.warn('loadNotifications error:', err);
@@ -59,6 +78,7 @@ export const AuthProvider = ({ children }) => {
       loadProfile();
     } else {
       setUser(null);
+      setUserAvatar(null);
       setSessions([]);
       setNotifications([]);
       setUnreadNotifCount(0);
@@ -80,6 +100,7 @@ export const AuthProvider = ({ children }) => {
     setAccessToken(data.tokens.access_token);
     setUser(data.user);
     localStorage.setItem(ACCESS_TOKEN_KEY, data.tokens.access_token);
+    loadAvatar(data.user.id);
     triggerToast(`Добро пожаловать, ${data.user.full_name || data.user.email}!`);
     return data;
   };
@@ -105,6 +126,7 @@ export const AuthProvider = ({ children }) => {
     } catch (e) { }
     setAccessToken(null);
     setUser(null);
+    setUserAvatar(null);
     setSessions([]);
     setNotifications([]);
     setUnreadNotifCount(0);
@@ -124,18 +146,23 @@ export const AuthProvider = ({ children }) => {
 
   const markNotifRead = async (notificationId) => {
     try {
-      await apiJson(`/api/v1/notifications/${notificationId}/send`, { method: 'POST' });
-      triggerToast('Уведомление отмечено прочитанным');
+      await apiJson(`/api/v1/notifications/${notificationId}/read`, { method: 'POST' });
+      triggerToast('Уведомление прочитано');
       loadNotifications();
     } catch (err) {
       loadNotifications();
     }
   };
 
+  const updateAvatarUrl = (url) => {
+    setUserAvatar(url);
+  };
+
   return (
     <AuthContext.Provider value={{
       accessToken,
       user,
+      userAvatar,
       sessions,
       notifications,
       unreadNotifCount,
@@ -145,7 +172,8 @@ export const AuthProvider = ({ children }) => {
       closeSession,
       loadProfile,
       loadNotifications,
-      markNotifRead
+      markNotifRead,
+      updateAvatarUrl
     }}>
       {children}
     </AuthContext.Provider>

@@ -16,6 +16,12 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
   const [errorMsg, setErrorMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Promocode state
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [loadingPromo, setLoadingPromo] = useState(false);
+  const [promoError, setPromoError] = useState('');
+
   if (!user) {
     return (
       <div className="max-w-[600px] mx-auto my-8 px-4 text-center">
@@ -34,6 +40,49 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
       </div>
     );
   }
+
+  const rawTotalRub = cartTotal();
+  const rawTotalMinor = Math.round(rawTotalRub * 100);
+
+  const discountMinor = appliedPromo ? Number(appliedPromo.discount_amount || 0) : 0;
+  const finalTotalMinor = appliedPromo
+    ? Number(appliedPromo.final_amount)
+    : rawTotalMinor;
+  const finalTotalRub = finalTotalMinor / 100;
+  const discountRub = discountMinor / 100;
+
+  // Handle promocode validation
+  const handleApplyPromocode = async () => {
+    if (!promoCodeInput.trim()) return;
+    setLoadingPromo(true);
+    setPromoError('');
+
+    try {
+      const result = await apiJson('/api/v1/promocodes/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: promoCodeInput.trim().toUpperCase(),
+          order_amount: rawTotalMinor,
+          user_id: user.id
+        })
+      });
+      if (!result.valid) throw new Error(result.error || 'Недействительный промокод');
+      setAppliedPromo({ ...result, code: promoCodeInput.trim().toUpperCase() });
+      triggerToast('Промокод успешно применен!');
+    } catch (err) {
+      setPromoError(err.message || 'Недействительный промокод');
+      setAppliedPromo(null);
+    } finally {
+      setLoadingPromo(false);
+    }
+  };
+
+  const handleRemovePromocode = () => {
+    setAppliedPromo(null);
+    setPromoCodeInput('');
+    setPromoError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,58 +103,79 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
 
     setSubmitting(true);
     const successfulReservations = [];
-    const createdOrders = [];
 
     try {
+      // 1. Reserve every line
       for (const item of cart) {
-        const tempOrderId = crypto.randomUUID();
+        const reserveBody = {
+          user_id: user.id,
+          quantity: item.qty
+        };
+        if (item.variant_id) reserveBody.variant_id = item.variant_id;
+        if (item.drop_id) reserveBody.drop_id = item.drop_id;
 
-        // 1. Reserve stock
-        let reserveRes;
         try {
-          reserveRes = await apiJson(`/api/v1/stocks/${item.id}/reserve`, {
+          const reserveRes = await apiJson(`/api/v1/stocks/${item.id}/reserve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: user.id,
-              quantity: item.qty,
-              order_id: tempOrderId
-            })
+            body: JSON.stringify(reserveBody)
           });
-          successfulReservations.push({ productId: item.id, orderId: tempOrderId, reservation: reserveRes.reservation });
+
+          const reservationObj = reserveRes.reservation || reserveRes;
+          successfulReservations.push({
+            productId: item.id,
+            reservationId: reservationObj.id,
+            expiresAt: reservationObj.expires_at,
+            item
+          });
         } catch (err) {
           throw new Error(`Ошибка резервирования "${item.name}": ${err.message}`);
         }
-
-        // 2. Create Order (price in kopecks)
-        const priceKopecks = Math.round(item.price * 100);
-        try {
-          const order = await apiJson('/api/v1/orders', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: user.id,
-              product_id: item.id,
-              product_name: item.name,
-              price: priceKopecks,
-              currency: item.currency || 'RUB',
-              quantity: item.qty,
-              reservation_id: reserveRes.reservation.id
-            })
-          });
-          createdOrders.push(order);
-        } catch (err) {
-          throw new Error(`Ошибка создания заказа для "${item.name}": ${err.message}`);
-        }
       }
+
+      // 2. Submit Orders Batch
+      const linesData = successfulReservations.map(resObj => {
+        const item = resObj.item;
+        const linePriceMinor = Math.round(item.price * 100);
+        const lineData = {
+          user_id: user.id,
+          product_id: item.id,
+          product_name: item.name,
+          price: linePriceMinor,
+          currency: item.currency || 'RUB',
+          quantity: item.qty,
+          reservation_id: resObj.reservationId
+        };
+        if (item.variant_id) lineData.variant_id = item.variant_id;
+        if (item.variant_sku) lineData.variant_sku = item.variant_sku;
+        if (item.variant_size || item.size) lineData.variant_size = item.variant_size || item.size;
+        if (item.variant_color) lineData.variant_color = item.variant_color;
+        if (item.drop_id) lineData.drop_id = item.drop_id;
+        if (resObj.expiresAt) lineData.payment_expires_at = resObj.expiresAt;
+        return lineData;
+      });
+
+      const batchPayload = {
+        lines: linesData
+      };
+      if (appliedPromo?.code || promoCodeInput) {
+        batchPayload.promocode_code = (appliedPromo?.code || promoCodeInput).toUpperCase();
+      }
+
+      const createdOrdersResponse = await apiJson('/api/v1/orders/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batchPayload)
+      });
 
       // Success! Clear cart
       clearCart();
-      triggerToast(`Заказ успешно оформлен! Номер заказа: ${createdOrders[0]?.id || ''}`);
+      const firstOrderId = createdOrdersResponse.orders?.[0]?.id || createdOrdersResponse[0]?.id || '';
+      triggerToast(`Заказ успешно оформлен!${firstOrderId ? ' ID: ' + firstOrderId : ''}`);
       onCheckoutSuccess();
 
     } catch (err) {
-      // ROLLBACK: Release all reservations
+      // ROLLBACK: Release all reservations created during this attempt
       setErrorMsg(`${err.message}. Выполняем откат резервов...`);
 
       for (const resItem of successfulReservations) {
@@ -113,7 +183,9 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
           await apiJson(`/api/v1/stocks/${resItem.productId}/release`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_id: resItem.orderId })
+            body: JSON.stringify({
+              reservation_id: resItem.reservationId
+            })
           });
         } catch (releaseErr) {
           console.error('Rollback release error:', releaseErr);
@@ -139,19 +211,81 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
 
       <div className="bg-white border border-border-color rounded-lg p-6 md:p-8 space-y-6">
         {/* Order Summary */}
-        <div className="bg-gray-50 border border-border-color rounded-md p-4 text-xs space-y-2">
+        <div className="bg-gray-50 border border-border-color rounded-md p-4 text-xs space-y-3">
           <div className="font-extrabold uppercase tracking-wider mb-2 text-[11px] text-gray-500">
             Содержимое заказа:
           </div>
           {cart.map((item, idx) => (
             <div key={idx} className="flex justify-between font-medium">
-              <span>{item.name} × {item.qty} ({item.size})</span>
+              <div>
+                <span>{item.name} × {item.qty}</span>
+                <span className="text-gray-500 text-[10px] ml-1">({item.variant_size || item.size}{item.variant_color ? `, ${item.variant_color}` : ''})</span>
+              </div>
               <span className="font-bold">{formatPrice(item.price * item.qty, item.currency, false)}</span>
             </div>
           ))}
-          <div className="border-t border-border-color pt-2 flex justify-between font-black text-sm uppercase">
-            <span>ИТОГО:</span>
-            <span>{formatPrice(cartTotal(), 'RUB', false)}</span>
+
+          {/* Promocode Input Box */}
+          <div className="pt-3 border-t border-gray-200">
+            <label className="block text-[10px] font-extrabold uppercase tracking-wider text-gray-600 mb-1.5">
+              Промокод
+            </label>
+            {appliedPromo ? (
+              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-2.5 rounded">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-black text-emerald-700">✓ {appliedPromo.code || promoCodeInput.toUpperCase()}</span>
+                  <span className="text-[10px] text-emerald-600 font-bold">
+                    (Скидка: {formatPrice(discountRub, 'RUB', false)})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="text-xs text-red-600 hover:text-red-800 font-bold underline"
+                  onClick={handleRemovePromocode}
+                >
+                  Удалить
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Введите промокод (напр. FLASH10)"
+                  className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-xs font-mono uppercase outline-none focus:border-black"
+                  value={promoCodeInput}
+                  onChange={(e) => setPromoCodeInput(e.target.value)}
+                />
+                <button
+                  type="button"
+                  disabled={loadingPromo || !promoCodeInput.trim()}
+                  className="bg-black text-white px-3 py-1.5 text-xs font-bold uppercase rounded hover:bg-gray-800 disabled:opacity-50"
+                  onClick={handleApplyPromocode}
+                >
+                  {loadingPromo ? '…' : 'Применить'}
+                </button>
+              </div>
+            )}
+            {promoError && (
+              <div className="text-[10px] font-bold text-red-600 mt-1">{promoError}</div>
+            )}
+          </div>
+
+          {/* Amount Breakdown */}
+          <div className="border-t border-border-color pt-3 space-y-1.5">
+            <div className="flex justify-between text-gray-500 font-medium">
+              <span>Сумма товаров:</span>
+              <span>{formatPrice(rawTotalRub, 'RUB', false)}</span>
+            </div>
+            {discountRub > 0 && (
+              <div className="flex justify-between text-emerald-600 font-extrabold">
+                <span>Скидка по промокоду:</span>
+                <span>−{formatPrice(discountRub, 'RUB', false)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-black text-base uppercase pt-1 border-t border-gray-200">
+              <span>ИТОГО К ОПЛАТЕ:</span>
+              <span>{formatPrice(finalTotalRub, 'RUB', false)}</span>
+            </div>
           </div>
         </div>
 
@@ -209,7 +343,7 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
             disabled={submitting}
             className="w-full bg-black text-white py-4 px-6 text-xs font-black tracking-[1.5px] uppercase cursor-pointer rounded hover:bg-gray-900 disabled:opacity-50 transition-colors mt-4"
           >
-            {submitting ? 'ОБРАБОТКА И РЕЗЕРВИРОВАНИЕ...' : 'ПОДТВЕРДИТЬ ЗАКАЗ'}
+            {submitting ? 'ОБРАБОТКА И РЕЗЕРВИРОВАНИЕ...' : `ОПЛАТИТЬ ${formatPrice(finalTotalRub, 'RUB', false)}`}
           </button>
         </form>
       </div>

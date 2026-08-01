@@ -65,8 +65,13 @@ export const OrdersTab = ({ onSelectOrder }) => {
               {order.product_name}
             </div>
             <div className="text-[10.5px] text-gray-500 font-mono">
-              ID: {order.id.substring(0, 8)}... · {formatDate(order.created_at)} · Кол-во: {order.quantity} · {formatPrice(order.price * order.quantity, order.currency, true)}
+              ID: {order.id.substring(0, 8)}... · {formatDate(order.created_at)} · Кол-во: {order.quantity} · {formatPrice(order.final_price ?? order.price * order.quantity, order.currency, true)}
             </div>
+            {(order.variant_sku || order.variant_size || order.variant_color) && (
+              <div className="text-[10px] text-gray-500 font-mono mt-1">
+                {[order.variant_sku, order.variant_size, order.variant_color].filter(Boolean).join(' · ')}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3 self-end sm:self-center">

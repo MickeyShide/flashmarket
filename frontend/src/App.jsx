@@ -18,6 +18,10 @@ import { CheckoutView } from './components/Checkout/CheckoutView';
 import { ProfileView } from './components/Profile/ProfileView';
 import { OrderDetailView } from './components/Order/OrderDetailView';
 
+import { DropsSection } from './components/Drops/DropsSection';
+import { DropDetail } from './components/Drops/DropDetail';
+import { AdminView } from './components/Admin/AdminView';
+
 const DevHub = lazy(() => import('./components/DevHub/DevHub'));
 
 export const App = () => {
@@ -27,11 +31,13 @@ export const App = () => {
       return 'dev';
     }
     return 'catalog';
-  }); // 'catalog' | 'product' | 'cart' | 'checkout' | 'auth' | 'order-detail' | 'dev'
+  }); // 'catalog' | 'product' | 'cart' | 'checkout' | 'auth' | 'order-detail' | 'dev' | 'drops' | 'drop-detail' | 'admin'
 
   const [selectedProductSlug, setSelectedProductSlug] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
-  const [profileTab, setProfileTab] = useState('profile'); // 'profile' | 'orders' | 'notifications'
+  const [selectedDropIdentifier, setSelectedDropIdentifier] = useState(null);
+  const [selectedDropInfo, setSelectedDropInfo] = useState(null);
+  const [profileTab, setProfileTab] = useState('profile'); // 'profile' | 'wishlist' | 'orders' | 'notifications'
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Sync URL pathname with currentView
@@ -66,7 +72,10 @@ export const App = () => {
   const [brandsData, setBrandsData] = useState([]);
   const [activeCategoryId, setActiveCategoryId] = useState(null);
   const [activeBrandId, setActiveBrandId] = useState(null);
-  const [activeStatus, setActiveStatus] = useState(null);
+  const [activeSize, setActiveSize] = useState(null);
+  const [activePriceFrom, setActivePriceFrom] = useState('');
+  const [activePriceTo, setActivePriceTo] = useState('');
+  const [activeSort, setActiveSort] = useState('created_at');
   const [activeSearch, setActiveSearch] = useState('');
 
   // Catalog State & Pagination
@@ -81,6 +90,15 @@ export const App = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [currentView]);
+
+  useEffect(() => {
+    const openAuth = () => {
+      setProfileTab('wishlist');
+      setCurrentView('auth');
+    };
+    window.addEventListener('flashmarket:auth-required', openAuth);
+    return () => window.removeEventListener('flashmarket:auth-required', openAuth);
+  }, []);
 
   // Initial load: Categories & Brands
   useEffect(() => {
@@ -117,12 +135,25 @@ export const App = () => {
       params.set('offset', offsetToUse);
       if (activeCategoryId) params.set('category_id', activeCategoryId);
       if (activeBrandId) params.set('brand_id', activeBrandId);
-      if (activeStatus) params.set('status', activeStatus);
-      if (activeSearch) params.set('search', activeSearch);
+      if (activeSize) params.set('size', activeSize);
+      if (activePriceFrom) params.set('price_from', activePriceFrom);
+      if (activePriceTo) params.set('price_to', activePriceTo);
+
+      if (activeSearch) {
+        params.set('search', activeSearch);
+        params.set('sort_by', 'relevance');
+      } else if (activeSort) {
+        if (activeSort.startsWith('price_')) {
+          params.set('sort_by', 'price');
+          params.set('sort_order', activeSort.endsWith('_asc') ? 'asc' : 'desc');
+        } else {
+          params.set('sort_by', activeSort);
+        }
+      }
 
       const data = await apiJson('/api/v1/products?' + params.toString());
-      const items = data.items || [];
-      const total = data.total || 0;
+      const items = Array.isArray(data) ? data : (data.items || []);
+      const total = data.total || items.length || 0;
 
       setCatalogTotal(total);
 
@@ -141,7 +172,7 @@ export const App = () => {
       setLoadingCatalog(false);
       setLoadingMore(false);
     }
-  }, [activeCategoryId, activeBrandId, activeStatus, activeSearch, currentView]);
+  }, [activeCategoryId, activeBrandId, activeSize, activePriceFrom, activePriceTo, activeSort, activeSearch, currentView]);
 
   // Re-fetch catalog on filter changes
   useEffect(() => {
@@ -169,25 +200,31 @@ export const App = () => {
     setActiveBrandId(null);
   };
 
-  const handleFilterStatus = (status) => {
-    setActiveStatus(status);
-  };
-
-  const handleSearchChange = (query) => {
+  const handleSearchChange = useCallback((query) => {
     setActiveSearch(query);
-  };
+  }, []);
 
   const handleGoHome = () => {
     setCurrentView('catalog');
     setActiveCategoryId(null);
     setActiveBrandId(null);
-    setActiveStatus(null);
+    setActiveSize(null);
+    setActivePriceFrom('');
+    setActivePriceTo('');
+    setActiveSort('created_at');
     setActiveSearch('');
+    setSelectedDropInfo(null);
   };
 
-  const handleOpenProduct = (slug) => {
+  const handleOpenProduct = (slug, dropInfo = null) => {
     setSelectedProductSlug(slug);
+    setSelectedDropInfo(dropInfo);
     setCurrentView('product');
+  };
+
+  const handleOpenDrop = (dropIdentifier) => {
+    setSelectedDropIdentifier(dropIdentifier);
+    setCurrentView('drop-detail');
   };
 
   const handleOpenOrder = (orderId) => {
@@ -240,6 +277,11 @@ export const App = () => {
               resetBrandFilter={handleResetBrandFilter}
             />
 
+            <DropsSection
+              onSelectDrop={handleOpenDrop}
+              onViewAllDrops={() => setCurrentView('drops')}
+            />
+
             <BrandsGallery
               brandsData={brandsData}
               onSelectBrand={handleSelectBrand}
@@ -251,8 +293,14 @@ export const App = () => {
               brandsData={brandsData}
               activeBrandId={activeBrandId}
               onSelectBrandSelect={handleSelectBrand}
-              activeStatus={activeStatus}
-              onFilterStatus={handleFilterStatus}
+              activeSize={activeSize}
+              onSelectSize={setActiveSize}
+              priceFrom={activePriceFrom}
+              priceTo={activePriceTo}
+              onPriceFromChange={setActivePriceFrom}
+              onPriceToChange={setActivePriceTo}
+              activeSort={activeSort}
+              onSelectSort={setActiveSort}
               onSearchChange={handleSearchChange}
             />
 
@@ -261,7 +309,7 @@ export const App = () => {
               loading={loadingCatalog}
               error={errorCatalog}
               onRetry={() => loadCatalog(true, 0)}
-              onOpenProduct={handleOpenProduct}
+              onOpenProduct={(slug) => handleOpenProduct(slug, null)}
               hasMore={catalogOffset + CATALOG_LIMIT < catalogTotal}
               loadingMore={loadingMore}
               onLoadMore={handleLoadMore}
@@ -269,9 +317,30 @@ export const App = () => {
           </>
         )}
 
+        {currentView === 'drops' && (
+          <div className="max-w-[1280px] mx-auto my-6 md:my-8 px-3.5 md:px-6">
+            <button className="text-[11px] font-bold uppercase mb-6 cursor-pointer text-text-muted hover:text-black" onClick={() => setCurrentView('catalog')}>
+              ← Назад в каталог
+            </button>
+            <DropsSection
+              onSelectDrop={handleOpenDrop}
+              showAll
+            />
+          </div>
+        )}
+
+        {currentView === 'drop-detail' && (
+          <DropDetail
+            dropIdentifier={selectedDropIdentifier}
+            onOpenProductWithDrop={(slug, dropInfo) => handleOpenProduct(slug, dropInfo)}
+            onBack={() => setCurrentView('catalog')}
+          />
+        )}
+
         {currentView === 'product' && (
           <ProductDetail
             productSlug={selectedProductSlug}
+            dropInfo={selectedDropInfo}
             onBack={() => setCurrentView('catalog')}
           />
         )}
@@ -300,6 +369,7 @@ export const App = () => {
             activeTab={profileTab}
             setActiveTab={setProfileTab}
             onSelectOrder={handleOpenOrder}
+            onOpenProduct={(slug) => handleOpenProduct(slug, null)}
             onBack={() => setCurrentView('catalog')}
           />
         )}
@@ -311,6 +381,12 @@ export const App = () => {
               setCurrentView('auth');
               setProfileTab('orders');
             }}
+          />
+        )}
+
+        {currentView === 'admin' && (
+          <AdminView
+            onBack={() => setCurrentView('catalog')}
           />
         )}
       </main>
