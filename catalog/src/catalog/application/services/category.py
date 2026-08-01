@@ -3,6 +3,7 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from catalog.application.contracts import CategoryTreeCache
 from catalog.application.schemas import CategoryTreeNode, CreateCategoryRequest
 from catalog.domain.exceptions import CategoryNotFound, DuplicateSlug
 from catalog.infrastructure.models import CategoryModel
@@ -16,9 +17,11 @@ class CategoryService:
         self,
         session: AsyncSession,
         category_repo: CategoryRepository,
+        category_cache: CategoryTreeCache,
     ) -> None:
         self._session = session
         self._category_repo = category_repo
+        self._category_cache = category_cache
 
     async def create_category(self, data: CreateCategoryRequest) -> CategoryModel:
         """Validate inputs and persist a new category."""
@@ -45,10 +48,15 @@ class CategoryService:
                 raise DuplicateSlug("A category with this slug already exists") from exc
             raise
         await self._session.refresh(category)
+        await self._category_cache.invalidate_tree()
         return category
 
     async def get_category_tree(self) -> list[CategoryTreeNode]:
         """Build the complete category hierarchy without relationship lazy-loads."""
+        cached_tree = await self._category_cache.get_tree()
+        if cached_tree is not None:
+            return cached_tree
+
         categories = await self._category_repo.list_all()
         nodes = {
             category.id: CategoryTreeNode(
@@ -72,6 +80,7 @@ class CategoryService:
                 continue
             parent.children.append(node)
 
+        await self._category_cache.store_tree(roots)
         return roots
 
 

@@ -39,6 +39,11 @@ HTTP_IN_PROGRESS = Gauge(
     "catalog_http_requests_in_progress",
     "HTTP requests currently in progress",
 )
+CATEGORY_CACHE_OPERATIONS = Counter(
+    "catalog_category_cache_operations_total",
+    "Category tree cache operations",
+    labelnames=("operation", "result"),
+)
 
 SENSITIVE_KEYS = {
     "password",

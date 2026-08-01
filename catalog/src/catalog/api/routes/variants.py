@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, status
 
 from catalog.api.dependencies import AdminPrincipal, VariantServiceDep
 from catalog.application.schemas import (

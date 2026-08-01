@@ -73,4 +73,3 @@ class DuplicateVariantOptions(VariantError):
 
     code = "duplicate_variant_options"
     message = "A variant with these options already exists for this product"
-

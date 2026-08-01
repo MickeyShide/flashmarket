@@ -1,11 +1,9 @@
 """Integration tests for Product Variants API endpoints."""
 
-from httpx import AsyncClient
+import uuid
 
 import pytest
-
-
-import uuid
+from httpx import AsyncClient
 
 
 async def _setup_category_and_product(client: AsyncClient):

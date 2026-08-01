@@ -3,8 +3,10 @@
 import uuid
 
 import pytest
-from httpx import AsyncClient
-from jwt_verifier.testing import TestKeyStore
+from httpx import ASGITransport, AsyncClient
+from jwt_verifier.testing import TestKeyStore as JWTTestKeyStore
+
+from catalog.main import app
 
 
 @pytest.mark.asyncio
@@ -80,17 +82,18 @@ async def test_cat_001_to_005_category_brand_product_crud_and_slugs(client: Asyn
 
 @pytest.mark.asyncio
 async def test_cat_012_admin_authorization_enforcement(
-    jwt_keystore: TestKeyStore,
+    jwt_keystore: JWTTestKeyStore,
 ) -> None:
     """CAT-012: Mutation endpoints reject requests without ADMIN role (401/403)."""
-    from catalog.main import app
-    from httpx import ASGITransport
-
     user_token = jwt_keystore.create_token(role="USER")
     headers = {"Authorization": f"Bearer {user_token}"}
     transport = ASGITransport(app=app)
 
-    async with AsyncClient(transport=transport, base_url="http://localhost", headers=headers) as user_client:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://localhost",
+        headers=headers,
+    ) as user_client:
         resp = await user_client.post(
             "/api/v1/categories",
             json={"name": "Forbidden Cat", "slug": "forbidden-cat"},

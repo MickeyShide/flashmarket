@@ -37,9 +37,7 @@ class VariantService:
         self._repo = repo
         self._product_repo = product_repo
 
-    async def generate_sku(
-        self, product_name: str, size: str | None, color: str | None
-    ) -> str:
+    async def generate_sku(self, product_name: str, size: str | None, color: str | None) -> str:
         """Generate a unique SKU based on product name, color, and size."""
         words = product_name.split()[:3]
         prefix_parts = [slugify_simple(w)[:3].upper() for w in words if w]
@@ -100,7 +98,10 @@ class VariantService:
             await self._session.rollback()
             raise DuplicateSKU() from exc
 
-        return await self._repo.get_by_id(variant.id)
+        persisted = await self._repo.get_by_id(variant.id)
+        if persisted is None:
+            raise VariantNotFound()
+        return persisted
 
     async def get_by_id(
         self, variant_id: UUID, product_id: UUID | None = None
@@ -157,11 +158,12 @@ class VariantService:
             await self._session.rollback()
             raise DuplicateSKU() from exc
 
-        return await self._repo.get_by_id(variant.id)
+        persisted = await self._repo.get_by_id(variant.id)
+        if persisted is None:
+            raise VariantNotFound()
+        return persisted
 
-    async def delete_variant(
-        self, variant_id: UUID, product_id: UUID | None = None
-    ) -> None:
+    async def delete_variant(self, variant_id: UUID, product_id: UUID | None = None) -> None:
         """Delete a variant by ID."""
         variant = await self.get_by_id(variant_id, product_id=product_id)
         deleted = await self._repo.delete(variant.id)

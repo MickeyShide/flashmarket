@@ -1,6 +1,7 @@
 """Unit and integration tests for VariantService."""
 
 from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -27,7 +28,8 @@ from catalog.infrastructure.repositories.variant import VariantRepository
 async def _create_test_product(session: AsyncSession):
     cat_repo = CategoryRepository(session)
     prod_repo = ProductRepository(session)
-    cat_service = CategoryService(session, cat_repo)
+    category_cache = AsyncMock()
+    cat_service = CategoryService(session, cat_repo, category_cache)
     prod_service = ProductService(session, prod_repo, cat_repo)
 
     category = await cat_service.create_category(

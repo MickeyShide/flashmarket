@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -261,11 +261,15 @@ class VariantResponse(BaseModel):
         if hasattr(data, "price_override"):
             override = getattr(data, "price_override", None)
             product = getattr(data, "product", None)
-            effective = override if override is not None else (product.price if product is not None else Decimal("0"))
+            effective = (
+                override
+                if override is not None
+                else (product.price if product is not None else Decimal("0"))
+            )
             if isinstance(data, dict):
                 data["effective_price"] = effective
             else:
-                setattr(data, "effective_price", effective)
+                data.effective_price = effective
         elif isinstance(data, dict):
             if "effective_price" not in data:
                 override = data.get("price_override")

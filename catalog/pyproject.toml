@@ -14,6 +14,7 @@ dependencies = [
     "sqlalchemy>=2.0,<3",
     "uvicorn[standard]>=0.51,<1",
     "jwt_verifier",
+    "redis>=8,<9",
 ]
 
 [tool.uv.sources]
@@ -22,6 +23,7 @@ jwt_verifier = { path = "../shared/jwt_verifier" }
 [dependency-groups]
 dev = [
     "aiosqlite>=0.22,<1",
+    "fakeredis>=2.37,<3",
     "httpx>=0.28,<1",
     "mypy>=2.1,<3",
     "pytest>=9.1,<10",

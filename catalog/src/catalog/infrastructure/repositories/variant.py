@@ -1,8 +1,10 @@
 """Data-access operations for product variants."""
 
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -60,12 +62,16 @@ class VariantRepository:
     async def delete(self, variant_id: UUID) -> bool:
         """Delete a variant by ID."""
         stmt = delete(ProductVariantModel).where(ProductVariantModel.id == variant_id)
-        result = await self._session.execute(stmt)
+        result = cast(CursorResult[Any], await self._session.execute(stmt))
         return bool(result.rowcount > 0)
 
     async def sku_exists(self, sku: str) -> bool:
         """Check if a SKU already exists."""
-        stmt = select(func.count()).select_from(ProductVariantModel).where(ProductVariantModel.sku == sku)
+        stmt = (
+            select(func.count())
+            .select_from(ProductVariantModel)
+            .where(ProductVariantModel.sku == sku)
+        )
         result = await self._session.execute(stmt)
         return result.scalar_one() > 0
 
@@ -73,10 +79,14 @@ class VariantRepository:
         self, product_id: UUID, size: str | None, color: str | None
     ) -> bool:
         """Check if a size+color combination exists for a product."""
-        stmt = select(func.count()).select_from(ProductVariantModel).where(
-            ProductVariantModel.product_id == product_id,
-            ProductVariantModel.size == size,
-            ProductVariantModel.color == color,
+        stmt = (
+            select(func.count())
+            .select_from(ProductVariantModel)
+            .where(
+                ProductVariantModel.product_id == product_id,
+                ProductVariantModel.size == size,
+                ProductVariantModel.color == color,
+            )
         )
         result = await self._session.execute(stmt)
         return result.scalar_one() > 0

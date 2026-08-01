@@ -12,7 +12,6 @@ from catalog.domain.exceptions import (
     DuplicateVariantOptions,
     InvalidProductData,
     ProductNotFound,
-    VariantError,
     VariantNotFound,
 )
 

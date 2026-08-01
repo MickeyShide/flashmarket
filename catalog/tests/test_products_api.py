@@ -192,4 +192,3 @@ async def test_archive_product_200(client: AsyncClient) -> None:
     assert resp.status_code == 200
     assert resp.json()["status"] == "ARCHIVED"
 
-

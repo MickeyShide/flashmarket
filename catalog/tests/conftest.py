@@ -2,9 +2,11 @@
 
 import os
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from jwt_verifier.testing import TestKeyStore
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -14,13 +16,35 @@ from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("CATALOG_ENVIRONMENT", "test")
 
-from pathlib import Path
-
-from catalog.api.dependencies import get_verifier
-from catalog.config import get_settings
+from catalog.api.dependencies import get_category_tree_cache, get_verifier  # noqa: E402
+from catalog.application.schemas import CategoryTreeNode  # noqa: E402
+from catalog.config import get_settings  # noqa: E402
 from catalog.infrastructure.database import Base, get_db  # noqa: E402
 from catalog.main import app  # noqa: E402
-from jwt_verifier.testing import TestKeyStore
+
+
+class InMemoryCategoryTreeCache:
+    """Isolated cache fake used by the fast API suite."""
+
+    def __init__(self) -> None:
+        self.tree: list[CategoryTreeNode] | None = None
+        self.reads = 0
+        self.writes = 0
+        self.invalidations = 0
+
+    async def get_tree(self) -> list[CategoryTreeNode] | None:
+        self.reads += 1
+        if self.tree is None:
+            return None
+        return [node.model_copy(deep=True) for node in self.tree]
+
+    async def store_tree(self, tree: list[CategoryTreeNode]) -> None:
+        self.writes += 1
+        self.tree = [node.model_copy(deep=True) for node in tree]
+
+    async def invalidate_tree(self) -> None:
+        self.invalidations += 1
+        self.tree = None
 
 
 @pytest.fixture(autouse=True)
@@ -58,14 +82,26 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
 
 
 @pytest.fixture
+def category_cache() -> InMemoryCategoryTreeCache:
+    """Provide an empty cache for each test."""
+    return InMemoryCategoryTreeCache()
+
+
+@pytest.fixture
 async def client(
     session_factory: async_sessionmaker[AsyncSession],
     jwt_keystore: TestKeyStore,
+    category_cache: InMemoryCategoryTreeCache,
 ) -> AsyncIterator[AsyncClient]:
     """Provide an async HTTP client wired to the test app with admin auth header."""
     del session_factory  # consumed only to ensure DB is ready
     admin_token = jwt_keystore.create_token(role="ADMIN")
     headers = {"Authorization": f"Bearer {admin_token}"}
+    app.dependency_overrides[get_category_tree_cache] = lambda: category_cache
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://localhost", headers=headers) as test_client:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://localhost",
+        headers=headers,
+    ) as test_client:
         yield test_client

@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 
 from catalog.api.dependencies import DbSession
 

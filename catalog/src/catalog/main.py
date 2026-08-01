@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from catalog.api.dependencies import get_verifier
 from catalog.api.error_handlers import catalog_error_handler
 from catalog.api.routes import (
     brands,
@@ -18,6 +19,7 @@ from catalog.api.routes import (
 )
 from catalog.config import get_settings
 from catalog.domain.exceptions import CatalogError
+from catalog.infrastructure.category_cache import redis_client
 from catalog.infrastructure.database import engine
 from catalog.observability import (
     request_observability_middleware,
@@ -25,15 +27,17 @@ from catalog.observability import (
 )
 
 
-from catalog.api.dependencies import get_verifier
-
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application-wide resources."""
     get_verifier().validate_startup()
-    yield
-    await engine.dispose()
+    try:
+        yield
+    finally:
+        try:
+            await redis_client.aclose()
+        finally:
+            await engine.dispose()
 
 
 def create_app() -> FastAPI:

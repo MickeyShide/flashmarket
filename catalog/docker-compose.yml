@@ -7,6 +7,9 @@ x-catalog-runtime: &catalog-runtime
 x-catalog-environment: &catalog-environment
   CATALOG_ENVIRONMENT: development
   CATALOG_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/catalog
+  CATALOG_REDIS_URL: redis://shide-redis:6379/1
+  CATALOG_CATEGORY_CACHE_TTL_SECONDS: '60'
+  CATALOG_REDIS_SOCKET_TIMEOUT_SECONDS: '0.2'
   CATALOG_CORS_ORIGINS: '["http://localhost:3000"]'
   CATALOG_LOG_FILE_PATH: /var/log/shide/catalog-api.log
   CATALOG_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
