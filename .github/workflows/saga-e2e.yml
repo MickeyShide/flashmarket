@@ -39,10 +39,32 @@ jobs:
           docker volume create auth-jwt-keys-private || true
           docker volume create auth-jwt-keys-public || true
 
+          docker run -d --name shide-postgres \
+            --network shide-observability \
+            -e POSTGRES_USER=shide \
+            -e POSTGRES_PASSWORD=shide \
+            -e POSTGRES_DB=postgres \
+            -p 5432:5432 \
+            postgres:17-alpine
+
+          docker run -d --name shide-redis \
+            --network shide-observability \
+            -p 6379:6379 \
+            redis:7-alpine
+
+          docker run -d --name shide-rabbitmq \
+            --network shide-observability \
+            -e RABBITMQ_DEFAULT_USER=shide \
+            -e RABBITMQ_DEFAULT_PASS=shide \
+            -p 5672:5672 -p 15672:15672 \
+            rabbitmq:3-management-alpine
+
+          sleep 10
+
       - name: Start Full Docker Compose Stack
         run: |
           docker compose up -d --build
-          sleep 15
+          sleep 30
 
       - name: Run Purchase Saga E2E Integration Suite
         run: |
@@ -50,4 +72,6 @@ jobs:
 
       - name: Teardown Docker Stack
         if: always()
-        run: docker compose down -v
+        run: |
+          docker compose down -v
+          docker rm -f shide-postgres shide-redis shide-rabbitmq || true
