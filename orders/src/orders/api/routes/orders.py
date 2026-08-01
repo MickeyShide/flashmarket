@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from orders.api.dependencies import CurrentPrincipal, get_order_service
 from orders.application.schemas import (
+    CreateOrderBatchRequest,
     CreateOrderRequest,
+    OrderBatchResponse,
     OrderListParams,
     OrderListResponse,
     OrderResponse,
@@ -42,10 +44,38 @@ async def create_order(
     return _order_response(order)
 
 
+@router.post(
+    "/batch",
+    response_model=OrderBatchResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a checkout from reserved lines",
+)
+async def create_order_batch(
+    data: CreateOrderBatchRequest,
+    principal: CurrentPrincipal,
+    service: OrderService = Depends(get_order_service),
+) -> OrderBatchResponse:
+    user_id = data.lines[0].user_id
+    if principal.role != "ADMIN" and user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot create checkout for another user",
+        )
+    result = await service.create_batch(data)
+    return OrderBatchResponse(
+        checkout_id=result.checkout_id,
+        orders=[_order_response(order) for order in result.orders],
+        original_amount=result.original_amount,
+        discount_amount=result.discount_amount,
+        final_amount=result.final_amount,
+    )
+
+
 @router.get(
-    "/{order_id}",
+    "/{order_id:uuid}",
     response_model=OrderResponse,
     summary="Get an order",
+    openapi_extra={"x-flashmarket-access": "authenticated"},
 )
 async def get_order(
     order_id: UUID,

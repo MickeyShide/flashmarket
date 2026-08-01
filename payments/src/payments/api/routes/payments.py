@@ -43,9 +43,10 @@ async def create_payment(
 
 
 @router.get(
-    "/{payment_id}",
+    "/{payment_id:uuid}",
     response_model=PaymentResponse,
     summary="Get a payment",
+    openapi_extra={"x-flashmarket-access": "authenticated"},
 )
 async def get_payment(
     payment_id: UUID,

@@ -26,6 +26,32 @@ class CreateOrderRequest(BaseModel):
     quantity: int = Field(default=1, ge=1, le=10_000)
     reservation_id: uuid.UUID
     promocode: str | None = Field(default=None, max_length=50)
+    variant_id: uuid.UUID | None = None
+    variant_sku: str | None = Field(default=None, max_length=100)
+    variant_size: str | None = Field(default=None, max_length=20)
+    variant_color: str | None = Field(default=None, max_length=50)
+    drop_id: uuid.UUID | None = None
+    payment_expires_at: datetime | None = None
+
+
+class CreateOrderBatchRequest(BaseModel):
+    """Create all reservation-backed lines in one Orders transaction."""
+
+    lines: list[CreateOrderRequest] = Field(min_length=1, max_length=100)
+    promocode_code: str | None = Field(default=None, max_length=50)
+
+    @model_validator(mode="after")
+    def validate_lines(self) -> CreateOrderBatchRequest:
+        reservation_ids = [line.reservation_id for line in self.lines]
+        if len(reservation_ids) != len(set(reservation_ids)):
+            raise ValueError("reservation_id values must be unique")
+        currencies = {line.currency for line in self.lines}
+        users = {line.user_id for line in self.lines}
+        if len(currencies) != 1:
+            raise ValueError("all lines must use the same currency")
+        if len(users) != 1:
+            raise ValueError("all lines must belong to the same user")
+        return self
 
 
 class OrderListParams(BaseModel):
@@ -50,7 +76,7 @@ class CreatePromocodeRequest(BaseModel):
     expires_at: datetime
 
     @model_validator(mode="after")
-    def validate_promocode_fields(self) -> "CreatePromocodeRequest":
+    def validate_promocode_fields(self) -> CreatePromocodeRequest:
         if self.expires_at <= self.starts_at:
             raise ValueError("expires_at must be after starts_at")
         if self.discount_type == DiscountType.PERCENTAGE and (
@@ -153,6 +179,13 @@ class OrderResponse(BaseModel):
     discount_amount: Decimal = Decimal("0")
     final_price: Decimal | None = None
     promocode_id: uuid.UUID | None = None
+    checkout_id: uuid.UUID | None = None
+    variant_id: uuid.UUID | None = None
+    variant_sku: str | None = None
+    variant_size: str | None = None
+    variant_color: str | None = None
+    drop_id: uuid.UUID | None = None
+    payment_expires_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -164,6 +197,14 @@ class OrderListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class OrderBatchResponse(BaseModel):
+    checkout_id: uuid.UUID
+    orders: list[OrderResponse]
+    original_amount: Decimal
+    discount_amount: Decimal
+    final_amount: Decimal
 
 
 class ErrorDetail(BaseModel):

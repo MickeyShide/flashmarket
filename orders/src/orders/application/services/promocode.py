@@ -1,8 +1,8 @@
 """Service for managing and applying promocodes."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from decimal import Decimal
+from datetime import UTC
+from decimal import ROUND_FLOOR, Decimal
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -91,8 +91,16 @@ class PromocodeService:
             raise PromocodeDisabled()
 
         now = utc_now()
-        starts_at = promo.starts_at.replace(tzinfo=UTC) if promo.starts_at.tzinfo is None else promo.starts_at
-        expires_at = promo.expires_at.replace(tzinfo=UTC) if promo.expires_at.tzinfo is None else promo.expires_at
+        starts_at = (
+            promo.starts_at.replace(tzinfo=UTC)
+            if promo.starts_at.tzinfo is None
+            else promo.starts_at
+        )
+        expires_at = (
+            promo.expires_at.replace(tzinfo=UTC)
+            if promo.expires_at.tzinfo is None
+            else promo.expires_at
+        )
         if now < starts_at or now > expires_at:
             raise PromocodeExpired()
 
@@ -115,8 +123,8 @@ class PromocodeService:
             if discount > order_amount:
                 discount = order_amount
 
-        discount = discount.quantize(Decimal("0.01"))
-        final = (order_amount - discount).quantize(Decimal("0.01"))
+        discount = discount.quantize(Decimal("1"), rounding=ROUND_FLOOR)
+        final = order_amount - discount
 
         return PromocodeResult(
             promocode_id=promo.id,

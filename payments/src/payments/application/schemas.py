@@ -18,6 +18,7 @@ class CreatePaymentRequest(BaseModel):
     amount: int = Field(gt=0, le=10_000_000_000)
     currency: str = Field(default="RUB", min_length=3, max_length=3)
     provider: str = Field(default="mock", min_length=1, max_length=64)
+    expires_at: datetime | None = None
 
 
 class PaymentListParams(BaseModel):
@@ -40,6 +41,7 @@ class PaymentResponse(BaseModel):
     provider: str
     status: PaymentStatus
     external_id: str | None
+    expires_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

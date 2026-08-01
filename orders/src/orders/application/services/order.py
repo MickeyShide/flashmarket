@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
-from decimal import Decimal
+from dataclasses import dataclass
+from decimal import ROUND_FLOOR, Decimal
 from typing import TYPE_CHECKING
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from orders.application.schemas import CreateOrderRequest
+from orders.application.schemas import CreateOrderBatchRequest, CreateOrderRequest
 from orders.domain.entities import OrderEventType, OrderStatus
 from orders.domain.exceptions import DuplicateOrder, InvalidOrderState, OrderNotFound
 from orders.infrastructure.models import OrderModel
@@ -17,6 +18,15 @@ from orders.infrastructure.repositories.order import OrderRepository, OutboxRepo
 
 if TYPE_CHECKING:
     from orders.application.services.promocode import PromocodeService
+
+
+@dataclass(frozen=True, slots=True)
+class BatchOrderResult:
+    checkout_id: UUID
+    orders: list[OrderModel]
+    original_amount: Decimal
+    discount_amount: Decimal
+    final_amount: Decimal
 
 
 class OrderService:
@@ -55,13 +65,11 @@ class OrderService:
             promocode_id = promo_res.promocode_id
 
         final_total = original_total - discount_amount
-        price_per_item = int(final_total // data.quantity) if discount_amount > 0 else data.price
-
         order = OrderModel(
             user_id=data.user_id,
             product_id=data.product_id,
             product_name=data.product_name,
-            price=price_per_item,
+            price=data.price,
             currency=data.currency,
             quantity=data.quantity,
             status=OrderStatus.AWAITING_PAYMENT,
@@ -70,6 +78,12 @@ class OrderService:
             discount_amount=discount_amount,
             final_price=final_total,
             promocode_id=promocode_id,
+            variant_id=data.variant_id,
+            variant_sku=data.variant_sku,
+            variant_size=data.variant_size,
+            variant_color=data.variant_color,
+            drop_id=data.drop_id,
+            payment_expires_at=data.payment_expires_at,
         )
         await self._order_repo.create(order)
 
@@ -89,6 +103,9 @@ class OrderService:
             "product_name": order.product_name,
             "amount": int(final_total),
             "currency": order.currency,
+            "payment_expires_at": (
+                order.payment_expires_at.isoformat() if order.payment_expires_at else None
+            ),
         }
         await self._outbox_repo.add(
             OrderEventType.ORDER_CREATED,
@@ -102,6 +119,109 @@ class OrderService:
         await self._session.commit()
         await self._session.refresh(order)
         return order
+
+    async def create_batch(self, data: CreateOrderBatchRequest) -> BatchOrderResult:
+        """Create all checkout lines atomically and consume one optional promo."""
+        for line in data.lines:
+            if await self._order_repo.get_by_reservation_id(line.reservation_id) is not None:
+                raise DuplicateOrder
+
+        line_totals = [Decimal(line.price * line.quantity) for line in data.lines]
+        original_amount = sum(line_totals, Decimal("0"))
+        total_discount = Decimal("0")
+        promocode_id: UUID | None = None
+        if data.promocode_code and self._promocode_service:
+            result = await self._promocode_service.validate_and_apply(
+                code=data.promocode_code,
+                user_id=data.lines[0].user_id,
+                order_amount=original_amount,
+                for_update=True,
+            )
+            total_discount = min(result.discount_amount, original_amount)
+            promocode_id = result.promocode_id
+
+        discount_units = int(total_discount.to_integral_value(rounding=ROUND_FLOOR))
+        allocations = [0 for _ in data.lines]
+        if discount_units and original_amount > 0:
+            exact = [Decimal(discount_units) * total / original_amount for total in line_totals]
+            allocations = [int(value.to_integral_value(rounding=ROUND_FLOOR)) for value in exact]
+            remainder = discount_units - sum(allocations)
+            order = sorted(
+                range(len(exact)),
+                key=lambda index: (exact[index] - allocations[index], -index),
+                reverse=True,
+            )
+            for index in order[:remainder]:
+                allocations[index] += 1
+
+        checkout_id = uuid4()
+        orders: list[OrderModel] = []
+        for line, original, allocated in zip(data.lines, line_totals, allocations, strict=True):
+            discount = Decimal(allocated)
+            final = original - discount
+            order = OrderModel(
+                checkout_id=checkout_id,
+                user_id=line.user_id,
+                product_id=line.product_id,
+                product_name=line.product_name,
+                price=line.price,
+                currency=line.currency,
+                quantity=line.quantity,
+                status=OrderStatus.AWAITING_PAYMENT,
+                reservation_id=line.reservation_id,
+                original_price=original,
+                discount_amount=discount,
+                final_price=final,
+                promocode_id=promocode_id,
+                variant_id=line.variant_id,
+                variant_sku=line.variant_sku,
+                variant_size=line.variant_size,
+                variant_color=line.variant_color,
+                drop_id=line.drop_id,
+                payment_expires_at=line.payment_expires_at,
+            )
+            await self._order_repo.create(order)
+            payload = {
+                "order_id": str(order.id),
+                "checkout_id": str(checkout_id),
+                "reservation_id": str(order.reservation_id),
+                "user_id": str(order.user_id),
+                "product_id": str(order.product_id),
+                "product_name": order.product_name,
+                "amount": int(final),
+                "currency": order.currency,
+                "payment_expires_at": (
+                    order.payment_expires_at.isoformat() if order.payment_expires_at else None
+                ),
+            }
+            await self._outbox_repo.add(
+                OrderEventType.ORDER_CREATED,
+                json.dumps(payload, separators=(",", ":")),
+            )
+            await self._outbox_repo.add(
+                OrderEventType.PAYMENT_REQUESTED,
+                json.dumps(payload, separators=(",", ":")),
+            )
+            orders.append(order)
+
+        if promocode_id and self._promocode_service:
+            await self._promocode_service.record_usage(
+                promo_id=promocode_id,
+                user_id=data.lines[0].user_id,
+                order_id=orders[0].id,
+                discount_amount=Decimal(discount_units),
+            )
+
+        await self._session.commit()
+        for order in orders:
+            await self._session.refresh(order)
+        return BatchOrderResult(
+            checkout_id=checkout_id,
+            orders=orders,
+            original_amount=original_amount,
+            discount_amount=Decimal(discount_units),
+            final_amount=original_amount - Decimal(discount_units),
+        )
 
     async def confirm_payment(self, order_id: UUID, payment_id: UUID) -> OrderModel:
         """Confirm order after successful payment."""

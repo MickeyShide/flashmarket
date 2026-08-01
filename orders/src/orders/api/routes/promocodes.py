@@ -4,10 +4,6 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from decimal import Decimal
-from typing import Annotated
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, Query, status
 
 from orders.api.dependencies import AdminPrincipal, CurrentPrincipal, PromocodeServiceDep
@@ -133,4 +129,3 @@ async def validate_promocode(
             final_amount=data.order_amount,
             error=exc.public_message,
         )
-

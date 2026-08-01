@@ -48,6 +48,15 @@ class OrderModel(Base):
     )
     reservation_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     payment_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+    checkout_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+    variant_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    variant_sku: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    variant_size: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    variant_color: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    drop_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+    payment_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Promocode and discount fields
     original_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

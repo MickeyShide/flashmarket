@@ -7,6 +7,7 @@ import json
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from typing import Any
 
 import aio_pika
@@ -34,6 +35,11 @@ async def handle_payment_requested(
     user_id = uuid.UUID(str(payload["user_id"]))
     amount = int(payload["amount"])
     currency = str(payload.get("currency", "RUB"))
+    expires_at = (
+        datetime.fromisoformat(str(payload["payment_expires_at"]))
+        if payload.get("payment_expires_at")
+        else None
+    )
 
     payment_repo = PaymentRepository(session)
 
@@ -49,6 +55,7 @@ async def handle_payment_requested(
         currency=currency,
         provider="mock",
         status=PaymentStatus.PENDING,
+        expires_at=expires_at,
     )
     await payment_repo.create(payment)
     logger.info("Created payment %s for order %s", payment.id, order_id)

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import UTC
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from payments.application.schemas import CreatePaymentRequest
 from payments.domain.entities import PaymentEventType, PaymentStatus
 from payments.domain.exceptions import InvalidPaymentState, PaymentNotFound
+from payments.infrastructure.database import utc_now
 from payments.infrastructure.models import PaymentModel
 from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
 
@@ -40,6 +42,7 @@ class PaymentService:
             currency=data.currency,
             provider=data.provider,
             status=PaymentStatus.PENDING,
+            expires_at=data.expires_at,
         )
         await self._payment_repo.create(payment)
         await self._session.commit()
@@ -53,6 +56,12 @@ class PaymentService:
             raise PaymentNotFound
         if payment.status != PaymentStatus.PENDING:
             raise InvalidPaymentState("Payment is not pending")
+        expires_at = payment.expires_at
+        if expires_at is not None:
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if utc_now() >= expires_at:
+                raise InvalidPaymentState("Payment deadline has expired")
 
         payment.status = PaymentStatus.SUCCESS
         payment.external_id = uuid.uuid7().hex
