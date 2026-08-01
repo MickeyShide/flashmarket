@@ -116,16 +116,31 @@ def setup_metrics() -> None:
     """Initialize structured logging."""
     settings = get_settings()
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+    formatter = StructuredJsonFormatter()
 
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
-
-    for handler in list(root_logger.handlers):
-        root_logger.removeHandler(handler)
-
+    handlers: list[logging.Handler] = []
     stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(StructuredJsonFormatter())
-    root_logger.addHandler(stream_handler)
+    stream_handler.setFormatter(formatter)
+    handlers.append(stream_handler)
+
+    if settings.log_file_path:
+        from pathlib import Path
+
+        log_path = Path(settings.log_file_path)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_path, encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        handlers.append(file_handler)
+
+    root_logger.handlers.clear()
+    root_logger.handlers.extend(handlers)
+    for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+        logger = logging.getLogger(logger_name)
+        logger.handlers.clear()
+        logger.handlers.extend(handlers)
+        logger.propagate = False
 
 
 def _extract_route_template(request: Request) -> str:

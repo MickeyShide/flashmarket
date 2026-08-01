@@ -61,12 +61,32 @@ class StructuredJsonFormatter(logging.Formatter):
 
 
 def setup_observability() -> None:
+    settings = get_settings()
     root = logging.getLogger()
-    root.setLevel(getattr(logging, get_settings().log_level.upper(), logging.INFO))
+    root.setLevel(getattr(logging, settings.log_level.upper(), logging.INFO))
+    formatter = StructuredJsonFormatter()
+    handlers: list[logging.Handler] = []
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    handlers.append(stream_handler)
+
+    if settings.log_file_path:
+        from pathlib import Path
+
+        log_path = Path(settings.log_file_path)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_path, encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        handlers.append(file_handler)
+
     root.handlers.clear()
-    handler = logging.StreamHandler()
-    handler.setFormatter(StructuredJsonFormatter())
-    root.addHandler(handler)
+    root.handlers.extend(handlers)
+    for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+        logger = logging.getLogger(logger_name)
+        logger.handlers.clear()
+        logger.handlers.extend(handlers)
+        logger.propagate = False
 
 
 def _route(request: Request) -> str:

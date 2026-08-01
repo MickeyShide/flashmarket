@@ -192,6 +192,14 @@ services:
       file: gateway/docker-compose.yml
       service: nginx
 
+  gateway-exporter:
+    extends:
+      file: gateway/docker-compose.yml
+      service: nginx-exporter
+    depends_on: !override
+      gateway:
+        condition: service_started
+
   frontend:
     extends:
       file: frontend/docker-compose.yml

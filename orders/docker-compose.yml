@@ -9,8 +9,8 @@ x-orders-environment: &orders-environment
   ORDERS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/orders
   ORDERS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   ORDERS_CORS_ORIGINS: '["http://localhost:3000"]'
+  ORDERS_TRUSTED_HOSTS: '["localhost","127.0.0.1","orders","gateway"]'
   ORDERS_LOG_FILE_PATH: /var/log/shide/orders-api.log
-  ORDERS_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
   ORDERS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
   ORDERS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
   ORDERS_JWT_ALGORITHM: EdDSA

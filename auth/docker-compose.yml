@@ -16,7 +16,6 @@ x-auth-environment: &auth-environment
   AUTH_REFRESH_COOKIE_SECURE: 'false'
   AUTH_REFRESH_COOKIE_SAMESITE: 'lax'
   AUTH_LOG_FILE_PATH: /var/log/shide/auth-api.log
-  AUTH_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
   AUTH_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
 
 services:

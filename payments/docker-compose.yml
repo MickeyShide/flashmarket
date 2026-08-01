@@ -9,8 +9,8 @@ x-payments-environment: &payments-environment
   PAYMENTS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/payments
   PAYMENTS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   PAYMENTS_CORS_ORIGINS: '["http://localhost:3000"]'
+  PAYMENTS_TRUSTED_HOSTS: '["localhost","127.0.0.1","payments","gateway"]'
   PAYMENTS_LOG_FILE_PATH: /var/log/shide/payments-api.log
-  PAYMENTS_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
   PAYMENTS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
   PAYMENTS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
   PAYMENTS_JWT_ALGORITHM: EdDSA

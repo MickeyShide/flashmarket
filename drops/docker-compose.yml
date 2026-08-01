@@ -9,6 +9,7 @@ x-drops-environment: &drops-environment
   DROPS_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/drops
   DROPS_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   DROPS_CORS_ORIGINS: '["http://localhost:3000"]'
+  DROPS_TRUSTED_HOSTS: '["localhost","127.0.0.1","drops","gateway"]'
   DROPS_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
   DROPS_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
   DROPS_JWT_ALGORITHM: EdDSA
@@ -21,11 +22,14 @@ services:
     build:
       context: ..
       dockerfile: drops/Dockerfile
-    environment: *drops-environment
+    environment:
+      <<: *drops-environment
+      DROPS_LOG_FILE_PATH: /var/log/shide/drops-api.log
     ports:
       - "127.0.0.1:${DROPS_PORT:-4925}:8000"
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
+      - backend-logs-local:/var/log/shide
     healthcheck:
       test:
         - CMD
@@ -40,7 +44,11 @@ services:
 
   scheduler:
     <<: *drops-runtime
-    environment: *drops-environment
+    environment:
+      <<: *drops-environment
+      DROPS_LOG_FILE_PATH: /var/log/shide/drops-scheduler.log
+    volumes:
+      - backend-logs-local:/var/log/shide
     command:
       - consumer
       - drops.scheduler
@@ -48,7 +56,11 @@ services:
 
   outbox:
     <<: *drops-runtime
-    environment: *drops-environment
+    environment:
+      <<: *drops-environment
+      DROPS_LOG_FILE_PATH: /var/log/shide/drops-outbox.log
+    volumes:
+      - backend-logs-local:/var/log/shide
     command:
       - outbox
       - drops.outbox_worker
@@ -56,6 +68,9 @@ services:
 
 volumes:
   auth-jwt-keys-public:
+  backend-logs-local:
+    external: true
+    name: shide-backend-logs-local
 
 networks:
   default:

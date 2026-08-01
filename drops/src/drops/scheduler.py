@@ -8,6 +8,7 @@ from drops.domain.entities import DropEventType, DropStatus
 from drops.infrastructure.database import SessionFactory, utc_now
 from drops.infrastructure.models import OutboxEventModel
 from drops.infrastructure.repositories.drop import DropRepository
+from drops.observability import setup_metrics
 
 logger = logging.getLogger("drops.scheduler")
 
@@ -59,7 +60,7 @@ async def run_scheduler_tick(session_factory=None) -> None:
 
 async def main() -> None:
     """Scheduler main loop."""
-    logging.basicConfig(level=logging.INFO)
+    setup_metrics()
     logger.info("Starting drops scheduler loop...")
     while True:
         try:

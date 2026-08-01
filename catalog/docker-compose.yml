@@ -11,8 +11,8 @@ x-catalog-environment: &catalog-environment
   CATALOG_CATEGORY_CACHE_TTL_SECONDS: '60'
   CATALOG_REDIS_SOCKET_TIMEOUT_SECONDS: '0.2'
   CATALOG_CORS_ORIGINS: '["http://localhost:3000"]'
+  CATALOG_TRUSTED_HOSTS: '["localhost","127.0.0.1","catalog","gateway"]'
   CATALOG_LOG_FILE_PATH: /var/log/shide/catalog-api.log
-  CATALOG_PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
   CATALOG_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
   CATALOG_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
   CATALOG_JWT_ALGORITHM: EdDSA

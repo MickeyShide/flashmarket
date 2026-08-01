@@ -8,6 +8,8 @@ x-wishlist-environment: &wishlist-environment
   WISHLIST_ENVIRONMENT: development
   WISHLIST_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/wishlist
   WISHLIST_CORS_ORIGINS: '["http://localhost:3000"]'
+  WISHLIST_TRUSTED_HOSTS: '["localhost","127.0.0.1","wishlist","gateway"]'
+  WISHLIST_LOG_FILE_PATH: /var/log/shide/wishlist-api.log
   WISHLIST_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
   WISHLIST_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
   WISHLIST_JWT_ALGORITHM: EdDSA
@@ -25,6 +27,7 @@ services:
       - "127.0.0.1:${WISHLIST_PORT:-4924}:8000"
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
+      - backend-logs-local:/var/log/shide
     healthcheck:
       test:
         - CMD
@@ -39,6 +42,9 @@ services:
 
 volumes:
   auth-jwt-keys-public:
+  backend-logs-local:
+    external: true
+    name: shide-backend-logs-local
 
 networks:
   default:

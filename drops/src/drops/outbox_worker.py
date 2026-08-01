@@ -15,6 +15,7 @@ from drops.config import get_settings
 from drops.domain.entities import DropEventType
 from drops.infrastructure.database import SessionFactory, engine, utc_now
 from drops.infrastructure.models import OutboxEventModel
+from drops.observability import setup_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -137,10 +138,7 @@ async def run() -> None:
 
 def main() -> None:
     """Run this module as a command-line entry point."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+    setup_metrics()
     asyncio.run(run())
 
 

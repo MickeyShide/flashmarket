@@ -15,6 +15,7 @@ x-media-environment: &media-environment
   MEDIA_S3_REGION: ${MEDIA_S3_REGION:-us-east-1}
   MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-http://localhost:9000/flashmarket-public}
   MEDIA_CORS_ORIGINS: '["http://localhost:3000"]'
+  MEDIA_TRUSTED_HOSTS: '["localhost","127.0.0.1","media","gateway"]'
   MEDIA_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
   MEDIA_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
   MEDIA_JWT_ALGORITHM: EdDSA
@@ -27,11 +28,14 @@ services:
     build:
       context: ..
       dockerfile: media/Dockerfile
-    environment: *media-environment
+    environment:
+      <<: *media-environment
+      MEDIA_LOG_FILE_PATH: /var/log/shide/media-api.log
     ports:
       - "127.0.0.1:${MEDIA_PORT:-4926}:8000"
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
+      - backend-logs-local:/var/log/shide
     healthcheck:
       test:
         - CMD
@@ -49,14 +53,20 @@ services:
     build:
       context: ..
       dockerfile: media/Dockerfile
-    environment: *media-environment
+    environment:
+      <<: *media-environment
+      MEDIA_LOG_FILE_PATH: /var/log/shide/media-cleanup.log
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
+      - backend-logs-local:/var/log/shide
     command: ["cleanup", "python", "-m", "media_service.cleanup_worker"]
     restart: unless-stopped
 
 volumes:
   auth-jwt-keys-public:
+  backend-logs-local:
+    external: true
+    name: shide-backend-logs-local
 
 networks:
   default:
