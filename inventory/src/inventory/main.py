@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from inventory.api.error_handlers import inventory_error_handler
-from inventory.api.routes import health, internal, metrics, stock
+from inventory.api.routes import health, metrics, stock
 from inventory.config import get_settings
 from inventory.domain.exceptions import InventoryError
 from inventory.infrastructure.database import engine
@@ -18,9 +18,13 @@ from inventory.observability import (
 )
 
 
+from inventory.api.dependencies import get_verifier
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application-wide resources."""
+    get_verifier().validate_startup()
     yield
     await engine.dispose()
 
@@ -59,7 +63,6 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(metrics.router)
     app.include_router(stock.router)
-    app.include_router(internal.router)
 
     return app
 

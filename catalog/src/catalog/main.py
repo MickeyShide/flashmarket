@@ -12,7 +12,6 @@ from catalog.api.routes import (
     brands,
     categories,
     health,
-    internal,
     metrics,
     products,
     variants,
@@ -26,9 +25,13 @@ from catalog.observability import (
 )
 
 
+from catalog.api.dependencies import get_verifier
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application-wide resources."""
+    get_verifier().validate_startup()
     yield
     await engine.dispose()
 
@@ -70,7 +73,6 @@ def create_app() -> FastAPI:
     app.include_router(brands.router)
     app.include_router(products.router)
     app.include_router(variants.router)
-    app.include_router(internal.router)
 
     return app
 

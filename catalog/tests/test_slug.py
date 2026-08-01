@@ -1,13 +1,16 @@
 """Tests for automatic slug generation and uniqueness."""
 
+import uuid
+
 from httpx import AsyncClient
 
 
 async def _create_category(client: AsyncClient) -> str:
     """Create a category and return its id."""
+    slug = f"cat-{uuid.uuid4().hex[:8]}"
     resp = await client.post(
         "/api/v1/categories",
-        json={"name": "General", "slug": "general"},
+        json={"name": "General", "slug": slug},
     )
     assert resp.status_code == 201
     return resp.json()["id"]

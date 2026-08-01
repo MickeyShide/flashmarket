@@ -107,7 +107,7 @@ async def test_order_creation_with_promocode(client: AsyncClient) -> None:
         "promocode": "ORDERPROMO",
     }
 
-    response = await client.post("/api/v1/orders/", json=order_payload)
+    response = await client.post("/api/v1/orders", json=order_payload)
     assert response.status_code == 201
     data = response.json()
     assert data["user_id"] == str(user_id)

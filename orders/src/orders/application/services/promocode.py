@@ -1,6 +1,7 @@
 """Service for managing and applying promocodes."""
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -90,7 +91,9 @@ class PromocodeService:
             raise PromocodeDisabled()
 
         now = utc_now()
-        if now < promo.starts_at or now > promo.expires_at:
+        starts_at = promo.starts_at.replace(tzinfo=UTC) if promo.starts_at.tzinfo is None else promo.starts_at
+        expires_at = promo.expires_at.replace(tzinfo=UTC) if promo.expires_at.tzinfo is None else promo.expires_at
+        if now < starts_at or now > expires_at:
             raise PromocodeExpired()
 
         if promo.max_uses is not None and promo.current_uses >= promo.max_uses:

@@ -2,9 +2,13 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from notifications.api.dependencies import get_notification_service
+from notifications.api.dependencies import (
+    AdminPrincipal,
+    CurrentPrincipal,
+    get_notification_service,
+)
 from notifications.application.schemas import (
     CreateNotificationRequest,
     NotificationListParams,
@@ -29,6 +33,7 @@ def _notification_response(notification: NotificationModel) -> NotificationRespo
 )
 async def create_notification(
     data: CreateNotificationRequest,
+    admin: AdminPrincipal,
     service: NotificationService = Depends(get_notification_service),
 ) -> NotificationResponse:
     """Persist a notification to be delivered."""
@@ -43,10 +48,16 @@ async def create_notification(
 )
 async def get_notification(
     notification_id: UUID,
+    principal: CurrentPrincipal,
     service: NotificationService = Depends(get_notification_service),
 ) -> NotificationResponse:
     """Return a single notification by id."""
     notification = await service.get_notification(notification_id)
+    if principal.role != "ADMIN" and notification.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot view another user's notification",
+        )
     return _notification_response(notification)
 
 
@@ -57,10 +68,16 @@ async def get_notification(
 )
 async def list_notifications(
     user_id: UUID,
+    principal: CurrentPrincipal,
     params: NotificationListParams = Depends(),
     service: NotificationService = Depends(get_notification_service),
 ) -> NotificationListResponse:
     """Return paginated notifications for a user."""
+    if principal.role != "ADMIN" and user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot list another user's notifications",
+        )
     items, total = await service.list_user_notifications(
         user_id,
         limit=params.limit,
@@ -81,9 +98,16 @@ async def list_notifications(
 )
 async def send_notification(
     notification_id: UUID,
+    principal: CurrentPrincipal,
     service: NotificationService = Depends(get_notification_service),
 ) -> NotificationResponse:
     """Mark a notification as sent and emit an event."""
+    n = await service.get_notification(notification_id)
+    if principal.role != "ADMIN" and n.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot send notification belonging to another user",
+        )
     notification = await service.mark_sent(notification_id)
     return _notification_response(notification)
 
@@ -96,6 +120,7 @@ async def send_notification(
 async def fail_notification(
     notification_id: UUID,
     reason: str,
+    admin: AdminPrincipal,
     service: NotificationService = Depends(get_notification_service),
 ) -> NotificationResponse:
     """Mark a notification as failed."""

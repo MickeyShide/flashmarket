@@ -5,7 +5,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, status
 
-from catalog.api.dependencies import ProductServiceDep
+from catalog.api.dependencies import AdminPrincipal, ProductServiceDep
 from catalog.application.schemas import (
     CreateProductRequest,
     ErrorResponse,
@@ -14,6 +14,7 @@ from catalog.application.schemas import (
     ProductListResponse,
     ProductResponse,
     UpdateProductRequest,
+    VariantResponse,
 )
 from catalog.infrastructure.models import ProductModel
 
@@ -45,6 +46,10 @@ def _product_to_response(product: ProductModel) -> ProductResponse:
             ImageResponse(id=img.id, url=img.url, sort_order=img.sort_order)
             for img in product.images
         ],
+        variants=[
+            VariantResponse.model_validate(v)
+            for v in getattr(product, "variants", [])
+        ],
         created_at=product.created_at,
         updated_at=product.updated_at,
         published_at=product.published_at,
@@ -62,6 +67,7 @@ def _product_to_response(product: ProductModel) -> ProductResponse:
 async def create_product(
     data: CreateProductRequest,
     service: ProductServiceDep,
+    admin: AdminPrincipal,
 ) -> ProductResponse:
     """Validate, persist, and return a new product."""
     product = await service.create_product(data)
@@ -100,8 +106,12 @@ async def get_product(
     slug: str,
     service: ProductServiceDep,
 ) -> ProductResponse:
-    """Return an ACTIVE product by its slug."""
-    product = await service.get_by_slug(slug)
+    """Return an ACTIVE product by its slug or ID."""
+    try:
+        product_id = uuid.UUID(slug)
+        product = await service.get_by_id(product_id)
+    except ValueError:
+        product = await service.get_by_slug(slug)
     return _product_to_response(product)
 
 
@@ -116,6 +126,7 @@ async def update_product(
     product_id: uuid.UUID,
     data: UpdateProductRequest,
     service: ProductServiceDep,
+    admin: AdminPrincipal,
 ) -> ProductResponse:
     """Apply a partial update to an existing product."""
     product = await service.update_product(product_id, data)
@@ -132,6 +143,7 @@ async def update_product(
 async def archive_product(
     product_id: uuid.UUID,
     service: ProductServiceDep,
+    admin: AdminPrincipal,
 ) -> ProductResponse:
     """Soft-delete a product by archiving it."""
     product = await service.archive_product(product_id)

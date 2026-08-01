@@ -3,9 +3,9 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 
-from wishlist.api.dependencies import WishlistServiceDep
+from wishlist.api.dependencies import CurrentPrincipal, WishlistServiceDep
 from wishlist.application.schemas import (
     AddToWishlistRequest,
     CheckWishlistRequest,
@@ -28,8 +28,14 @@ async def add_item(
     user_id: UUID,
     data: AddToWishlistRequest,
     service: WishlistServiceDep,
+    principal: CurrentPrincipal,
 ) -> WishlistItemResponse:
     """Add a product to user's wishlist."""
+    if principal.role != "ADMIN" and user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot modify another user's wishlist",
+        )
     item = await service.add_item(user_id, data)
     return WishlistItemResponse.model_validate(item)
 
@@ -43,8 +49,14 @@ async def remove_item(
     user_id: UUID,
     product_id: UUID,
     service: WishlistServiceDep,
+    principal: CurrentPrincipal,
 ) -> None:
     """Remove a product from user's wishlist."""
+    if principal.role != "ADMIN" and user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot modify another user's wishlist",
+        )
     await service.remove_item(user_id, product_id)
 
 
@@ -58,8 +70,14 @@ async def list_items(
     user_id: UUID,
     params: Annotated[WishlistListParams, Query()],
     service: WishlistServiceDep,
+    principal: CurrentPrincipal,
 ) -> WishlistListResponse:
     """List wishlist items for user with pagination."""
+    if principal.role != "ADMIN" and user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot view another user's wishlist",
+        )
     page = await service.list_items(user_id, params)
     items_response = [WishlistItemResponse.model_validate(item) for item in page.items]
     return WishlistListResponse(
@@ -80,7 +98,13 @@ async def check_items(
     user_id: UUID,
     data: CheckWishlistRequest,
     service: WishlistServiceDep,
+    principal: CurrentPrincipal,
 ) -> WishlistCheckResponse:
     """Batch check which of given product IDs are in user's wishlist."""
+    if principal.role != "ADMIN" and user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot check another user's wishlist",
+        )
     found_ids = await service.check_items(user_id, data.product_ids)
     return WishlistCheckResponse(product_ids=list(found_ids))

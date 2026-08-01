@@ -1,11 +1,15 @@
 """Tests for product business logic via the HTTP API."""
 
+import uuid
+
 from httpx import AsyncClient
 
 
 async def _create_category(
-    client: AsyncClient, name: str = "Electronics", slug: str = "electronics"
+    client: AsyncClient, name: str = "Electronics", slug: str | None = None
 ) -> str:
+    if slug is None:
+        slug = f"cat-{uuid.uuid4().hex[:8]}"
     resp = await client.post(
         "/api/v1/categories",
         json={"name": name, "slug": slug},

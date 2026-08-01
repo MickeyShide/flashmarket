@@ -138,7 +138,7 @@ class OrderService:
         if order.status != OrderStatus.AWAITING_PAYMENT:
             raise InvalidOrderState("Order is not awaiting payment")
 
-        order.status = OrderStatus.PAYMENT_FAILED
+        order.status = OrderStatus.CANCELLED
         order.payment_id = payment_id
         await self._order_repo.update(order)
 
@@ -202,4 +202,6 @@ class OrderService:
         self, user_id: UUID, limit: int = 20, offset: int = 0
     ) -> tuple[list[OrderModel], int]:
         """Fetch paginated orders for a given user."""
-        return await self._order_repo.list_user_orders(user_id, limit, offset)
+        items = list(await self._order_repo.list_by_user(user_id, limit=limit, offset=offset))
+        total = await self._order_repo.count_by_user(user_id)
+        return items, total

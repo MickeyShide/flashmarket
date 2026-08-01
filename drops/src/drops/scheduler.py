@@ -12,10 +12,11 @@ from drops.infrastructure.repositories.drop import DropRepository
 logger = logging.getLogger("drops.scheduler")
 
 
-async def run_scheduler_tick() -> None:
+async def run_scheduler_tick(session_factory=None) -> None:
     """Perform one iteration of drop state checks."""
+    factory = session_factory or SessionFactory
     now = utc_now()
-    async with SessionFactory() as session, session.begin():
+    async with factory() as session, session.begin():
         repo = DropRepository(session)
 
         # 1. Start due SCHEDULED drops

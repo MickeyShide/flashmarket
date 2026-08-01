@@ -12,6 +12,7 @@ WORKDIR /app
 
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
+COPY shared/jwt_verifier /shared/jwt_verifier
 COPY catalog/pyproject.toml catalog/uv.lock catalog/README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 

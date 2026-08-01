@@ -1,5 +1,6 @@
 import socket
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit, urlunsplit
 
@@ -42,6 +43,10 @@ class Settings(BaseSettings):
     trusted_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
     cors_origins: list[str] = Field(default_factory=list)
     allow_insecure_internal_services: bool = False
+    jwt_public_key_dir: Path = Path("keys/public")
+    jwt_algorithm: str = "EdDSA"
+    jwt_issuer: str = "flashmarket-auth"
+    jwt_audience: str = "flashmarket-api"
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":

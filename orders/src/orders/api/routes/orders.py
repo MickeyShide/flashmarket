@@ -2,9 +2,9 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from orders.api.dependencies import get_order_service
+from orders.api.dependencies import CurrentPrincipal, get_order_service
 from orders.application.schemas import (
     CreateOrderRequest,
     OrderListParams,
@@ -29,9 +29,15 @@ def _order_response(order: OrderModel) -> OrderResponse:
 )
 async def create_order(
     data: CreateOrderRequest,
+    principal: CurrentPrincipal,
     service: OrderService = Depends(get_order_service),
 ) -> OrderResponse:
     """Create an order after stock has been reserved."""
+    if principal.role != "ADMIN" and data.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot create order for another user",
+        )
     order = await service.create_order(data)
     return _order_response(order)
 
@@ -43,10 +49,16 @@ async def create_order(
 )
 async def get_order(
     order_id: UUID,
+    principal: CurrentPrincipal,
     service: OrderService = Depends(get_order_service),
 ) -> OrderResponse:
     """Return a single order by id."""
-    order = await service.get_order(order_id)
+    order = await service.get_by_id(order_id)
+    if principal.role != "ADMIN" and order.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot view another user's order",
+        )
     return _order_response(order)
 
 
@@ -57,10 +69,16 @@ async def get_order(
 )
 async def list_orders(
     user_id: UUID,
+    principal: CurrentPrincipal,
     params: OrderListParams = Depends(),
     service: OrderService = Depends(get_order_service),
 ) -> OrderListResponse:
     """Return paginated orders for a user."""
+    if principal.role != "ADMIN" and user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot list another user's orders",
+        )
     items, total = await service.list_user_orders(
         user_id,
         limit=params.limit,
@@ -82,9 +100,16 @@ async def list_orders(
 async def confirm_order(
     order_id: UUID,
     payment_id: UUID,
+    principal: CurrentPrincipal,
     service: OrderService = Depends(get_order_service),
 ) -> OrderResponse:
     """Confirm an order after a successful payment."""
+    order_obj = await service.get_by_id(order_id)
+    if principal.role != "ADMIN" and order_obj.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot confirm another user's order",
+        )
     order = await service.confirm_payment(order_id, payment_id)
     return _order_response(order)
 
@@ -97,8 +122,15 @@ async def confirm_order(
 async def fail_order(
     order_id: UUID,
     payment_id: UUID,
+    principal: CurrentPrincipal,
     service: OrderService = Depends(get_order_service),
 ) -> OrderResponse:
     """Mark an order as cancelled after a failed payment."""
+    order_obj = await service.get_by_id(order_id)
+    if principal.role != "ADMIN" and order_obj.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot fail another user's order",
+        )
     order = await service.fail_payment(order_id, payment_id)
     return _order_response(order)

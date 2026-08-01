@@ -3,9 +3,9 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
-from catalog.api.dependencies import BrandServiceDep
+from catalog.api.dependencies import AdminPrincipal, BrandServiceDep
 from catalog.application.schemas import (
     BrandResponse,
     CreateBrandRequest,
@@ -44,6 +44,7 @@ def _brand_to_response(brand: BrandModel) -> BrandResponse:
 async def create_brand(
     data: CreateBrandRequest,
     service: BrandServiceDep,
+    admin: AdminPrincipal,
 ) -> BrandResponse:
     """Create a new brand."""
     brand = await service.create_brand(data)

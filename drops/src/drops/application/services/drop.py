@@ -65,7 +65,9 @@ class DropService:
             await self._session.rollback()
             raise DuplicateDropSlug() from exc
 
-        return drop
+        fetched = await self._repo.get_by_id(drop.id)
+        assert fetched is not None
+        return fetched
 
     async def update_drop(self, drop_id: UUID, data: UpdateDropRequest) -> DropModel:
         """Update fields of an existing drop."""
@@ -107,7 +109,9 @@ class DropService:
             await self._session.rollback()
             raise DuplicateDropSlug() from exc
 
-        return drop
+        fetched = await self._repo.get_by_id(drop.id)
+        assert fetched is not None
+        return fetched
 
     async def schedule_drop(self, drop_id: UUID) -> DropModel:
         """Transition drop from DRAFT to SCHEDULED."""

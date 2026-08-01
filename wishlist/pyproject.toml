@@ -8,10 +8,15 @@ dependencies = [
     "alembic>=1.18,<2",
     "asyncpg>=0.31,<1",
     "fastapi>=0.140,<1",
+    "prometheus-client>=0.26,<1",
     "pydantic-settings>=2.14,<3",
     "sqlalchemy>=2.0,<3",
     "uvicorn[standard]>=0.51,<1",
+    "jwt_verifier",
 ]
+
+[tool.uv.sources]
+jwt_verifier = { path = "../shared/jwt_verifier" }
 
 [dependency-groups]
 dev = [

@@ -18,9 +18,13 @@ from wishlist.observability import (
 )
 
 
+from wishlist.api.dependencies import get_verifier
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application-wide resources."""
+    get_verifier().validate_startup()
     yield
     await engine.dispose()
 

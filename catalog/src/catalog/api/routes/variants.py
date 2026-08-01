@@ -2,9 +2,9 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
-from catalog.api.dependencies import VariantServiceDep
+from catalog.api.dependencies import AdminPrincipal, VariantServiceDep
 from catalog.application.schemas import (
     CreateVariantRequest,
     UpdateVariantRequest,
@@ -24,6 +24,7 @@ async def create_variant(
     product_id: UUID,
     data: CreateVariantRequest,
     service: VariantServiceDep,
+    admin: AdminPrincipal,
 ) -> VariantResponse:
     """Create a new variant option for a product."""
     variant = await service.create_variant(product_id, data)
@@ -57,8 +58,7 @@ async def get_variant(
     service: VariantServiceDep,
 ) -> VariantResponse:
     """Get variant details by ID."""
-    del product_id  # handled implicitly by DB query
-    variant = await service.get_by_id(variant_id)
+    variant = await service.get_by_id(variant_id, product_id=product_id)
     return VariantResponse.model_validate(variant)
 
 
@@ -73,10 +73,10 @@ async def update_variant(
     variant_id: UUID,
     data: UpdateVariantRequest,
     service: VariantServiceDep,
+    admin: AdminPrincipal,
 ) -> VariantResponse:
     """Update fields of a variant."""
-    del product_id
-    variant = await service.update_variant(variant_id, data)
+    variant = await service.update_variant(variant_id, data, product_id=product_id)
     return VariantResponse.model_validate(variant)
 
 
@@ -89,7 +89,7 @@ async def delete_variant(
     product_id: UUID,
     variant_id: UUID,
     service: VariantServiceDep,
+    admin: AdminPrincipal,
 ) -> None:
     """Delete a variant option."""
-    del product_id
-    await service.delete_variant(variant_id)
+    await service.delete_variant(variant_id, product_id=product_id)

@@ -14,8 +14,22 @@ from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("DROPS_ENVIRONMENT", "test")
 
+from pathlib import Path
+
+from drops.api.dependencies import get_verifier
+from drops.config import get_settings
 from drops.infrastructure.database import Base, get_db  # noqa: E402
 from drops.main import app  # noqa: E402
+from jwt_verifier.testing import TestKeyStore
+
+
+@pytest.fixture(autouse=True)
+def jwt_keystore(tmp_path: Path) -> TestKeyStore:
+    keystore = TestKeyStore(tmp_path / "keys" / "public")
+    settings = get_settings()
+    settings.jwt_public_key_dir = keystore.key_dir
+    get_verifier.cache_clear()
+    return keystore
 
 
 @pytest.fixture
@@ -46,9 +60,12 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
 @pytest.fixture
 async def client(
     session_factory: async_sessionmaker[AsyncSession],
+    jwt_keystore: TestKeyStore,
 ) -> AsyncIterator[AsyncClient]:
-    """Provide an async HTTP client wired to the test app."""
+    """Provide an async HTTP client wired to the test app with admin auth header."""
     del session_factory
+    admin_token = jwt_keystore.create_token(role="ADMIN")
+    headers = {"Authorization": f"Bearer {admin_token}"}
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as test_client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as test_client:
         yield test_client

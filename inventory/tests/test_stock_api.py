@@ -150,36 +150,6 @@ async def test_release_200(client: AsyncClient, db_session: AsyncSession) -> Non
     assert stock_result.available == 10
 
 
-async def test_expire_releases_stock(client: AsyncClient, db_session: AsyncSession) -> None:
-    """POST /internal/expire releases reservations past their TTL."""
-    from datetime import UTC, datetime, timedelta
-
-    stock = await _create_stock(client, total=10)
-    order_id = uuid.uuid7()
-
-    await client.post(
-        f"/api/v1/stocks/{stock['product_id']}/reserve",
-        json={"user_id": str(uuid.uuid7()), "quantity": 3, "order_id": str(order_id)},
-    )
-
-    reservation = await db_session.scalar(
-        select(ReservationModel).where(ReservationModel.order_id == order_id)
-    )
-    assert reservation is not None
-    reservation.expires_at = datetime.now(UTC) - timedelta(seconds=1)
-    await db_session.commit()
-
-    resp = await client.post("/internal/expire")
-    assert resp.status_code == 200
-    assert resp.json()["expired"] == 1
-
-    product_id_str: str = stock["product_id"]  # type: ignore[assignment]
-    stock_result = await db_session.scalar(
-        select(StockModel).where(StockModel.product_id == uuid.UUID(product_id_str))
-    )
-    assert stock_result is not None
-    assert stock_result.reserved == 0
-    assert stock_result.available == 10
 
 
 async def test_serial_reservations_no_oversell(

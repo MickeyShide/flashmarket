@@ -4,9 +4,13 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from decimal import Decimal
+from typing import Annotated
+from uuid import UUID
 
-from orders.api.dependencies import PromocodeServiceDep
+from fastapi import APIRouter, HTTPException, Query, status
+
+from orders.api.dependencies import AdminPrincipal, CurrentPrincipal, PromocodeServiceDep
 from orders.application.schemas import (
     CreatePromocodeRequest,
     PromocodeListParams,
@@ -30,6 +34,7 @@ router = APIRouter(prefix="/api/v1/promocodes", tags=["promocodes"])
 async def create_promocode(
     data: CreatePromocodeRequest,
     service: PromocodeServiceDep,
+    admin: AdminPrincipal,
 ) -> PromocodeResponse:
     """Create a new promocode definition."""
     promo = await service.create_promocode(data)
@@ -45,6 +50,7 @@ async def create_promocode(
 async def list_promocodes(
     params: Annotated[PromocodeListParams, Query()],
     service: PromocodeServiceDep,
+    admin: AdminPrincipal,
 ) -> PromocodeListResponse:
     """List all promocodes with pagination."""
     page = await service.list_promocodes(params.limit, params.offset)
@@ -66,6 +72,7 @@ async def list_promocodes(
 async def get_promocode(
     promo_id: UUID,
     service: PromocodeServiceDep,
+    admin: AdminPrincipal,
 ) -> PromocodeResponse:
     """Get details of a specific promocode."""
     promo = await service.get_by_id(promo_id)
@@ -82,6 +89,7 @@ async def update_promocode(
     promo_id: UUID,
     data: UpdatePromocodeRequest,
     service: PromocodeServiceDep,
+    admin: AdminPrincipal,
 ) -> PromocodeResponse:
     """Update fields of an existing promocode."""
     promo = await service.update_promocode(promo_id, data)
@@ -92,13 +100,19 @@ async def update_promocode(
     "/validate",
     response_model=PromocodeValidationResponse,
     status_code=status.HTTP_200_OK,
-    summary="Validate promocode (Public)",
+    summary="Validate promocode (Authenticated user)",
 )
 async def validate_promocode(
     data: ValidatePromocodeRequest,
     service: PromocodeServiceDep,
+    principal: CurrentPrincipal,
 ) -> PromocodeValidationResponse:
     """Validate whether a promocode is applicable to an order amount for a user."""
+    if principal.role != "ADMIN" and data.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot validate promocode for another user",
+        )
     try:
         res = await service.validate_and_apply(
             code=data.code,
@@ -119,3 +133,4 @@ async def validate_promocode(
             final_amount=data.order_amount,
             error=exc.public_message,
         )
+

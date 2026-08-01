@@ -12,6 +12,7 @@ WORKDIR /app
 
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
+COPY shared/jwt_verifier /shared/jwt_verifier
 COPY inventory/pyproject.toml inventory/uv.lock inventory/README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 

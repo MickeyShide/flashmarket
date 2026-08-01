@@ -5,21 +5,26 @@ from httpx import AsyncClient
 import pytest
 
 
+import uuid
+
+
 async def _setup_category_and_product(client: AsyncClient):
     cat_res = await client.post(
-        "/api/v1/categories/",
-        json={"name": "Shoes", "slug": "shoes"},
+        "/api/v1/categories",
+        json={"name": "Shoes", "slug": f"shoes-{uuid.uuid4().hex[:8]}"},
     )
+    assert cat_res.status_code == 201
     cat_id = cat_res.json()["id"]
 
     prod_res = await client.post(
-        "/api/v1/products/",
+        "/api/v1/products",
         json={
             "name": "Sneakers",
             "price": 10000,
             "category_id": cat_id,
         },
     )
+    assert prod_res.status_code == 201
     return prod_res.json()["id"]
 
 

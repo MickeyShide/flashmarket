@@ -18,9 +18,13 @@ from payments.observability import (
 )
 
 
+from payments.api.dependencies import get_verifier
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application-wide resources."""
+    get_verifier().validate_startup()
     yield
     await engine.dispose()
 

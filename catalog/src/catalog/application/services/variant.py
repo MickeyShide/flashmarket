@@ -100,12 +100,14 @@ class VariantService:
             await self._session.rollback()
             raise DuplicateSKU() from exc
 
-        return variant
+        return await self._repo.get_by_id(variant.id)
 
-    async def get_by_id(self, variant_id: UUID) -> ProductVariantModel:
-        """Fetch variant by ID."""
+    async def get_by_id(
+        self, variant_id: UUID, product_id: UUID | None = None
+    ) -> ProductVariantModel:
+        """Fetch variant by ID, checking product ownership if provided."""
         variant = await self._repo.get_by_id(variant_id)
-        if not variant:
+        if not variant or (product_id is not None and variant.product_id != product_id):
             raise VariantNotFound()
         return variant
 
@@ -117,12 +119,13 @@ class VariantService:
         return await self._repo.list_by_product(product_id)
 
     async def update_variant(
-        self, variant_id: UUID, data: UpdateVariantRequest
+        self,
+        variant_id: UUID,
+        data: UpdateVariantRequest,
+        product_id: UUID | None = None,
     ) -> ProductVariantModel:
         """Update fields of an existing variant."""
-        variant = await self._repo.get_by_id(variant_id)
-        if not variant:
-            raise VariantNotFound()
+        variant = await self.get_by_id(variant_id, product_id=product_id)
 
         if data.sku is not None and data.sku.strip().upper() != variant.sku:
             new_sku = data.sku.strip().upper()
@@ -154,11 +157,14 @@ class VariantService:
             await self._session.rollback()
             raise DuplicateSKU() from exc
 
-        return variant
+        return await self._repo.get_by_id(variant.id)
 
-    async def delete_variant(self, variant_id: UUID) -> None:
+    async def delete_variant(
+        self, variant_id: UUID, product_id: UUID | None = None
+    ) -> None:
         """Delete a variant by ID."""
-        deleted = await self._repo.delete(variant_id)
+        variant = await self.get_by_id(variant_id, product_id=product_id)
+        deleted = await self._repo.delete(variant.id)
         if not deleted:
             raise VariantNotFound()
         await self._session.commit()

@@ -3,9 +3,9 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
-from drops.api.dependencies import DropServiceDep
+from drops.api.dependencies import DropServiceDep, require_admin
 from drops.application.schemas import (
     AddDropItemRequest,
     CreateDropRequest,
@@ -16,7 +16,11 @@ from drops.application.schemas import (
     UpdateDropRequest,
 )
 
-router = APIRouter(prefix="/api/v1/admin/drops", tags=["admin-drops"])
+router = APIRouter(
+    prefix="/api/v1/admin/drops",
+    tags=["admin-drops"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 @router.post(

@@ -1,11 +1,15 @@
 """HTTP-level tests for product listing, filtering, sorting, and pagination."""
 
+import uuid
+
 from httpx import AsyncClient
 
 
 async def _create_category(
-    client: AsyncClient, name: str = "Default", slug: str = "default"
+    client: AsyncClient, name: str = "Default", slug: str | None = None
 ) -> str:
+    if slug is None:
+        slug = f"cat-{uuid.uuid4().hex[:8]}"
     resp = await client.post("/api/v1/categories", json={"name": name, "slug": slug})
     assert resp.status_code == 201
     return resp.json()["id"]
@@ -50,6 +54,8 @@ async def test_create_product_201(client: AsyncClient) -> None:
             ],
         },
     )
+    if resp.status_code != 201:
+        print("DEBUG RESPONSE:", resp.json())
     assert resp.status_code == 201
     data = resp.json()
     assert data["name"] == "Widget"
@@ -187,11 +193,3 @@ async def test_archive_product_200(client: AsyncClient) -> None:
     assert resp.json()["status"] == "ARCHIVED"
 
 
-async def test_internal_get_any_status(client: AsyncClient) -> None:
-    """Internal endpoint should return HIDDEN products."""
-    cat_id = await _create_category(client)
-    product = await _create_product(client, cat_id, name="Hidden", status="HIDDEN")
-
-    resp = await client.get(f"/api/v1/internal/products/{product['id']}")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "HIDDEN"

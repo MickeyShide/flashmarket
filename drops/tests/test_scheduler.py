@@ -40,7 +40,7 @@ async def test_scheduler_starts_and_ends_drops(
         session.add(due_to_end_drop)
 
     # Run scheduler tick
-    await run_scheduler_tick()
+    await run_scheduler_tick(session_factory)
 
     # Verify states and outbox events
     async with session_factory() as session:

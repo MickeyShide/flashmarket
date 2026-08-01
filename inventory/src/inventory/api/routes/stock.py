@@ -2,9 +2,13 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from inventory.api.dependencies import InventoryServiceDep
+from inventory.api.dependencies import (
+    AdminPrincipal,
+    CurrentPrincipal,
+    InventoryServiceDep,
+)
 from inventory.application.schemas import (
     CommitRequest,
     ReleaseRequest,
@@ -37,6 +41,7 @@ def _reservation_response(reservation: ReservationModel) -> ReservationResponse:
 async def create_stock(
     data: StockCreateRequest,
     service: InventoryServiceDep,
+    admin: AdminPrincipal,
 ) -> StockResponse:
     """Initialize stock for a product."""
     stock = await service.create_stock(data)
@@ -67,6 +72,7 @@ async def update_stock(
     product_id: UUID,
     data: StockUpdateRequest,
     service: InventoryServiceDep,
+    admin: AdminPrincipal,
     variant_id: UUID | None = None,
 ) -> StockResponse:
     """Adjust the total stock of a product or variant."""
@@ -84,8 +90,14 @@ async def reserve(
     product_id: UUID,
     data: ReserveRequest,
     service: InventoryServiceDep,
+    principal: CurrentPrincipal,
 ) -> ReservationResult:
     """Reserve one or more units for a user."""
+    if principal.role != "ADMIN" and data.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot reserve stock for another user",
+        )
     reservation = await service.reserve(product_id, data)
     stock = await service.get_stock(product_id, data.variant_id)
     return ReservationResult(
@@ -103,6 +115,7 @@ async def commit(
     product_id: UUID,
     data: CommitRequest,
     service: InventoryServiceDep,
+    admin: AdminPrincipal,
 ) -> ReservationResponse:
     """Convert an active reservation into a confirmed sale."""
     reservation = await service.commit(product_id, data)
@@ -118,7 +131,15 @@ async def release(
     product_id: UUID,
     data: ReleaseRequest,
     service: InventoryServiceDep,
+    principal: CurrentPrincipal,
 ) -> ReservationResponse:
     """Manually release an active reservation."""
+    if principal.role != "ADMIN":
+        res = await service._reservation_repo.get_by_order_id(data.order_id)
+        if res is not None and res.user_id != principal.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot release reservation belonging to another user",
+            )
     reservation = await service.release(product_id, data)
     return _reservation_response(reservation)

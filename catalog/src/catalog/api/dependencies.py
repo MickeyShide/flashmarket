@@ -8,12 +8,36 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from catalog.application.services.brand import BrandService
 from catalog.application.services.category import CategoryService
 from catalog.application.services.product import ProductService
+from catalog.application.services.variant import VariantService
 from catalog.infrastructure.database import get_db
 from catalog.infrastructure.repositories.brand import BrandRepository
 from catalog.infrastructure.repositories.category import CategoryRepository
 from catalog.infrastructure.repositories.product import ProductRepository
+from catalog.infrastructure.repositories.variant import VariantRepository
+
+from functools import lru_cache
+from jwt_verifier import JWTVerifier, Principal, create_auth_dependencies
+from catalog.config import get_settings
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
+
+
+@lru_cache
+def get_verifier() -> JWTVerifier:
+    settings = get_settings()
+    return JWTVerifier(
+        public_key_dir=settings.jwt_public_key_dir,
+        algorithm=settings.jwt_algorithm,
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+    )
+
+
+get_optional_principal, get_current_principal, require_admin = create_auth_dependencies(get_verifier)
+
+OptionalPrincipal = Annotated[Principal | None, Depends(get_optional_principal)]
+CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]
+AdminPrincipal = Annotated[Principal, Depends(require_admin)]
 
 
 def get_product_service(db: DbSession) -> ProductService:

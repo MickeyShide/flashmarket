@@ -2,9 +2,9 @@
 
 from typing import Any
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
-from catalog.api.dependencies import CategoryServiceDep
+from catalog.api.dependencies import AdminPrincipal, CategoryServiceDep
 from catalog.application.schemas import (
     CategoryResponse,
     CategoryTreeNode,
@@ -32,6 +32,7 @@ ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
 async def create_category(
     data: CreateCategoryRequest,
     service: CategoryServiceDep,
+    admin: AdminPrincipal,
 ) -> CategoryResponse:
     """Persist a new category and return its representation."""
     category = await service.create_category(data)

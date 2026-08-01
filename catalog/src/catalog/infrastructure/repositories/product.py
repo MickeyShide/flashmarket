@@ -11,7 +11,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from catalog.domain.entities import ProductStatus
-from catalog.infrastructure.models import ProductImageModel, ProductModel
+from catalog.infrastructure.models import BrandModel, ProductImageModel, ProductModel
 from catalog.infrastructure.search import (
     product_search_condition,
     product_search_rank,
@@ -63,6 +63,7 @@ class ProductRepository:
         """Return standard eager-load options to avoid N+1."""
         return [
             selectinload(ProductModel.images),
+            selectinload(ProductModel.variants),
             joinedload(ProductModel.category),
             joinedload(ProductModel.brand),
         ]
@@ -115,6 +116,8 @@ class ProductRepository:
             filters.append(ProductModel.category_id == query.category_id)
         if query.brand_id is not None:
             filters.append(ProductModel.brand_id == query.brand_id)
+        if query.brand_slug is not None:
+            filters.append(ProductModel.brand.has(BrandModel.slug == query.brand_slug))
         if query.status is not None:
             filters.append(ProductModel.status == query.status)
         if query.price_from is not None:

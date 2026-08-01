@@ -1,6 +1,7 @@
 import socket
 from datetime import UTC, datetime
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit, urlunsplit
 
@@ -53,6 +54,10 @@ class Settings(BaseSettings):
     allow_insecure_internal_services: bool = False
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
+    jwt_public_key_dir: Path = Path("keys/public")
+    jwt_algorithm: str = "EdDSA"
+    jwt_issuer: str = "flashmarket-auth"
+    jwt_audience: str = "flashmarket-api"
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
