@@ -132,8 +132,8 @@ must fail the build; stale or mock artifacts are not used as fallback.
 
 ## Access metadata
 
-OpenAPI security describes authentication but not application roles. Public
-operations therefore use a small FlashMarket extension:
+OpenAPI security describes authentication but not application roles. The
+exporter therefore writes a small FlashMarket extension on every operation:
 
 ```python
 openapi_extra={"x-flashmarket-access": "admin"}
@@ -145,11 +145,13 @@ Supported values are:
 - `authenticated` — runnable by any authenticated user;
 - `admin` — runnable only when the current profile role is `ADMIN`.
 
-Admin access is declared beside the FastAPI route rather than in a separate
-frontend permission list. Existing admin-only routes are annotated during the
-implementation. New routes must declare the correct access level as part of
-their API contract. The generator rejects an operation whose access cannot be
-classified safely.
+The exporter infers the value from the project's standard FastAPI dependencies:
+`require_admin`, `get_current_principal`, and optional/no principal. A route may
+set `openapi_extra` explicitly when its access policy cannot be represented by
+those shared dependencies. This avoids a separate frontend permission list and
+keeps new conventional routes automatic. The generator rejects an operation
+whose access cannot be classified safely, and rejects an `/admin` path that
+does not use the admin dependency.
 
 The extension controls the developer-hub affordance only. FastAPI dependencies
 and business authorization remain authoritative and must reject unauthorized

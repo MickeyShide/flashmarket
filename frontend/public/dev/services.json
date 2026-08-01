@@ -1,0 +1,183 @@
+{
+  "openapi": "3.1.0",
+  "operationCount": 98,
+  "serviceCount": 9,
+  "services": [
+    {
+      "accessLevels": [
+        "admin",
+        "anonymous",
+        "authenticated"
+      ],
+      "id": "auth",
+      "name": "Auth",
+      "operationCount": 31,
+      "prefixes": [
+        "/auth",
+        "/admin",
+        "/users",
+        "/sessions",
+        "/.well-known",
+        "/api/v1/auth",
+        "/api/v1/admin",
+        "/api/v1/users",
+        "/api/v1/sessions"
+      ],
+      "statusUrl": "/dev/status/auth",
+      "tags": [
+        "admin",
+        "auth",
+        "sessions",
+        "users",
+        "well-known"
+      ],
+      "title": "FlashMarket Auth"
+    },
+    {
+      "accessLevels": [
+        "admin",
+        "anonymous"
+      ],
+      "id": "catalog",
+      "name": "Catalog",
+      "operationCount": 15,
+      "prefixes": [
+        "/api/v1/brands",
+        "/api/v1/products",
+        "/api/v1/categories"
+      ],
+      "statusUrl": "/dev/status/catalog",
+      "tags": [
+        "brands",
+        "categories",
+        "products",
+        "variants"
+      ],
+      "title": "FlashMarket Catalog"
+    },
+    {
+      "accessLevels": [
+        "admin",
+        "anonymous"
+      ],
+      "id": "drops",
+      "name": "Drops",
+      "operationCount": 13,
+      "prefixes": [
+        "/api/v1/drops",
+        "/api/v1/admin/drops"
+      ],
+      "statusUrl": "/dev/status/drops",
+      "tags": [
+        "admin-drops",
+        "drops"
+      ],
+      "title": "FlashMarket Drops"
+    },
+    {
+      "accessLevels": [
+        "admin",
+        "anonymous",
+        "authenticated"
+      ],
+      "id": "inventory",
+      "name": "Inventory",
+      "operationCount": 6,
+      "prefixes": [
+        "/api/v1/stocks"
+      ],
+      "statusUrl": "/dev/status/inventory",
+      "tags": [
+        "stocks"
+      ],
+      "title": "FlashMarket Inventory"
+    },
+    {
+      "accessLevels": [
+        "admin",
+        "anonymous",
+        "authenticated"
+      ],
+      "id": "media",
+      "name": "Media",
+      "operationCount": 8,
+      "prefixes": [
+        "/api/v1/media"
+      ],
+      "statusUrl": "/dev/status/media",
+      "tags": [
+        "media"
+      ],
+      "title": "FlashMarket Media"
+    },
+    {
+      "accessLevels": [
+        "admin",
+        "authenticated"
+      ],
+      "id": "notifications",
+      "name": "Notifications",
+      "operationCount": 5,
+      "prefixes": [
+        "/api/v1/notifications"
+      ],
+      "statusUrl": "/dev/status/notifications",
+      "tags": [
+        "notifications"
+      ],
+      "title": "FlashMarket Notifications"
+    },
+    {
+      "accessLevels": [
+        "admin",
+        "authenticated"
+      ],
+      "id": "orders",
+      "name": "Orders",
+      "operationCount": 10,
+      "prefixes": [
+        "/api/v1/orders",
+        "/api/v1/promocodes"
+      ],
+      "statusUrl": "/dev/status/orders",
+      "tags": [
+        "orders",
+        "promocodes"
+      ],
+      "title": "FlashMarket Orders"
+    },
+    {
+      "accessLevels": [
+        "authenticated"
+      ],
+      "id": "payments",
+      "name": "Payments",
+      "operationCount": 6,
+      "prefixes": [
+        "/api/v1/payments"
+      ],
+      "statusUrl": "/dev/status/payments",
+      "tags": [
+        "payments"
+      ],
+      "title": "FlashMarket Payments"
+    },
+    {
+      "accessLevels": [
+        "authenticated"
+      ],
+      "id": "wishlist",
+      "name": "Wishlist",
+      "operationCount": 4,
+      "prefixes": [
+        "/api/v1/wishlist"
+      ],
+      "statusUrl": "/dev/status/wishlist",
+      "tags": [
+        "wishlist"
+      ],
+      "title": "FlashMarket Wishlist"
+    }
+  ],
+  "version": "1.0.0"
+}

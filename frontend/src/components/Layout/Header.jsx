@@ -132,6 +132,21 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
             )}
           </button>
 
+          {/* Developer Hub Link Button */}
+          <button
+            onClick={() => {
+              setCurrentView('dev');
+              if (window.location.pathname !== '/dev') {
+                window.history.pushState({}, '', '/dev');
+              }
+            }}
+            className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider bg-black text-[#BFF532] hover:bg-zinc-800 rounded transition-colors flex items-center gap-1 border border-black cursor-pointer"
+            title="Developer Hub API Explorer (/dev)"
+          >
+            <span>DEV</span>
+            <span className="hidden md:inline">HUB</span>
+          </button>
+
           {/* Cart Icon Button */}
           <button
             className="p-[4px] flex items-center justify-center cursor-pointer relative"

@@ -24,7 +24,7 @@ export async function api(path, options = {}, tokenOverride = null) {
   let res = await fetch(path, { ...options, headers, credentials: 'include' });
 
   // Task 8: Transparent Refresh Token on 401
-  if (res.status === 401 && !path.includes('/auth/login') && !path.includes('/auth/refresh')) {
+  if (res.status === 401 && token && !path.includes('/auth/login') && !path.includes('/auth/refresh')) {
     if (!isRefreshingToken) {
       isRefreshingToken = true;
       try {

@@ -8,6 +8,35 @@ on:
     paths:
       - frontend/**
       - gateway/**
+      - tools/openapi/**
+      - auth/src/**
+      - auth/pyproject.toml
+      - auth/uv.lock
+      - catalog/src/**
+      - catalog/pyproject.toml
+      - catalog/uv.lock
+      - inventory/src/**
+      - inventory/pyproject.toml
+      - inventory/uv.lock
+      - orders/src/**
+      - orders/pyproject.toml
+      - orders/uv.lock
+      - payments/src/**
+      - payments/pyproject.toml
+      - payments/uv.lock
+      - notifications/src/**
+      - notifications/pyproject.toml
+      - notifications/uv.lock
+      - wishlist/src/**
+      - wishlist/pyproject.toml
+      - wishlist/uv.lock
+      - drops/src/**
+      - drops/pyproject.toml
+      - drops/uv.lock
+      - media/src/**
+      - media/pyproject.toml
+      - media/uv.lock
+      - shared/jwt_verifier/**
       - docker-compose.prod.yml
       - .github/workflows/gateway-deploy.yml
   push:
@@ -17,6 +46,35 @@ on:
     paths:
       - frontend/**
       - gateway/**
+      - tools/openapi/**
+      - auth/src/**
+      - auth/pyproject.toml
+      - auth/uv.lock
+      - catalog/src/**
+      - catalog/pyproject.toml
+      - catalog/uv.lock
+      - inventory/src/**
+      - inventory/pyproject.toml
+      - inventory/uv.lock
+      - orders/src/**
+      - orders/pyproject.toml
+      - orders/uv.lock
+      - payments/src/**
+      - payments/pyproject.toml
+      - payments/uv.lock
+      - notifications/src/**
+      - notifications/pyproject.toml
+      - notifications/uv.lock
+      - wishlist/src/**
+      - wishlist/pyproject.toml
+      - wishlist/uv.lock
+      - drops/src/**
+      - drops/pyproject.toml
+      - drops/uv.lock
+      - media/src/**
+      - media/pyproject.toml
+      - media/uv.lock
+      - shared/jwt_verifier/**
       - docker-compose.prod.yml
       - .github/workflows/gateway-deploy.yml
   workflow_dispatch:
@@ -44,6 +102,28 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Generate public API contract
+        run: python tools/openapi/generate.py
+
+      - name: Reject Developer Hub mock artifacts
+        shell: bash
+        run: |
+          if rg -n "mockApiData|Mock Runtime|LIVE MOCK|mock_token|flashmarket\.dev" frontend/src/components/DevHub; then
+            echo "::error::Developer Hub contains mock or hard-coded production data"
+            exit 1
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -240,6 +320,10 @@ jobs:
                 "https://${GATEWAY_DOMAIN}/health" 2>&1
             )"; then
               printf '%s\n' "$response"
+              curl --fail --silent --show-error \
+                "https://${GATEWAY_DOMAIN}/dev" > /dev/null
+              curl --fail --silent --show-error \
+                "https://${GATEWAY_DOMAIN}/dev/openapi.json" > /dev/null
               exit 0
             fi
             last_error="$response"

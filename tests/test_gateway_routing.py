@@ -234,3 +234,32 @@ def test_gw_009_rate_limit_error_contract() -> None:
     }"""
 
     assert content.count(handler) == 10
+
+
+def test_gw_010_developer_hub_readiness_routes_are_same_origin_and_read_only() -> None:
+    """GW-010: Every documented service has a bounded same-origin readiness target."""
+    content = _config()
+    expected_services = (
+        "auth",
+        "catalog",
+        "inventory",
+        "orders",
+        "payments",
+        "notifications",
+        "wishlist",
+        "drops",
+        "media",
+    )
+
+    for service in expected_services:
+        assert (
+            f"/dev/status/{service}" in content
+            and f"http://{service}:8000/health/ready;" in content
+        )
+
+    main = _main_server(content)
+    status_location = _location(main, "^~ /dev/status/")
+    assert "limit_except GET" in status_location
+    assert "proxy_connect_timeout 2s;" in status_location
+    assert "proxy_read_timeout 3s;" in status_location
+    assert "limit_req zone=" not in status_location

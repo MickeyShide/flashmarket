@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import { apiJson } from './services/api';
 import { CATALOG_LIMIT } from './config/constants';
 
@@ -18,13 +18,48 @@ import { CheckoutView } from './components/Checkout/CheckoutView';
 import { ProfileView } from './components/Profile/ProfileView';
 import { OrderDetailView } from './components/Order/OrderDetailView';
 
+const DevHub = lazy(() => import('./components/DevHub/DevHub'));
+
 export const App = () => {
   // Navigation & View Routing
-  const [currentView, setCurrentView] = useState('catalog'); // 'catalog' | 'product' | 'cart' | 'checkout' | 'auth' | 'order-detail'
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/dev')) {
+      return 'dev';
+    }
+    return 'catalog';
+  }); // 'catalog' | 'product' | 'cart' | 'checkout' | 'auth' | 'order-detail' | 'dev'
+
   const [selectedProductSlug, setSelectedProductSlug] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [profileTab, setProfileTab] = useState('profile'); // 'profile' | 'orders' | 'notifications'
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Sync URL pathname with currentView
+  useEffect(() => {
+    const handlePopState = () => {
+      if (window.location.pathname.startsWith('/dev')) {
+        setCurrentView('dev');
+      } else {
+        setCurrentView('catalog');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Update browser history when view changes manually
+  useEffect(() => {
+    if (currentView === 'dev') {
+      if (window.location.pathname !== '/dev') {
+        window.history.pushState({}, '', '/dev');
+      }
+    } else {
+      if (window.location.pathname === '/dev') {
+        window.history.pushState({}, '', '/');
+      }
+    }
+  }, [currentView]);
 
   // Global Data & Catalog Filters
   const [categoriesData, setCategoriesData] = useState([]);
@@ -49,6 +84,7 @@ export const App = () => {
 
   // Initial load: Categories & Brands
   useEffect(() => {
+    if (currentView === 'dev') return undefined;
     async function initData() {
       try {
         const [cats, bnd] = await Promise.all([
@@ -62,10 +98,12 @@ export const App = () => {
       }
     }
     initData();
-  }, []);
+    return undefined;
+  }, [currentView]);
 
   // Fetch Catalog Products
   const loadCatalog = useCallback(async (replace = true, offsetToUse = 0) => {
+    if (currentView === 'dev') return;
     if (replace) {
       setLoadingCatalog(true);
       setErrorCatalog(null);
@@ -103,7 +141,7 @@ export const App = () => {
       setLoadingCatalog(false);
       setLoadingMore(false);
     }
-  }, [activeCategoryId, activeBrandId, activeStatus, activeSearch]);
+  }, [activeCategoryId, activeBrandId, activeStatus, activeSearch, currentView]);
 
   // Re-fetch catalog on filter changes
   useEffect(() => {
@@ -158,6 +196,19 @@ export const App = () => {
   };
 
   const activeBrand = brandsData.find(b => b.id === activeBrandId);
+
+  if (currentView === 'dev') {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-[#0B0B0C]" aria-busy="true" />}>
+        <DevHub
+          onBackToStore={() => {
+            handleGoHome();
+            window.history.pushState({}, '', '/');
+          }}
+        />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-primary text-text-main font-sans">
