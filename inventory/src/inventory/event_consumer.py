@@ -43,11 +43,25 @@ async def _emit_inventory_event(
 
 async def _find_active_reservation(
     session: AsyncSession,
-    order_id: uuid.UUID,
+    payload: dict[str, Any],
 ) -> tuple[Any, Any] | None:
-    """Return (reservation, stock) for an active reservation bound to order_id."""
+    """Return (reservation, stock) for an active reservation bound to order_id or reservation_id."""
     reservation_repo = ReservationRepository(session)
-    reservation = await reservation_repo.get_by_order_id(order_id)
+    reservation = None
+    if "order_id" in payload and payload["order_id"]:
+        try:
+            order_id = uuid.UUID(str(payload["order_id"]))
+            reservation = await reservation_repo.get_by_order_id(order_id)
+        except (ValueError, TypeError):
+            pass
+
+    if reservation is None and "reservation_id" in payload and payload["reservation_id"]:
+        try:
+            res_id = uuid.UUID(str(payload["reservation_id"]))
+            reservation = await reservation_repo.get_by_id(res_id)
+        except (ValueError, TypeError):
+            pass
+
     if reservation is None:
         return None
 
@@ -64,11 +78,11 @@ async def handle_payment_succeeded(
     payload: dict[str, Any],
 ) -> None:
     """Commit reservation after successful payment."""
-    order_id = uuid.UUID(str(payload["order_id"]))
+    order_id = payload.get("order_id")
 
-    result = await _find_active_reservation(session, order_id)
+    result = await _find_active_reservation(session, payload)
     if result is None:
-        logger.warning("No active reservation for order %s to commit", order_id)
+        logger.warning("No active reservation for order/payload %s to commit", payload)
         return
     reservation, stock = result
 
@@ -95,7 +109,7 @@ async def handle_payment_succeeded(
         {
             "reservation_id": str(reservation.id),
             "product_id": str(stock.product_id),
-            "order_id": str(order_id),
+            "order_id": str(order_id) if order_id else None,
             "quantity": reservation.quantity,
         },
     )
@@ -112,11 +126,11 @@ async def handle_payment_failed(
     payload: dict[str, Any],
 ) -> None:
     """Release reservation after failed payment."""
-    order_id = uuid.UUID(str(payload["order_id"]))
+    order_id = payload.get("order_id")
 
-    result = await _find_active_reservation(session, order_id)
+    result = await _find_active_reservation(session, payload)
     if result is None:
-        logger.warning("No active reservation for order %s to release", order_id)
+        logger.warning("No active reservation for order/payload %s to release", payload)
         return
     reservation, stock = result
 
@@ -143,7 +157,7 @@ async def handle_payment_failed(
         {
             "reservation_id": str(reservation.id),
             "product_id": str(stock.product_id),
-            "order_id": str(order_id),
+            "order_id": str(order_id) if order_id else None,
             "quantity": reservation.quantity,
             "reason": payload.get("reason", "payment_failed"),
         },
@@ -161,9 +175,9 @@ async def handle_order_cancelled(
     payload: dict[str, Any],
 ) -> None:
     """Release reservation when order is cancelled."""
-    order_id = uuid.UUID(str(payload["order_id"]))
+    order_id = payload.get("order_id")
 
-    result = await _find_active_reservation(session, order_id)
+    result = await _find_active_reservation(session, payload)
     if result is None:
         logger.warning("No active reservation for order %s to release", order_id)
         return
@@ -192,7 +206,7 @@ async def handle_order_cancelled(
         {
             "reservation_id": str(reservation.id),
             "product_id": str(stock.product_id),
-            "order_id": str(order_id),
+            "order_id": str(order_id) if order_id else None,
             "quantity": reservation.quantity,
             "reason": payload.get("reason", "order_cancelled"),
         },

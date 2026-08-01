@@ -51,8 +51,11 @@ class InventoryService:
         """Initialize stock for a product or variant."""
         existing = await self._stock_repo.get_by_product_and_variant(data.product_id, data.variant_id)
         if existing is not None:
+            reserved_plus_sold = existing.reserved + existing.sold
+            if data.total < reserved_plus_sold:
+                raise OutOfStock(f"Cannot reset total below reserved + sold ({reserved_plus_sold})")
             existing.total = data.total
-            existing.available = data.total
+            existing.available = data.total - reserved_plus_sold
             await self._stock_repo.update(existing)
             await self._session.commit()
             await self._session.refresh(existing)
@@ -148,13 +151,13 @@ class InventoryService:
 
     async def commit(self, product_id: UUID, data: CommitRequest) -> ReservationModel:
         """Convert a reservation into a sale."""
-        stock = await self._stock_repo.get_by_product_id_for_update(product_id)
+        reservation = await self._reservation_repo.get_by_order_id(data.order_id)
+        if reservation is None:
+            raise ReservationNotFound
+
+        stock = await self._stock_repo.get_by_id_for_update(reservation.stock_id)
         if stock is None:
             raise StockNotFound
-
-        reservation = await self._reservation_repo.get_by_order_id(data.order_id)
-        if reservation is None or reservation.stock_id != stock.id:
-            raise ReservationNotFound
 
         if reservation.status != ReservationStatus.RESERVED:
             raise InvalidReservationState("Reservation is not active")
@@ -183,13 +186,13 @@ class InventoryService:
 
     async def release(self, product_id: UUID, data: ReleaseRequest) -> ReservationModel:
         """Release a reservation and return stock to available."""
-        stock = await self._stock_repo.get_by_product_id_for_update(product_id)
+        reservation = await self._reservation_repo.get_by_order_id(data.order_id)
+        if reservation is None:
+            raise ReservationNotFound
+
+        stock = await self._stock_repo.get_by_id_for_update(reservation.stock_id)
         if stock is None:
             raise StockNotFound
-
-        reservation = await self._reservation_repo.get_by_order_id(data.order_id)
-        if reservation is None or reservation.stock_id != stock.id:
-            raise ReservationNotFound
 
         if reservation.status != ReservationStatus.RESERVED:
             raise InvalidReservationState("Reservation is not active")

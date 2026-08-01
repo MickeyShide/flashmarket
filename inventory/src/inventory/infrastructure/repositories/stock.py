@@ -53,6 +53,12 @@ class StockRepository:
         result = await self._session.scalars(stmt)
         return result.first()
 
+    async def get_by_id_for_update(self, stock_id: UUID) -> StockModel | None:
+        """Fetch and lock a stock record by primary key."""
+        stmt = select(StockModel).where(StockModel.id == stock_id).with_for_update()
+        result = await self._session.scalars(stmt)
+        return result.first()
+
     async def get_by_product_id(self, product_id: UUID) -> StockModel | None:
         """Fetch a stock record by product id."""
         return await self.get_by_product_and_variant(product_id, None)
@@ -102,6 +108,7 @@ class ReservationRepository:
                 ReservationModel.expires_at <= before,
             )
             .order_by(ReservationModel.expires_at)
+            .with_for_update(skip_locked=True)
         )
         return result.all()
 
