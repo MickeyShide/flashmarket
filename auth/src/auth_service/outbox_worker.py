@@ -61,7 +61,7 @@ async def publish_outbox_batch(
                         },
                     ),
                     routing_key=f"identity.{event.event_type}",
-                    mandatory=True,
+                    mandatory=False,
                 )
             except Exception as exc:
                 event.attempts += 1
@@ -83,7 +83,6 @@ async def run_connected_worker() -> None:
     async with connection:
         channel = await connection.channel(
             publisher_confirms=True,
-            on_return_raises=True,
         )
         exchange = await channel.declare_exchange(
             settings.rabbitmq_exchange,
