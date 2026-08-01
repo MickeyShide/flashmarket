@@ -12,6 +12,7 @@ from typing import Any
 import aio_pika
 from aio_pika import ExchangeType
 from aio_pika.abc import AbstractIncomingMessage
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from notifications.config import get_settings
@@ -57,12 +58,21 @@ async def handle_order_created(
     """Notify user that order was created."""
     user_id = uuid.UUID(str(payload["user_id"]))
     order_id = str(payload.get("order_id", ""))
-    await _create_notification(
-        session,
-        user_id,
-        subject="Order created",
-        body=f"Your order {order_id} has been created and is awaiting payment.",
+    subject = "Order created"
+    body = f"Your order {order_id} has been created and is awaiting payment."
+    
+    existing = await session.scalar(
+        select(NotificationModel).where(
+            NotificationModel.user_id == user_id,
+            NotificationModel.subject == subject,
+            NotificationModel.body.contains(order_id),
+        )
     )
+    if existing is not None:
+        logger.info("Notification for %s (order %s) already exists, skipping", subject, order_id)
+        return
+
+    await _create_notification(session, user_id, subject=subject, body=body)
 
 
 async def handle_order_confirmed(
@@ -72,12 +82,21 @@ async def handle_order_confirmed(
     """Notify user that order was confirmed."""
     user_id = uuid.UUID(str(payload["user_id"]))
     order_id = str(payload.get("order_id", ""))
-    await _create_notification(
-        session,
-        user_id,
-        subject="Order confirmed",
-        body=f"Your order {order_id} has been confirmed.",
+    subject = "Order confirmed"
+    body = f"Your order {order_id} has been confirmed."
+
+    existing = await session.scalar(
+        select(NotificationModel).where(
+            NotificationModel.user_id == user_id,
+            NotificationModel.subject == subject,
+            NotificationModel.body.contains(order_id),
+        )
     )
+    if existing is not None:
+        logger.info("Notification for %s (order %s) already exists, skipping", subject, order_id)
+        return
+
+    await _create_notification(session, user_id, subject=subject, body=body)
 
 
 async def handle_order_cancelled(
@@ -88,12 +107,21 @@ async def handle_order_cancelled(
     user_id = uuid.UUID(str(payload["user_id"]))
     order_id = str(payload.get("order_id", ""))
     reason = str(payload.get("reason", ""))
-    await _create_notification(
-        session,
-        user_id,
-        subject="Order cancelled",
-        body=f"Your order {order_id} was cancelled. Reason: {reason or 'unknown'}.",
+    subject = "Order cancelled"
+    body = f"Your order {order_id} was cancelled. Reason: {reason or 'unknown'}."
+
+    existing = await session.scalar(
+        select(NotificationModel).where(
+            NotificationModel.user_id == user_id,
+            NotificationModel.subject == subject,
+            NotificationModel.body.contains(order_id),
+        )
     )
+    if existing is not None:
+        logger.info("Notification for %s (order %s) already exists, skipping", subject, order_id)
+        return
+
+    await _create_notification(session, user_id, subject=subject, body=body)
 
 
 HANDLERS: dict[str, Handler] = {
