@@ -97,6 +97,7 @@ class ReservationModel(Base):
         index=True,
     )
     order_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+    drop_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

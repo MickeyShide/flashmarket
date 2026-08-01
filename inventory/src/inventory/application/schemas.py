@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from inventory.domain.entities import ReservationStatus
 
@@ -33,6 +33,7 @@ class ReserveRequest(BaseModel):
 
     user_id: uuid.UUID
     variant_id: uuid.UUID | None = None
+    drop_id: uuid.UUID | None = None
     quantity: int = Field(default=1, ge=1, le=10_000)
     order_id: uuid.UUID | None = None
 
@@ -46,7 +47,14 @@ class CommitRequest(BaseModel):
 class ReleaseRequest(BaseModel):
     """Payload for manually releasing a reservation."""
 
-    order_id: uuid.UUID
+    order_id: uuid.UUID | None = None
+    reservation_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def require_identifier(self) -> ReleaseRequest:
+        if (self.order_id is None) == (self.reservation_id is None):
+            raise ValueError("provide exactly one of order_id or reservation_id")
+        return self
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +87,7 @@ class ReservationResponse(BaseModel):
     stock_id: uuid.UUID
     user_id: uuid.UUID
     order_id: uuid.UUID | None
+    drop_id: uuid.UUID | None = None
     quantity: int
     status: ReservationStatus
     expires_at: datetime

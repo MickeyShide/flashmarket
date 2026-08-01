@@ -135,7 +135,11 @@ async def release(
 ) -> ReservationResponse:
     """Manually release an active reservation."""
     if principal.role != "ADMIN":
-        res = await service._reservation_repo.get_by_order_id(data.order_id)
+        res = (
+            await service._reservation_repo.get_by_id(data.reservation_id)
+            if data.reservation_id is not None
+            else await service._reservation_repo.get_by_order_id(data.order_id)  # type: ignore[arg-type]
+        )
         if res is not None and res.user_id != principal.user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

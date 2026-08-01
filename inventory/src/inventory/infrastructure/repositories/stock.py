@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inventory.domain.entities import ReservationStatus
@@ -111,6 +111,31 @@ class ReservationRepository:
             .with_for_update(skip_locked=True)
         )
         return result.all()
+
+    async def lock_drop_limit(self, user_id: UUID, drop_id: UUID) -> None:
+        """Serialize a user's concurrent reservations for one Drop on PostgreSQL."""
+        if self._session.get_bind().dialect.name != "postgresql":
+            return
+        user_key = int.from_bytes(user_id.bytes[:4], "big", signed=True)
+        drop_key = int.from_bytes(drop_id.bytes[:4], "big", signed=True)
+        await self._session.execute(select(func.pg_advisory_xact_lock(user_key, drop_key)))
+
+    async def active_drop_quantity(self, user_id: UUID, drop_id: UUID, now: datetime) -> int:
+        """Count committed and non-expired reserved units for a user and Drop."""
+        quantity = await self._session.scalar(
+            select(func.coalesce(func.sum(ReservationModel.quantity), 0)).where(
+                ReservationModel.user_id == user_id,
+                ReservationModel.drop_id == drop_id,
+                or_(
+                    ReservationModel.status == ReservationStatus.COMMITTED,
+                    (
+                        (ReservationModel.status == ReservationStatus.RESERVED)
+                        & (ReservationModel.expires_at > now)
+                    ),
+                ),
+            )
+        )
+        return int(quantity or 0)
 
     async def update(self, reservation: ReservationModel) -> ReservationModel:
         """Flush pending attribute changes on a reservation."""

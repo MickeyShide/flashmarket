@@ -17,6 +17,8 @@ x-inventory-environment: &inventory-environment
   INVENTORY_STOCK_CACHE_TTL_SECONDS: ${INVENTORY_STOCK_CACHE_TTL_SECONDS:-30}
   INVENTORY_RABBITMQ_URL: ${INVENTORY_RABBITMQ_URL}
   INVENTORY_RESERVATION_TTL_SECONDS: ${INVENTORY_RESERVATION_TTL_SECONDS:-300}
+  INVENTORY_DROPS_BASE_URL: ${INVENTORY_DROPS_BASE_URL:-http://drops:8000}
+  INVENTORY_EXPIRY_POLL_INTERVAL_SECONDS: ${INVENTORY_EXPIRY_POLL_INTERVAL_SECONDS:-5}
   INVENTORY_CORS_ORIGINS: ${INVENTORY_CORS_ORIGINS:-[]}
   INVENTORY_TRUSTED_HOSTS: ${INVENTORY_TRUSTED_HOSTS}
   INVENTORY_DOCS_ENABLED: ${INVENTORY_DOCS_ENABLED:-false}
@@ -61,6 +63,17 @@ services:
     command:
       - outbox
       - inventory.outbox_worker
+    depends_on: {}
+    restart: unless-stopped
+
+  expiry:
+    <<: *inventory-runtime
+    environment: *inventory-environment
+    command:
+      - cleanup
+      - python
+      - -m
+      - inventory.expiry_worker
     depends_on: {}
     restart: unless-stopped
 

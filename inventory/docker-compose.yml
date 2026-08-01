@@ -10,6 +10,8 @@ x-inventory-environment: &inventory-environment
   INVENTORY_REDIS_URL: redis://shide-redis:6379/2
   INVENTORY_STOCK_CACHE_TTL_SECONDS: 30
   INVENTORY_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
+  INVENTORY_DROPS_BASE_URL: http://drops:8000
+  INVENTORY_EXPIRY_POLL_INTERVAL_SECONDS: 5
   INVENTORY_CORS_ORIGINS: '["http://localhost:3000"]'
   INVENTORY_TRUSTED_HOSTS: '["localhost","127.0.0.1","inventory","gateway"]'
   INVENTORY_LOG_FILE_PATH: /var/log/shide/inventory-api.log
@@ -64,6 +66,20 @@ services:
     command:
       - outbox
       - inventory.outbox_worker
+    volumes:
+      - backend-logs-local:/var/log/shide
+    restart: unless-stopped
+
+  expiry:
+    <<: *inventory-runtime
+    environment:
+      <<: *inventory-environment
+      INVENTORY_LOG_FILE_PATH: /var/log/shide/inventory-expiry.log
+    command:
+      - cleanup
+      - python
+      - -m
+      - inventory.expiry_worker
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped

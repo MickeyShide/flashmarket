@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     trusted_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
     cors_origins: list[str] = Field(default_factory=list)
     reservation_ttl_seconds: int = 300
+    drops_base_url: str = "http://drops:8000"
+    drops_timeout_seconds: float = Field(default=1.0, gt=0, le=10)
+    expiry_poll_interval_seconds: float = Field(default=5.0, ge=1, le=300)
     rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672//inventory"
     rabbitmq_exchange: str = "flashmarket.events"
     allow_insecure_internal_services: bool = False

@@ -20,12 +20,14 @@ from inventory.application.schemas import (
 from inventory.config import get_settings
 from inventory.domain.entities import InventoryEventType, ReservationStatus
 from inventory.domain.exceptions import (
+    DropPurchaseDenied,
     InvalidReservationState,
     OutOfStock,
     ReservationNotFound,
     StockNotFound,
 )
 from inventory.infrastructure.database import utc_now
+from inventory.infrastructure.drop_client import DropClient
 from inventory.infrastructure.models import ReservationModel, StockModel
 from inventory.infrastructure.repositories.stock import (
     OutboxRepository,
@@ -44,12 +46,14 @@ class InventoryService:
         reservation_repo: ReservationRepository,
         outbox_repo: OutboxRepository,
         stock_cache: StockCache,
+        drop_client: DropClient | None = None,
     ) -> None:
         self._session = session
         self._stock_repo = stock_repo
         self._reservation_repo = reservation_repo
         self._outbox_repo = outbox_repo
         self._stock_cache = stock_cache
+        self._drop_client = drop_client
 
     async def _cache_stock(self, stock: StockModel) -> StockResponse:
         """Store and return the public snapshot of a committed stock row."""
@@ -132,6 +136,23 @@ class InventoryService:
         data: ReserveRequest,
     ) -> ReservationModel:
         """Atomically reserve stock for a user."""
+        ttl_seconds = get_settings().reservation_ttl_seconds
+        if data.drop_id is not None:
+            if self._drop_client is None:
+                raise DropPurchaseDenied("Drop purchase is unavailable")
+            policy = await self._drop_client.get_policy(data.drop_id)
+            if policy.status != "ACTIVE":
+                raise DropPurchaseDenied("Drop is not active")
+            if product_id not in policy.product_ids:
+                raise DropPurchaseDenied("Product does not belong to this Drop")
+            await self._reservation_repo.lock_drop_limit(data.user_id, data.drop_id)
+            already_reserved = await self._reservation_repo.active_drop_quantity(
+                data.user_id, data.drop_id, utc_now()
+            )
+            if already_reserved + data.quantity > policy.max_per_user:
+                raise DropPurchaseDenied(f"Drop limit is {policy.max_per_user} item(s) per user")
+            ttl_seconds = policy.payment_timeout_seconds
+
         stock = await self._stock_repo.get_by_product_and_variant_for_update(
             product_id, data.variant_id
         )
@@ -146,13 +167,13 @@ class InventoryService:
         stock.revision += 1
         await self._stock_repo.update(stock)
 
-        settings = get_settings()
-        expires_at = utc_now() + timedelta(seconds=settings.reservation_ttl_seconds)
+        expires_at = utc_now() + timedelta(seconds=ttl_seconds)
 
         reservation = ReservationModel(
             stock_id=stock.id,
             user_id=data.user_id,
             order_id=data.order_id,
+            drop_id=data.drop_id,
             quantity=data.quantity,
             status=ReservationStatus.RESERVED,
             expires_at=expires_at,
@@ -167,6 +188,7 @@ class InventoryService:
             "quantity": data.quantity,
             "order_id": str(data.order_id) if data.order_id else None,
             "expires_at": reservation.expires_at.isoformat(),
+            "drop_id": str(data.drop_id) if data.drop_id else None,
         }
         await self._outbox_repo.add(
             InventoryEventType.INVENTORY_RESERVED,
@@ -219,7 +241,11 @@ class InventoryService:
 
     async def release(self, product_id: UUID, data: ReleaseRequest) -> ReservationModel:
         """Release a reservation and return stock to available."""
-        reservation = await self._reservation_repo.get_by_order_id(data.order_id)
+        reservation = (
+            await self._reservation_repo.get_by_id(data.reservation_id)
+            if data.reservation_id is not None
+            else await self._reservation_repo.get_by_order_id(data.order_id)  # type: ignore[arg-type]
+        )
         if reservation is None:
             raise ReservationNotFound
 
@@ -241,7 +267,7 @@ class InventoryService:
         payload = {
             "reservation_id": str(reservation.id),
             "product_id": str(product_id),
-            "order_id": str(data.order_id),
+            "order_id": str(reservation.order_id) if reservation.order_id else None,
             "quantity": reservation.quantity,
             "reason": "manual_release",
         }

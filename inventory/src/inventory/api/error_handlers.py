@@ -4,6 +4,8 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from inventory.domain.exceptions import (
+    DropPurchaseDenied,
+    DropServiceUnavailable,
     InvalidReservationState,
     InventoryError,
     OutOfStock,
@@ -18,6 +20,8 @@ ERROR_STATUS: dict[type[InventoryError], int] = {
     ReservationNotFound: status.HTTP_404_NOT_FOUND,
     InvalidReservationState: status.HTTP_409_CONFLICT,
     StockInvariantViolation: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    DropPurchaseDenied: status.HTTP_409_CONFLICT,
+    DropServiceUnavailable: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

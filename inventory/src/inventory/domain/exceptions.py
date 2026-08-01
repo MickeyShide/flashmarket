@@ -45,3 +45,13 @@ class StockInvariantViolation(InventoryError):
 
     code = "stock_invariant_violation"
     message = "Stock invariant violation"
+
+
+class DropPurchaseDenied(InventoryError):
+    code = "drop_purchase_denied"
+    message = "Drop purchase is not allowed"
+
+
+class DropServiceUnavailable(InventoryError):
+    code = "drop_service_unavailable"
+    message = "Drop rules are temporarily unavailable"
