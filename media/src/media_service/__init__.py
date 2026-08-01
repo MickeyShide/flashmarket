@@ -1,0 +1,1 @@
+"""FlashMarket public media service."""

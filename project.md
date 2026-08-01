@@ -456,6 +456,7 @@ Payment Failed → Order CANCELLED → Inventory RELEASED → Notification SENT
 - Orders: `orders`, `orders-consumer`, `orders-outbox`
 - Payments: `payments`, `payments-consumer`, `payments-outbox`
 - Notifications: `notifications`, `notifications-consumer`, `notifications-outbox`
+- Media: `media`, `media-cleanup` (uses the existing MinIO/S3 in `shide-observability`)
 - Gateway: `gateway`
 - Frontend: `frontend`
 
@@ -471,6 +472,7 @@ Payment Failed → Order CANCELLED → Inventory RELEASED → Notification SENT
 | Orders | `orders` | 5435 |
 | Payments | `payments` | 5436 |
 | Notifications | `notifications` | 5437 |
+| Media | `media` | shared PostgreSQL |
 
 ### Init-Infra Script
 
@@ -692,6 +694,7 @@ python seed.py
 | Orders | 8012 | 5435 |
 | Payments | 8014 | 5436 |
 | Notifications | 8016 | 5437 |
+| Media | 4926 | shared PostgreSQL |
 | Redis | 6379 | — |
 | RabbitMQ | 5672 (AMQP), 15672 (Management) | — |
 
@@ -708,7 +711,8 @@ flashmarket/
 │   ├── inventory-deploy.yml
 │   ├── orders-deploy.yml
 │   ├── payments-deploy.yml
-│   └── notifications-deploy.yml
+│   ├── notifications-deploy.yml
+│   └── media-ci.yml
 │
 ├── auth/                       # Auth microservice
 │   ├── src/auth_service/

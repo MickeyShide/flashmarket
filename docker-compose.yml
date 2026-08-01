@@ -167,6 +167,24 @@ services:
     depends_on: !reset {}
 
   # -----------------------------------------------------------
+  # MEDIA MICROSERVICE
+  # Uses the existing S3/MinIO instance on shide-observability.
+  # -----------------------------------------------------------
+  media:
+    extends:
+      file: media/docker-compose.yml
+      service: api
+    depends_on:
+      auth-keygen:
+        condition: service_completed_successfully
+
+  media-cleanup:
+    extends:
+      file: media/docker-compose.yml
+      service: cleanup
+    depends_on: !reset {}
+
+  # -----------------------------------------------------------
   # GATEWAY & FRONTEND
   # -----------------------------------------------------------
   gateway:

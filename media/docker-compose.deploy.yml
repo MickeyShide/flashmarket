@@ -1,0 +1,46 @@
+name: flashmarket-media
+
+x-media-runtime: &media-runtime
+  image: ${MEDIA_IMAGE:?MEDIA_IMAGE must contain the image digest}
+  pull_policy: always
+  env_file:
+    - ${MEDIA_ENV_FILE:-.env}
+  networks:
+    backend:
+      aliases:
+        - media
+
+services:
+  api:
+    <<: *media-runtime
+    environment:
+      MEDIA_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
+      MEDIA_JWT_ALGORITHM: EdDSA
+      MEDIA_JWT_ISSUER: flashmarket-auth
+      MEDIA_JWT_AUDIENCE: flashmarket-api
+    volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  cleanup:
+    <<: *media-runtime
+    command: ["cleanup", "python", "-m", "media_service.cleanup_worker"]
+    volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
+    restart: unless-stopped
+
+networks:
+  backend:
+    external: true
+    name: shide-observability
+
+volumes:
+  auth-jwt-keys-public:
+    external: true
+    name: flashmarket-auth-jwt-keys-public

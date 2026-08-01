@@ -20,6 +20,7 @@ Nginx reverse proxy that routes public traffic to backend services.
 | `/api/v1/wishlist/*`         | wishlist      |
 | `/api/v1/drops/*`            | drops         |
 | `/api/v1/admin/drops/*`      | drops         |
+| `/api/v1/media/*`            | media         |
 | `/*`                         | frontend      |
 
 ## Rate limiting
@@ -31,7 +32,7 @@ profile.
 | Profile | Services and routes | Rate | Burst |
 | --- | --- | ---: | ---: |
 | `auth` | Auth, users, sessions, identity administration | 5 req/s | 10 |
-| `transaction` | Orders, payments, promocodes, wishlist | 10 req/s | 20 |
+| `transaction` | Orders, payments, promocodes, wishlist, media | 10 req/s | 20 |
 | `catalog` | Products, categories, brands, drops | 50 req/s | 100 |
 | `general` | Inventory, notifications | 20 req/s | 40 |
 
@@ -53,4 +54,4 @@ cd gateway
 docker compose up -d
 ```
 
-All services must be attached to the `flashmarket` Docker network.
+All services must be attached to the external `shide-observability` Docker network.

@@ -74,6 +74,7 @@ def test_gw_001_nginx_conf_location_rules_exist() -> None:
         r"location /api/v1/notifications",
         r"location /api/v1/wishlist",
         r"location /api/v1/drops",
+        r"location /api/v1/media",
         r"location \^~ /api/v1/admin/drops",
     ]
 
@@ -101,6 +102,7 @@ def test_gw_003_dynamic_upstream_targets() -> None:
         "notifications": 8000,
         "wishlist": 8000,
         "drops": 8000,
+        "media": 8000,
         "frontend": 3000,
         "prometheus": 9090,
     }
@@ -178,6 +180,7 @@ def test_gw_006_main_domain_routes_use_expected_profiles() -> None:
         "/api/v1/notifications": "limit_req zone=general_limit burst=40 nodelay;",
         "/api/v1/wishlist": "limit_req zone=transaction_limit burst=20 nodelay;",
         "/api/v1/drops": "limit_req zone=catalog_limit burst=100 nodelay;",
+        "/api/v1/media": "limit_req zone=transaction_limit burst=20 nodelay;",
     }
 
     for declaration, limiter in expected_locations.items():
@@ -205,6 +208,7 @@ def test_gw_007_service_subdomains_use_expected_profiles() -> None:
         "notifications": "limit_req zone=general_limit burst=40 nodelay;",
         "wishlist": "limit_req zone=transaction_limit burst=20 nodelay;",
         "drops": "limit_req zone=catalog_limit burst=100 nodelay;",
+        "media": "limit_req zone=transaction_limit burst=20 nodelay;",
     }
 
     for service, limiter in expected_services.items():
@@ -229,4 +233,4 @@ def test_gw_009_rate_limit_error_contract() -> None:
         return 429 '{"error":{"code":"rate_limit_exceeded","message":"Too many requests"}}';
     }"""
 
-    assert content.count(handler) == 9
+    assert content.count(handler) == 10

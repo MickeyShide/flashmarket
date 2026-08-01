@@ -23,6 +23,7 @@ SERVICE_NAMES = (
     "notifications",
     "wishlist",
     "drops",
+    "media",
 )
 SPECIAL_SUITES = ("jwt", "gateway")
 CRITICAL_SERVICES = (
@@ -197,6 +198,7 @@ class E2ERunner:
             "notifications",
             "wishlist",
             "drops",
+            "media",
             "frontend",
         )
         service_overrides = "\n".join(
@@ -315,6 +317,7 @@ volumes:
             "notifications",
             "wishlist",
             "drops",
+            "media",
         ):
             run_command(
                 (

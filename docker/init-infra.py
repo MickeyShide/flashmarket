@@ -76,6 +76,7 @@ def _get_db_url() -> str | None:
         "NOTIFICATIONS_DATABASE_URL",
         "WISHLIST_DATABASE_URL",
         "DROPS_DATABASE_URL",
+        "MEDIA_DATABASE_URL",
     ]:
         if val := os.environ.get(key):
             return val
