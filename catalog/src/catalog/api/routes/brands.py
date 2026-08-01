@@ -10,6 +10,7 @@ from catalog.application.schemas import (
     BrandResponse,
     CreateBrandRequest,
     ErrorResponse,
+    UpdateBrandRequest,
 )
 from catalog.infrastructure.models import BrandModel
 
@@ -62,6 +63,22 @@ async def list_brands(
     """Return all registered brands ordered by name."""
     brands = await service.list_brands()
     return [_brand_to_response(b) for b in brands]
+
+
+@router.patch(
+    "/{brand_id}",
+    response_model=BrandResponse,
+    responses=ERROR_RESPONSES,
+    summary="Update a brand",
+)
+async def update_brand(
+    brand_id: uuid.UUID,
+    data: UpdateBrandRequest,
+    service: BrandServiceDep,
+    admin: AdminPrincipal,
+) -> BrandResponse:
+    brand = await service.update_brand(brand_id, data)
+    return _brand_to_response(brand)
 
 
 @router.get(

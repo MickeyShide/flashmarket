@@ -121,6 +121,20 @@ class UpdateProductRequest(BaseModel):
         return normalized
 
 
+class ProductBatchRequest(BaseModel):
+    """Bounded product hydration request used by Drops and Wishlist."""
+
+    product_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+    @field_validator("product_ids")
+    @classmethod
+    def unique_product_ids(cls, value: list[uuid.UUID]) -> list[uuid.UUID]:
+        """Reject duplicate IDs so response ordering is unambiguous."""
+        if len(value) != len(set(value)):
+            raise ValueError("product_ids must be unique")
+        return value
+
+
 class ProductListParams(BaseModel):
     """Query-string parameters for the product listing endpoint."""
 
@@ -132,6 +146,7 @@ class ProductListParams(BaseModel):
     status: ProductStatus | None = None
     price_from: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     price_to: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    size: str | None = Field(default=None, min_length=1, max_length=20)
     search: str | None = Field(default=None, max_length=255)
     sort_by: Literal["price", "name", "created_at", "relevance"] = "created_at"
     sort_order: Literal["asc", "desc"] = "desc"
@@ -140,6 +155,14 @@ class ProductListParams(BaseModel):
     @classmethod
     def normalize_search(cls, value: str | None) -> str | None:
         """Normalize an optional text-search phrase."""
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @field_validator("size")
+    @classmethod
+    def normalize_size(cls, value: str | None) -> str | None:
         if value is None:
             return None
         normalized = value.strip()

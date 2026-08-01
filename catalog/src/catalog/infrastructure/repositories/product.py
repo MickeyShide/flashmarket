@@ -5,13 +5,18 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, delete, func, or_, select
+from sqlalchemy import ColumnElement, and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from catalog.domain.entities import ProductStatus
-from catalog.infrastructure.models import BrandModel, ProductImageModel, ProductModel
+from catalog.infrastructure.models import (
+    BrandModel,
+    ProductImageModel,
+    ProductModel,
+    ProductVariantModel,
+)
 from catalog.infrastructure.search import (
     product_search_condition,
     product_search_rank,
@@ -33,6 +38,7 @@ class ProductSearchQuery:
     status: ProductStatus | None = None
     price_from: Decimal | None = None
     price_to: Decimal | None = None
+    size: str | None = None
     search: str | None = None
     sort_by: str = "created_at"
     sort_order: str = "desc"
@@ -100,6 +106,21 @@ class ProductRepository:
         )
         return result.first()
 
+    async def get_public_by_ids(self, product_ids: list[UUID]) -> list[ProductModel]:
+        """Fetch ACTIVE products and preserve the caller's ID order."""
+        if not product_ids:
+            return []
+        result = await self._session.scalars(
+            select(ProductModel)
+            .where(
+                ProductModel.id.in_(product_ids),
+                ProductModel.status == ProductStatus.ACTIVE,
+            )
+            .options(*self._eager_options())
+        )
+        products = {product.id: product for product in result.unique().all()}
+        return [products[product_id] for product_id in product_ids if product_id in products]
+
     async def slug_exists(self, slug: str) -> bool:
         """Check whether a product slug is already taken."""
         result = await self._session.scalar(
@@ -124,6 +145,15 @@ class ProductRepository:
             filters.append(ProductModel.price >= query.price_from)
         if query.price_to is not None:
             filters.append(ProductModel.price <= query.price_to)
+        if query.size is not None:
+            filters.append(
+                ProductModel.variants.any(
+                    and_(
+                        ProductVariantModel.size == query.size,
+                        ProductVariantModel.is_active.is_(True),
+                    )
+                )
+            )
         if query.search:
             tokens = tokenize_search_phrase(query.search)
             if tokens and self._is_postgresql():

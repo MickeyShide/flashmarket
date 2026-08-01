@@ -117,11 +117,16 @@ class ProductService:
             status=params.status if params.status is not None else ProductStatus.ACTIVE,
             price_from=params.price_from,
             price_to=params.price_to,
+            size=params.size,
             search=params.search,
             sort_by=params.sort_by,
             sort_order=params.sort_order,
         )
         return await self._product_repo.search(query)
+
+    async def get_public_batch(self, product_ids: list[UUID]) -> list[ProductModel]:
+        """Hydrate a bounded list of public products in request order."""
+        return await self._product_repo.get_public_by_ids(product_ids)
 
     async def update_product(self, product_id: UUID, data: UpdateProductRequest) -> ProductModel:
         """Apply a partial update to an existing product."""

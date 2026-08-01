@@ -10,6 +10,7 @@ from catalog.application.schemas import (
     CreateProductRequest,
     ErrorResponse,
     ImageResponse,
+    ProductBatchRequest,
     ProductListParams,
     ProductListResponse,
     ProductResponse,
@@ -46,10 +47,7 @@ def _product_to_response(product: ProductModel) -> ProductResponse:
             ImageResponse(id=img.id, url=img.url, sort_order=img.sort_order)
             for img in product.images
         ],
-        variants=[
-            VariantResponse.model_validate(v)
-            for v in getattr(product, "variants", [])
-        ],
+        variants=[VariantResponse.model_validate(v) for v in getattr(product, "variants", [])],
         created_at=product.created_at,
         updated_at=product.updated_at,
         published_at=product.published_at,
@@ -72,6 +70,20 @@ async def create_product(
     """Validate, persist, and return a new product."""
     product = await service.create_product(data)
     return _product_to_response(product)
+
+
+@router.post(
+    "/batch",
+    response_model=list[ProductResponse],
+    responses=ERROR_RESPONSES,
+    summary="Hydrate public products by ID",
+)
+async def batch_products(
+    data: ProductBatchRequest,
+    service: ProductServiceDep,
+) -> list[ProductResponse]:
+    products = await service.get_public_batch(data.product_ids)
+    return [_product_to_response(product) for product in products]
 
 
 @router.get(

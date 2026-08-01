@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from catalog.application.schemas import CreateBrandRequest
+from catalog.application.schemas import CreateBrandRequest, UpdateBrandRequest
 from catalog.domain.exceptions import BrandNotFound, DuplicateSlug
 from catalog.infrastructure.models import BrandModel
 from catalog.infrastructure.repositories.brand import BrandRepository
@@ -61,3 +61,18 @@ class BrandService:
     async def list_brands(self) -> list[BrandModel]:
         """Return all brands."""
         return await self._brand_repo.list_all()
+
+    async def update_brand(self, brand_id: UUID, data: UpdateBrandRequest) -> BrandModel:
+        """Apply supplied Brand fields and persist them."""
+        brand = await self._brand_repo.get_by_id(brand_id)
+        if brand is None:
+            raise BrandNotFound
+        if data.name is not None:
+            brand.name = data.name.strip()
+        if data.description is not None:
+            brand.description = data.description
+        if data.logo_url is not None:
+            brand.logo_url = data.logo_url
+        await self._session.commit()
+        await self._session.refresh(brand)
+        return brand

@@ -1,5 +1,7 @@
 """Public API routes for drops."""
 
+from uuid import UUID
+
 from fastapi import APIRouter, status
 
 from drops.api.dependencies import DropServiceDep
@@ -32,6 +34,19 @@ async def list_upcoming(service: DropServiceDep) -> list[DropResponse]:
     """Return all scheduled upcoming drops."""
     drops = await service.list_upcoming()
     return [DropResponse.model_validate(drop) for drop in drops]
+
+
+@router.get(
+    "/id/{drop_id}",
+    response_model=DropResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get public drop by ID",
+)
+async def get_drop_by_id(drop_id: UUID, service: DropServiceDep) -> DropResponse:
+    drop = await service.get_by_id(drop_id)
+    if drop.status in (DropStatus.DRAFT, DropStatus.CANCELLED):
+        raise DropNotFound()
+    return DropResponse.model_validate(drop)
 
 
 @router.get(
