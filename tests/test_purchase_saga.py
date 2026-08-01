@@ -154,6 +154,16 @@ async def test_purchase_saga_happy_path(
     notifications = notifications_resp.json()["items"]
     assert any(n["subject"] == "Order confirmed" for n in notifications)
 
+    # 9. Verify stock counters (sold = 1, reserved = 0)
+    async def _stock_committed() -> bool:
+        resp = await api_client.get(f"/api/v1/stocks/{product_id}")
+        if resp.status_code != 200:
+            return False
+        stock = resp.json()
+        return stock["sold"] == 1 and stock["reserved"] == 0
+
+    await _poll_until(_stock_committed, timeout=30.0)
+
 
 async def test_purchase_saga_payment_failure_cancels_order(
     api_client: httpx.AsyncClient,
@@ -240,3 +250,13 @@ async def test_purchase_saga_payment_failure_cancels_order(
         return any(n["subject"] == "Order cancelled" for n in resp.json()["items"])
 
     await _poll_until(_cancellation_notification_created, timeout=30.0)
+
+    # Verify stock counters (reserved = 0, available = 10)
+    async def _stock_released() -> bool:
+        resp = await api_client.get(f"/api/v1/stocks/{product_id}")
+        if resp.status_code != 200:
+            return False
+        stock = resp.json()
+        return stock["reserved"] == 0 and stock["available"] == 10
+
+    await _poll_until(_stock_released, timeout=30.0)
