@@ -17,7 +17,8 @@ class CreateNotificationRequest(BaseModel):
     channel: NotificationChannel = NotificationChannel.EMAIL
     subject: str = Field(min_length=1, max_length=255)
     body: str = Field(min_length=1, max_length=10000)
-    recipient: str = Field(min_length=1, max_length=255)
+    recipient: str | None = Field(default=None, min_length=1, max_length=255)
+    attachment_url: str | None = Field(default=None, max_length=2048)
 
 
 class NotificationListParams(BaseModel):
@@ -41,6 +42,8 @@ class NotificationResponse(BaseModel):
     status: NotificationStatus
     attempts: int
     last_error: str | None
+    attachment_url: str | None
+    read_at: datetime | None
     created_at: datetime
     updated_at: datetime
     sent_at: datetime | None

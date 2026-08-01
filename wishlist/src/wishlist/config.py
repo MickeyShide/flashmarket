@@ -43,17 +43,21 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     prometheus_multiproc_dir: str | None = None
     docs_enabled: bool = True
-    trusted_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "test", "testserver"])
+    trusted_hosts: list[str] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "test", "testserver"]
+    )
     cors_origins: list[str] = Field(default_factory=list)
     allow_insecure_internal_services: bool = False
     max_items_per_user: int = 200
+    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672/flashmarket"
+    rabbitmq_exchange: str = "flashmarket.events"
     jwt_public_key_dir: Path = Path("keys/public")
     jwt_algorithm: str = "EdDSA"
     jwt_issuer: str = "flashmarket-auth"
     jwt_audience: str = "flashmarket-api"
 
     @model_validator(mode="after")
-    def validate_production_settings(self) -> "Settings":
+    def validate_production_settings(self) -> Settings:
         """Enforce strict settings in production."""
         if self.environment != "production":
             return self
@@ -72,12 +76,17 @@ class Settings(BaseSettings):
         db_is_internal = self.allow_insecure_internal_services
         if "sslmode" not in self.database_url and not db_is_internal:
             errors.append("WISHLIST_DATABASE_URL must use TLS (sslmode)")
+        rabbitmq_is_internal = self.allow_insecure_internal_services and urlsplit(
+            self.rabbitmq_url
+        ).hostname in {"rabbitmq", "shide-rabbitmq"}
+        if not self.rabbitmq_url.startswith("amqps://") and not rabbitmq_is_internal:
+            errors.append("WISHLIST_RABBITMQ_URL must use TLS (amqps://)")
         if errors:
             raise ValueError("Invalid production configuration: " + "; ".join(errors))
         return self
 
     @model_validator(mode="after")
-    def resolve_dns_ipv4(self) -> "Settings":
+    def resolve_dns_ipv4(self) -> Settings:
         if self.database_url:
             self.database_url = resolve_url_ipv4(self.database_url)
         return self

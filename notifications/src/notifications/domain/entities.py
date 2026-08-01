@@ -11,6 +11,8 @@ class NotificationChannel(StrEnum):
     EMAIL = "EMAIL"
     SMS = "SMS"
     PUSH = "PUSH"
+    SYSTEM = "SYSTEM"
+    DROP_ALERT = "DROP_ALERT"
 
 
 class NotificationStatus(StrEnum):

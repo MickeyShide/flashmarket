@@ -21,7 +21,6 @@ from notifications.infrastructure.database import SessionFactory, engine
 from notifications.infrastructure.models import NotificationModel
 from notifications.infrastructure.repositories.notification import (
     NotificationRepository,
-    OutboxRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,17 +34,19 @@ async def _create_notification(
     subject: str,
     body: str,
     recipient: str | None = None,
+    channel: NotificationChannel = NotificationChannel.EMAIL,
+    event_key: str | None = None,
 ) -> None:
     """Persist a pending notification."""
     repo = NotificationRepository(session)
-    outbox = OutboxRepository(session)
     notification = NotificationModel(
         user_id=user_id,
-        channel=NotificationChannel.EMAIL,
+        channel=channel,
         subject=subject,
         body=body,
         recipient=recipient or f"{user_id}@example.com",
         status=NotificationStatus.PENDING,
+        event_key=event_key,
     )
     await repo.create(notification)
     logger.info("Created notification %s for user %s", notification.id, user_id)
@@ -60,7 +61,7 @@ async def handle_order_created(
     order_id = str(payload.get("order_id", ""))
     subject = "Order created"
     body = f"Your order {order_id} has been created and is awaiting payment."
-    
+
     existing = await session.scalar(
         select(NotificationModel).where(
             NotificationModel.user_id == user_id,
@@ -124,10 +125,35 @@ async def handle_order_cancelled(
     await _create_notification(session, user_id, subject=subject, body=body)
 
 
+async def handle_wishlist_drop_available(
+    session: AsyncSession,
+    payload: dict[str, Any],
+) -> None:
+    """Notify a user that a drop containing a wished product has started."""
+    user_id = uuid.UUID(str(payload["user_id"]))
+    event_key = str(payload["event_key"])
+    existing = await session.scalar(
+        select(NotificationModel).where(NotificationModel.event_key == event_key)
+    )
+    if existing is not None:
+        return
+
+    drop_name = str(payload.get("drop_name") or "Flash drop")
+    await _create_notification(
+        session,
+        user_id,
+        subject="Wishlist item is available",
+        body=f"{drop_name} has started. An item from your wishlist is available now.",
+        channel=NotificationChannel.DROP_ALERT,
+        event_key=event_key,
+    )
+
+
 HANDLERS: dict[str, Handler] = {
     "orders.OrderCreated": handle_order_created,
     "orders.OrderConfirmed": handle_order_confirmed,
     "orders.OrderCancelled": handle_order_cancelled,
+    "wishlist.DropAvailable": handle_wishlist_drop_available,
 }
 
 

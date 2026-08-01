@@ -43,12 +43,23 @@ class NotificationService:
             channel=data.channel,
             subject=data.subject,
             body=data.body,
-            recipient=data.recipient,
+            recipient=data.recipient or f"{data.user_id}@flashmarket.local",
+            attachment_url=data.attachment_url,
             status=NotificationStatus.PENDING,
         )
         await self._notification_repo.create(notification)
         await self._session.commit()
         await self._session.refresh(notification)
+        return notification
+
+    async def mark_read(self, notification_id: uuid.UUID) -> NotificationModel:
+        """Mark a notification as read."""
+        notification = await self.get_notification(notification_id)
+        if notification.read_at is None:
+            notification.read_at = utc_now()
+            await self._notification_repo.update(notification)
+            await self._session.commit()
+            await self._session.refresh(notification)
         return notification
 
     async def mark_sent(self, notification_id: uuid.UUID) -> NotificationModel:
@@ -112,8 +123,6 @@ class NotificationService:
         offset: int,
     ) -> tuple[list[NotificationModel], int]:
         """Return a paginated list of a user's notifications."""
-        items = await self._notification_repo.list_by_user(
-            user_id, limit=limit, offset=offset
-        )
+        items = await self._notification_repo.list_by_user(user_id, limit=limit, offset=offset)
         total = await self._notification_repo.count_by_user(user_id)
         return list(items), total

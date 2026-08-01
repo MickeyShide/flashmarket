@@ -78,9 +78,7 @@ class WishlistRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
-    async def get_product_ids_for_user(
-        self, user_id: UUID, product_ids: list[UUID]
-    ) -> set[UUID]:
+    async def get_product_ids_for_user(self, user_id: UUID, product_ids: list[UUID]) -> set[UUID]:
         if not product_ids:
             return set()
         stmt = select(WishlistItemModel.product_id).where(
@@ -89,3 +87,14 @@ class WishlistRepository:
         )
         result = await self._session.execute(stmt)
         return set(result.scalars().all())
+
+    async def get_users_for_products(self, product_ids: list[UUID]) -> list[UUID]:
+        """Return distinct users watching any of the supplied products."""
+        if not product_ids:
+            return []
+        result = await self._session.scalars(
+            select(WishlistItemModel.user_id)
+            .where(WishlistItemModel.product_id.in_(product_ids))
+            .distinct()
+        )
+        return list(result.all())

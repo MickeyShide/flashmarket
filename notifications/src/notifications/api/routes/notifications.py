@@ -42,26 +42,6 @@ async def create_notification(
 
 
 @router.get(
-    "/{notification_id}",
-    response_model=NotificationResponse,
-    summary="Get a notification",
-)
-async def get_notification(
-    notification_id: UUID,
-    principal: CurrentPrincipal,
-    service: NotificationService = Depends(get_notification_service),
-) -> NotificationResponse:
-    """Return a single notification by id."""
-    notification = await service.get_notification(notification_id)
-    if principal.role != "ADMIN" and notification.user_id != principal.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot view another user's notification",
-        )
-    return _notification_response(notification)
-
-
-@router.get(
     "/users/{user_id}",
     response_model=NotificationListResponse,
     summary="List user notifications",
@@ -89,6 +69,45 @@ async def list_notifications(
         limit=params.limit,
         offset=params.offset,
     )
+
+
+@router.get(
+    "/{notification_id}",
+    response_model=NotificationResponse,
+    summary="Get a notification",
+)
+async def get_notification(
+    notification_id: UUID,
+    principal: CurrentPrincipal,
+    service: NotificationService = Depends(get_notification_service),
+) -> NotificationResponse:
+    """Return a single notification by id."""
+    notification = await service.get_notification(notification_id)
+    if principal.role != "ADMIN" and notification.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot view another user's notification",
+        )
+    return _notification_response(notification)
+
+
+@router.post(
+    "/{notification_id}/read",
+    response_model=NotificationResponse,
+    summary="Mark a notification as read",
+)
+async def read_notification(
+    notification_id: UUID,
+    principal: CurrentPrincipal,
+    service: NotificationService = Depends(get_notification_service),
+) -> NotificationResponse:
+    notification = await service.get_notification(notification_id)
+    if principal.role != "ADMIN" and notification.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot update another user's notification",
+        )
+    return _notification_response(await service.mark_read(notification_id))
 
 
 @router.post(

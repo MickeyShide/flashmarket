@@ -11,6 +11,7 @@ x-wishlist-environment: &wishlist-environment
   WISHLIST_TRUSTED_HOSTS: '["localhost","127.0.0.1","wishlist","gateway"]'
   WISHLIST_LOG_FILE_PATH: /var/log/shide/wishlist-api.log
   WISHLIST_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
+  WISHLIST_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
   WISHLIST_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
   WISHLIST_JWT_ALGORITHM: EdDSA
   WISHLIST_JWT_ISSUER: flashmarket-auth
@@ -38,6 +39,18 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
+
+  consumer:
+    <<: *wishlist-runtime
+    environment:
+      <<: *wishlist-environment
+      WISHLIST_LOG_FILE_PATH: /var/log/shide/wishlist-consumer.log
+    command:
+      - consumer
+      - wishlist.event_consumer
+    volumes:
+      - backend-logs-local:/var/log/shide
     restart: unless-stopped
 
 volumes:
