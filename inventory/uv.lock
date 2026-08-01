@@ -476,12 +476,14 @@ version = "0.1.3"
 source = { directory = "../shared/jwt_verifier" }
 dependencies = [
     { name = "cryptography" },
+    { name = "fastapi" },
     { name = "pyjwt" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=42.0.0" },
+    { name = "fastapi", specifier = ">=0.110.0" },
     { name = "pyjwt", specifier = ">=2.8.0" },
 ]
 
