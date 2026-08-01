@@ -1,0 +1,85 @@
+name: Drops CI / Deploy
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - drops/**
+      - .github/workflows/drops-deploy.yml
+  push:
+    branches:
+      - develop
+      - main
+    tags:
+      - drops-v*
+    paths:
+      - drops/**
+      - .github/workflows/drops-deploy.yml
+  workflow_dispatch:
+
+concurrency:
+  group: drops-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.11.32"
+  IMAGE_NAME: ghcr.io/mickeyshide/flashmarket-drops
+
+jobs:
+  ruff:
+    name: Ruff warnings
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: drops
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: drops/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Run Ruff as warnings
+        run: uv run ruff check .
+
+  pytest:
+    name: Pytest suite
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: drops
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: drops/uv.lock
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Run unit & integration tests
+        run: uv run pytest -q -p no:cacheprovider
