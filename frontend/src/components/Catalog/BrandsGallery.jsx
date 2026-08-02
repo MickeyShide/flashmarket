@@ -34,10 +34,7 @@ export const BrandsGallery = ({ brandsData, onSelectBrand, activeCategoryId, act
               <div className="absolute inset-0 bg-radial-gradient from-white/10 to-transparent pointer-events-none z-10" />
 
               {/* Header inside card */}
-              <div className="flex justify-between items-center z-20 relative">
-                <span className="font-mono text-[8.5px] font-extrabold tracking-[1.5px] uppercase px-2 py-0.5 rounded bg-white/10 text-gray-200">
-                  RELEASE 2026
-                </span>
+              <div className="flex justify-end items-center z-20 relative">
                 <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center transition-all duration-200 group-hover:bg-white group-hover:translate-x-0.5">
                   <svg className="w-3.5 h-3.5 stroke-white group-hover:stroke-black stroke-[2.5] fill-none" viewBox="0 0 24 24">
                     <line x1="5" y1="12" x2="19" y2="12"></line>
