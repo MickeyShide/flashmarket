@@ -69,6 +69,7 @@ def test_wishlist_deploy_compose_owns_runtime_and_gateway_alias() -> None:
     assert "      aliases:\n        - wishlist" in compose
     assert "name: shide-observability" in compose
     assert "name: flashmarket-auth-jwt-keys-public" in compose
-    assert "name: shide-backend-logs-local" in compose
+    assert "WISHLIST_LOG_FILE_PATH" not in compose
+    assert "backend-logs" not in compose
     assert "http://localhost:8000/health/ready" in compose
     assert "ports:" not in compose

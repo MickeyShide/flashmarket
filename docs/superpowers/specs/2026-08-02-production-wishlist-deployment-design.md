@@ -27,12 +27,12 @@ A manual server-only start is not the chosen solution because it is not reproduc
 
 Add `wishlist/docker-compose.deploy.yml` with a project name dedicated to production Wishlist and two services:
 
-- `api`, with the shared runtime environment, JWT public-key mount, log mount, health check, and network alias `wishlist`;
+- `api`, with the shared runtime environment, JWT public-key mount, stdout/stderr logging, health check, and network alias `wishlist`;
 - `consumer`, using the same immutable image and environment but running `wishlist.event_consumer`.
 
 Both services join the existing external `shide-observability` network. The API receives the `wishlist` alias required by the gateway. The compose file does not publish a host port because gateway-to-service traffic remains internal to Docker.
 
-The JWT public-key volume and backend log volume are external production resources. The API and consumer use restart policies suitable for long-running services. The image is supplied through `WISHLIST_IMAGE`; local image names and `pull_policy: never` are not used in production.
+The JWT public-key volume is an external production resource. The API and consumer emit logs to stdout/stderr so Docker and Promtail can collect them without granting the unprivileged application user write access to a shared host volume. Both services use restart policies suitable for long-running services. The image is supplied through `WISHLIST_IMAGE`; local image names and `pull_policy: never` are not used in production.
 
 ## Image Build
 
@@ -113,7 +113,7 @@ Add a repository-level deployment workflow test that asserts:
 - remote execution and migrations have explicit time bounds;
 - API health and consumer running state are checked;
 - the public gateway Wishlist readiness URL is verified;
-- the deploy Compose file uses the immutable image variable, external network, `wishlist` alias, external key/log volumes, API health check, and no host port.
+- the deploy Compose file uses the immutable image variable, external network, `wishlist` alias, external key volume, stdout/stderr logging, API health check, and no host port.
 
 Run the new workflow test, the Wishlist pytest suite, relevant gateway routing tests, Compose rendering, and YAML parsing before closure.
 

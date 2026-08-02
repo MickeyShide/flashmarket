@@ -11,13 +11,10 @@ x-wishlist-runtime: &wishlist-runtime
         - wishlist
   volumes:
     - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
-    - backend-logs:/var/log/shide
 
 services:
   api:
     <<: *wishlist-runtime
-    environment:
-      WISHLIST_LOG_FILE_PATH: /var/log/shide/wishlist-api.log
     healthcheck:
       test:
         - CMD
@@ -32,8 +29,6 @@ services:
 
   consumer:
     <<: *wishlist-runtime
-    environment:
-      WISHLIST_LOG_FILE_PATH: /var/log/shide/wishlist-consumer.log
     command:
       - consumer
       - wishlist.event_consumer
@@ -48,6 +43,3 @@ volumes:
   auth-jwt-keys-public:
     external: true
     name: flashmarket-auth-jwt-keys-public
-  backend-logs:
-    external: true
-    name: shide-backend-logs-local
