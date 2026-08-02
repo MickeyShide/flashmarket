@@ -1,0 +1,53 @@
+name: flashmarket-wishlist
+
+x-wishlist-runtime: &wishlist-runtime
+  image: ${WISHLIST_IMAGE:?WISHLIST_IMAGE must contain the image digest}
+  pull_policy: always
+  env_file:
+    - ${WISHLIST_ENV_FILE:-.env}
+  networks:
+    backend:
+      aliases:
+        - wishlist
+  volumes:
+    - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
+    - backend-logs:/var/log/shide
+
+services:
+  api:
+    <<: *wishlist-runtime
+    environment:
+      WISHLIST_LOG_FILE_PATH: /var/log/shide/wishlist-api.log
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  consumer:
+    <<: *wishlist-runtime
+    environment:
+      WISHLIST_LOG_FILE_PATH: /var/log/shide/wishlist-consumer.log
+    command:
+      - consumer
+      - wishlist.event_consumer
+    restart: unless-stopped
+
+networks:
+  backend:
+    external: true
+    name: shide-observability
+
+volumes:
+  auth-jwt-keys-public:
+    external: true
+    name: flashmarket-auth-jwt-keys-public
+  backend-logs:
+    external: true
+    name: shide-backend-logs-local
