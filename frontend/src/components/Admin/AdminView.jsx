@@ -32,21 +32,21 @@ export const AdminView = ({ onBack }) => {
   }
 
   return (
-    <div className="max-w-[1280px] mx-auto my-6 md:my-8 px-3.5 md:px-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="max-w-[1280px] mx-auto my-4 md:my-8 px-3.5 md:px-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <button
-          className="text-[11px] font-bold uppercase tracking-wider cursor-pointer text-text-muted hover:text-black flex items-center gap-1"
+          className="text-[11px] font-bold uppercase tracking-wider cursor-pointer text-text-muted hover:text-black flex items-center gap-1 self-start"
           onClick={onBack}
         >
           ← Назад в магазин
         </button>
 
-        <div className="text-xs font-bold font-mono text-purple-700 uppercase">
+        <div className="text-[10.5px] md:text-xs font-bold font-mono text-purple-700 uppercase truncate">
           ● Панель администратора ({user.email})
         </div>
       </div>
 
-      <h2 className="text-xl md:text-2xl font-black uppercase tracking-wide mb-6">
+      <h2 className="text-lg md:text-2xl font-black uppercase tracking-wide mb-4 md:mb-6">
         УПРАВЛЕНИЕ МАГАЗИНОМ
       </h2>
 

@@ -153,10 +153,10 @@ export const PromocodesTab = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <h3 className="text-sm font-black uppercase">Промокоды ({promocodes.length})</h3>
         <button
-          className="bg-black text-white px-4 py-2 rounded text-xs font-black uppercase tracking-wider hover:bg-gray-800"
+          className="bg-black text-white px-4 py-2 rounded text-xs font-black uppercase tracking-wider hover:bg-gray-800 w-full sm:w-auto cursor-pointer"
           onClick={handleOpenCreate}
         >
           + Создать промокод
@@ -307,8 +307,60 @@ export const PromocodesTab = () => {
         </div>
       )}
 
-      {/* Promocodes Table */}
-      <div className="bg-white border border-border-color rounded-lg overflow-hidden">
+      {/* Mobile Promocodes Cards List (< md screens) */}
+      <div className="md:hidden space-y-3">
+        {promocodes.length === 0 ? (
+          <div className="bg-white border border-border-color rounded-lg p-6 text-center text-xs text-gray-500">
+            Промокоды не найдены
+          </div>
+        ) : (
+          promocodes.map(p => {
+            const isFixed = (p.discount_type || p.type) === 'FIXED';
+            const displayVal = isFixed ? formatPrice(p.discount_value, 'RUB', true) : `${p.discount_value}%`;
+
+            return (
+              <div key={p.id} className="bg-white border border-border-color rounded-lg p-3.5 space-y-3 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="font-mono font-black text-sm uppercase text-black">{p.code}</h4>
+                    <div className="font-extrabold text-xs text-emerald-600 mt-0.5">Скидка: {displayVal}</div>
+                  </div>
+                  <span className={`text-[8.5px] font-black px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                    p.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {p.status === 'ACTIVE' ? 'АКТИВЕН' : 'ОТКЛЮЧЕН'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[10.5px] font-mono text-gray-600 bg-gray-50 p-2 rounded border">
+                  <div>Мин. заказ: {p.min_order_amount ? formatPrice(p.min_order_amount, 'RUB', true) : 'Без мин.'}</div>
+                  <div>Использования: {p.current_uses ?? p.used_count ?? 0}/{p.max_uses ? p.max_uses : '∞'}</div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                  <button
+                    className="flex-1 py-2 bg-black text-white text-[11px] font-bold rounded uppercase hover:bg-gray-800 cursor-pointer text-center"
+                    onClick={() => handleOpenEdit(p)}
+                  >
+                    Изменить
+                  </button>
+                  <button
+                    className={`px-3 py-2 text-[11px] font-bold rounded uppercase cursor-pointer ${
+                      p.status === 'ACTIVE' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                    }`}
+                    onClick={() => handleToggleStatus(p)}
+                  >
+                    {p.status === 'ACTIVE' ? 'Отключить' : 'Включить'}
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop Promocodes Table (>= md screens) */}
+      <div className="hidden md:block bg-white border border-border-color rounded-lg overflow-x-auto w-full">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b text-[10px] font-black uppercase text-gray-500">
@@ -344,13 +396,13 @@ export const PromocodesTab = () => {
                   </td>
                   <td className="p-3 text-right space-x-1.5">
                     <button
-                      className="px-2.5 py-1 bg-black text-white text-[10px] font-bold rounded uppercase hover:bg-gray-800"
+                      className="px-2.5 py-1 bg-black text-white text-[10px] font-bold rounded uppercase hover:bg-gray-800 cursor-pointer"
                       onClick={() => handleOpenEdit(p)}
                     >
                       Изменить
                     </button>
                     <button
-                      className={`px-2.5 py-1 text-[10px] font-bold rounded uppercase ${
+                      className={`px-2.5 py-1 text-[10px] font-bold rounded uppercase cursor-pointer ${
                         p.status === 'ACTIVE' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                       }`}
                       onClick={() => handleToggleStatus(p)}

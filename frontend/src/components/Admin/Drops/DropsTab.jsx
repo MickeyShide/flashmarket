@@ -181,8 +181,8 @@ export const DropsTab = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-black uppercase">Управление дропами ({drops.length})</h3>
           <select
             className="border p-1.5 rounded text-xs font-bold uppercase"
@@ -199,7 +199,7 @@ export const DropsTab = () => {
         </div>
 
         <button
-          className="bg-black text-white px-4 py-2 rounded text-xs font-black uppercase tracking-wider hover:bg-gray-800"
+          className="bg-black text-white px-4 py-2 rounded text-xs font-black uppercase tracking-wider hover:bg-gray-800 w-full sm:w-auto cursor-pointer"
           onClick={handleOpenCreate}
         >
           + Создать Дроп
@@ -390,8 +390,83 @@ export const DropsTab = () => {
         </div>
       )}
 
-      {/* Drops Table */}
-      <div className="bg-white border border-border-color rounded-lg overflow-hidden">
+      {/* Mobile Drops Cards List (< md screens) */}
+      <div className="md:hidden space-y-3">
+        {filteredDrops.length === 0 ? (
+          <div className="bg-white border border-border-color rounded-lg p-6 text-center text-xs text-gray-500">
+            Дропы не найдены
+          </div>
+        ) : (
+          filteredDrops.map(d => (
+            <div key={d.id} className="bg-white border border-border-color rounded-lg p-3.5 space-y-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="font-black text-xs uppercase">{d.name || d.title || d.slug}</h4>
+                  <div className="text-[10px] text-gray-400 font-mono">slug: {d.slug}</div>
+                </div>
+                <span className={`text-[8.5px] font-black px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                  d.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
+                  d.status === 'SCHEDULED' ? 'bg-purple-100 text-purple-800' : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {d.status}
+                </span>
+              </div>
+
+              <div className="text-[10.5px] font-mono text-gray-600 bg-gray-50 p-2 rounded border space-y-0.5">
+                <div>Старт: {d.starts_at ? new Date(d.starts_at).toLocaleString() : '-'}</div>
+                <div>Финиш: {d.ends_at ? new Date(d.ends_at).toLocaleString() : '-'}</div>
+                <div className="font-bold text-black mt-1">Товаров: {d.items?.length || d.product_ids?.length || 0} шт</div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                {(d.status === 'DRAFT' || d.status === 'SCHEDULED') && (
+                  <button
+                    className="flex-1 py-1.5 bg-black text-white text-[10px] font-bold rounded uppercase hover:bg-gray-800 cursor-pointer text-center"
+                    onClick={() => handleOpenEdit(d)}
+                  >
+                    Изменить
+                  </button>
+                )}
+                {d.status === 'DRAFT' && (
+                  <button
+                    className="px-2.5 py-1.5 bg-purple-600 text-white text-[10px] font-bold rounded uppercase hover:bg-purple-700 cursor-pointer"
+                    onClick={() => handleTransition(d.id, 'schedule')}
+                  >
+                    Schedule
+                  </button>
+                )}
+                {d.status === 'SCHEDULED' && (
+                  <button
+                    className="px-2.5 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded uppercase hover:bg-emerald-700 cursor-pointer"
+                    onClick={() => handleTransition(d.id, 'start')}
+                  >
+                    Start
+                  </button>
+                )}
+                {d.status === 'ACTIVE' && (
+                  <button
+                    className="px-2.5 py-1.5 bg-gray-700 text-white text-[10px] font-bold rounded uppercase hover:bg-gray-900 cursor-pointer"
+                    onClick={() => handleTransition(d.id, 'end')}
+                  >
+                    End
+                  </button>
+                )}
+                {d.status !== 'CANCELLED' && d.status !== 'ENDED' && (
+                  <button
+                    className="px-2.5 py-1.5 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase hover:bg-red-200 cursor-pointer"
+                    onClick={() => handleTransition(d.id, 'cancel')}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Drops Table (>= md screens) */}
+      <div className="hidden md:block bg-white border border-border-color rounded-lg overflow-x-auto w-full">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b text-[10px] font-black uppercase text-gray-500">
@@ -425,7 +500,7 @@ export const DropsTab = () => {
                 <td className="p-3 text-right space-x-1.5">
                   {(d.status === 'DRAFT' || d.status === 'SCHEDULED') && (
                     <button
-                      className="px-2.5 py-1 bg-black text-white text-[10px] font-bold rounded uppercase hover:bg-gray-800"
+                      className="px-2.5 py-1 bg-black text-white text-[10px] font-bold rounded uppercase hover:bg-gray-800 cursor-pointer"
                       onClick={() => handleOpenEdit(d)}
                     >
                       Изменить
@@ -433,7 +508,7 @@ export const DropsTab = () => {
                   )}
                   {d.status === 'DRAFT' && (
                     <button
-                      className="px-2 py-1 bg-purple-600 text-white text-[10px] font-bold rounded uppercase hover:bg-purple-700"
+                      className="px-2 py-1 bg-purple-600 text-white text-[10px] font-bold rounded uppercase hover:bg-purple-700 cursor-pointer"
                       onClick={() => handleTransition(d.id, 'schedule')}
                     >
                       Schedule
@@ -441,7 +516,7 @@ export const DropsTab = () => {
                   )}
                   {d.status === 'SCHEDULED' && (
                     <button
-                      className="px-2 py-1 bg-emerald-600 text-white text-[10px] font-bold rounded uppercase hover:bg-emerald-700"
+                      className="px-2 py-1 bg-emerald-600 text-white text-[10px] font-bold rounded uppercase hover:bg-emerald-700 cursor-pointer"
                       onClick={() => handleTransition(d.id, 'start')}
                     >
                       Start
@@ -449,7 +524,7 @@ export const DropsTab = () => {
                   )}
                   {d.status === 'ACTIVE' && (
                     <button
-                      className="px-2 py-1 bg-gray-700 text-white text-[10px] font-bold rounded uppercase hover:bg-gray-900"
+                      className="px-2 py-1 bg-gray-700 text-white text-[10px] font-bold rounded uppercase hover:bg-gray-900 cursor-pointer"
                       onClick={() => handleTransition(d.id, 'end')}
                     >
                       End
@@ -457,7 +532,7 @@ export const DropsTab = () => {
                   )}
                   {d.status !== 'CANCELLED' && d.status !== 'ENDED' && (
                     <button
-                      className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase hover:bg-red-200"
+                      className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase hover:bg-red-200 cursor-pointer"
                       onClick={() => handleTransition(d.id, 'cancel')}
                     >
                       Cancel

@@ -11,6 +11,8 @@ import { BrandActiveBanner } from './components/Catalog/BrandActiveBanner';
 import { BrandsGallery } from './components/Catalog/BrandsGallery';
 import { CatalogControls } from './components/Catalog/CatalogControls';
 import { ProductGrid } from './components/Catalog/ProductGrid';
+import { CategoriesView } from './components/Catalog/CategoriesView';
+import { flattenCategories } from './utils/formatters';
 
 import { ProductDetail } from './components/Product/ProductDetail';
 import { CartView } from './components/Cart/CartView';
@@ -233,6 +235,7 @@ export const App = () => {
   };
 
   const activeBrand = brandsData.find(b => b.id === activeBrandId);
+  const activeCategory = activeCategoryId ? flattenCategories(categoriesData).find(c => c.id === activeCategoryId) : null;
 
   if (currentView === 'dev') {
     return (
@@ -264,6 +267,7 @@ export const App = () => {
         filterCategory={handleFilterCategory}
         mobileNavOpen={mobileNavOpen}
         closeMobileNav={() => setMobileNavOpen(false)}
+        currentView={currentView}
         setCurrentView={setCurrentView}
         switchProfileTab={setProfileTab}
       />
@@ -275,6 +279,8 @@ export const App = () => {
             <BrandActiveBanner
               activeBrand={activeBrand}
               resetBrandFilter={handleResetBrandFilter}
+              activeCategory={activeCategory}
+              resetCategoryFilter={() => handleFilterCategory(null)}
             />
 
             <DropsSection
@@ -315,6 +321,18 @@ export const App = () => {
               onLoadMore={handleLoadMore}
             />
           </>
+        )}
+
+        {currentView === 'categories' && (
+          <CategoriesView
+            categoriesData={categoriesData}
+            activeCategoryId={activeCategoryId}
+            onSelectCategory={(catId) => {
+              handleFilterCategory(catId);
+              setCurrentView('catalog');
+            }}
+            onBack={() => setCurrentView('catalog')}
+          />
         )}
 
         {currentView === 'drops' && (

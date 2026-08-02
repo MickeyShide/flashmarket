@@ -74,27 +74,27 @@ export const StockTab = ({ product, variant = null }) => {
       </h3>
 
       {/* Stock counters */}
-      <div className="grid grid-cols-4 gap-3 text-center">
-        <div className="bg-gray-50 p-3 rounded border">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-center">
+        <div className="bg-gray-50 p-2.5 sm:p-3 rounded border">
           <div className="text-[10px] font-bold uppercase text-gray-500">Доступно</div>
           <div className="text-base font-black text-emerald-600">{stock?.available ?? 0}</div>
         </div>
-        <div className="bg-gray-50 p-3 rounded border">
+        <div className="bg-gray-50 p-2.5 sm:p-3 rounded border">
           <div className="text-[10px] font-bold uppercase text-gray-500">Зарезервировано</div>
           <div className="text-base font-black text-amber-600">{stock?.reserved ?? 0}</div>
         </div>
-        <div className="bg-gray-50 p-3 rounded border">
+        <div className="bg-gray-50 p-2.5 sm:p-3 rounded border">
           <div className="text-[10px] font-bold uppercase text-gray-500">Продано</div>
           <div className="text-base font-black text-blue-600">{stock?.sold ?? 0}</div>
         </div>
-        <div className="bg-gray-50 p-3 rounded border">
+        <div className="bg-gray-50 p-2.5 sm:p-3 rounded border">
           <div className="text-[10px] font-bold uppercase text-gray-500">Всего</div>
           <div className="text-base font-black text-black">{stock?.total ?? 0}</div>
         </div>
       </div>
 
       {/* Form to set available quantity */}
-      <form onSubmit={handleUpdateStock} className="flex gap-2 items-end pt-2">
+      <form onSubmit={handleUpdateStock} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end pt-2">
         <div className="flex-1">
           <label className="block text-[10.5px] font-bold uppercase text-gray-700 mb-1">
             Установить доступное количество на складе (шт.)

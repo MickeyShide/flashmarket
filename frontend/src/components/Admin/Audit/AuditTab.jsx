@@ -28,7 +28,30 @@ export const AuditTab = () => {
     <div className="space-y-4">
       <h3 className="text-sm font-black uppercase">Журнал аудит-событий ({logs.length})</h3>
 
-      <div className="bg-white border border-border-color rounded-lg overflow-hidden">
+      {/* Mobile Audit Cards List (< md screens) */}
+      <div className="md:hidden space-y-2.5 font-mono text-xs">
+        {logs.length === 0 ? (
+          <div className="bg-white border border-border-color rounded-lg p-6 text-center text-gray-400">
+            Нет записанных событий аудита
+          </div>
+        ) : (
+          logs.map((log, idx) => (
+            <div key={log.id || idx} className="bg-white border border-border-color rounded-lg p-3 space-y-1.5 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-extrabold uppercase text-purple-700 text-xs">{log.action || log.event_type}</span>
+                <span className="text-[10px] text-gray-400">{formatDate(log.created_at || log.timestamp)}</span>
+              </div>
+              <div className="text-[10.5px] text-gray-700">Пользователь: {log.actor_user_id || '-'}</div>
+              <div className="text-[10px] text-gray-500 bg-gray-50 p-1.5 rounded border break-all leading-tight">
+                {JSON.stringify(log.event_data || { subject_user_id: log.subject_user_id })}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Audit Table (>= md screens) */}
+      <div className="hidden md:block bg-white border border-border-color rounded-lg overflow-x-auto w-full">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b text-[10px] font-black uppercase text-gray-500">

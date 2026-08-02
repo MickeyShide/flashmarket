@@ -58,7 +58,53 @@ export const MediaTab = () => {
         </select>
       </div>
 
-      <div className="bg-white border border-border-color rounded-lg overflow-hidden">
+      {/* Mobile Media Cards List (< md screens) */}
+      <div className="md:hidden space-y-3">
+        {visibleAssets.length === 0 ? (
+          <div className="bg-white border border-border-color rounded-lg p-6 text-center text-xs text-gray-500">
+            Медиа файлы не найдены
+          </div>
+        ) : (
+          visibleAssets.map(a => (
+            <div key={a.id} className="bg-white border border-border-color rounded-lg p-3.5 flex items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {a.public_url ? (
+                  <img src={a.public_url} alt="" className="w-12 h-12 object-cover rounded bg-black shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-[9px] font-mono text-gray-400 shrink-0">
+                    NO URL
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs uppercase truncate">{a.original_filename || a.id}</div>
+                  <div className="text-[10px] text-gray-400 font-mono">цель: {a.purpose || 'general'}</div>
+                  <div className="text-[9.5px] text-gray-500 font-mono mt-0.5">{formatDate(a.created_at)}</div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <span className={`text-[8.5px] font-black px-1.5 py-0.5 rounded uppercase ${
+                  a.status === 'READY' ? 'bg-emerald-100 text-emerald-800' :
+                  a.status === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {a.status}
+                </span>
+
+                <button
+                  className="px-2.5 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase hover:bg-red-200 cursor-pointer"
+                  onClick={() => handleDeleteAsset(a.id)}
+                >
+                  Удалить
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Media Table (>= md screens) */}
+      <div className="hidden md:block bg-white border border-border-color rounded-lg overflow-x-auto w-full">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b text-[10px] font-black uppercase text-gray-500">
@@ -100,7 +146,7 @@ export const MediaTab = () => {
                 <td className="p-3 font-mono text-[10.5px]">{formatDate(a.created_at)}</td>
                 <td className="p-3 text-right">
                   <button
-                    className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase hover:bg-red-200"
+                    className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase hover:bg-red-200 cursor-pointer"
                     onClick={() => handleDeleteAsset(a.id)}
                   >
                     Удалить
