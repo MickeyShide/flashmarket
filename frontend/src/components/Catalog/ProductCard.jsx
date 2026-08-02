@@ -28,7 +28,7 @@ export const ProductCard = ({ product, onClick }) => {
     >
       {/* Thumbnail Box */}
       <div
-        className="w-full aspect-[3/4] max-h-[320px] bg-gray-100 rounded flex flex-col items-center justify-center relative mb-3 overflow-hidden"
+        className="w-full aspect-[3/4] max-h-[320px] bg-transparent rounded flex flex-col items-center justify-center relative mb-3 overflow-hidden"
       >
         {/* Heart Wishlist Button */}
         <button

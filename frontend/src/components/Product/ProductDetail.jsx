@@ -192,7 +192,7 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
       <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 md:gap-9">
         {/* Left: Product gallery */}
         <div className="min-w-0">
-          <div className="w-full h-[280px] md:h-[420px] bg-gray-100 rounded-lg flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="w-full h-[280px] md:h-[420px] bg-transparent rounded-lg flex flex-col items-center justify-center relative overflow-hidden">
             {selectedImageUrl ? (
               <img
                 src={selectedImageUrl}
@@ -224,7 +224,7 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
                   key={image.id || image.url}
                   type="button"
                   aria-label={image.isCover ? 'Выбрать обложку товара' : 'Выбрать изображение товара'}
-                  className={`w-14 h-14 rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center cursor-pointer transition-all ${
+                  className={`w-14 h-14 rounded-lg overflow-hidden border bg-transparent flex items-center justify-center cursor-pointer transition-all ${
                     selectedImageUrl === image.url ? 'border-black ring-2 ring-black' : 'border-border-color hover:border-gray-400'
                   }`}
                   onClick={() => setSelectedImageUrl(image.url)}
