@@ -50,6 +50,7 @@ async def test_presign_upload_head_read_and_delete_existing_s3() -> None:
     asset_id = str(uuid.uuid4())
     content = b"%PDF-1.4\n%%EOF\n"
     browser_origin = os.getenv("MEDIA_TEST_S3_ORIGIN")
+    public_base_url = os.getenv("MEDIA_TEST_S3_PUBLIC_BASE_URL", "").rstrip("/")
     post = await storage.create_presigned_post(
         key=key,
         content_type="application/pdf",
@@ -73,5 +74,10 @@ async def test_presign_upload_head_read_and_delete_existing_s3() -> None:
         assert head.size == len(content)
         assert head.metadata["asset-id"] == asset_id
         assert await storage.read_object(key, len(content)) == content
+        if public_base_url:
+            async with httpx.AsyncClient(timeout=30) as client:
+                public = await client.get(f"{public_base_url}/{key}")
+            assert public.status_code == 200, public.text
+            assert public.content == content
     finally:
         await storage.delete_object(key)

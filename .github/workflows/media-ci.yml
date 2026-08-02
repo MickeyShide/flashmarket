@@ -1,4 +1,4 @@
-name: Media CI
+name: Media CI / Deploy
 
 on:
   pull_request:
@@ -23,6 +23,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: media-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
 
 env:
   UV_VERSION: "0.11.32"
@@ -71,6 +75,8 @@ jobs:
     name: Build Media image
     needs: [quality]
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     permissions:
       contents: read
       packages: write
@@ -102,6 +108,7 @@ jobs:
             type=sha,prefix=sha-
 
       - name: Build and publish image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -111,3 +118,261 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=flashmarket-media
           cache-to: type=gha,mode=max,scope=flashmarket-media
+
+  deploy:
+    name: Deploy production
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/media-v')
+    needs: [image]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST || '176.108.242.100' }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER || 'user1' }}
+      DEPLOY_PATH: ${{ vars.MEDIA_DEPLOY_PATH }}
+      SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GHCR_USERNAME: ${{ github.actor }}
+      INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
+      MEDIA_IMAGE: ghcr.io/mickeyshide/flashmarket-media@${{ needs.image.outputs.digest }}
+      MEDIA_S3_BUCKET: ${{ vars.MEDIA_S3_BUCKET || 'flashmarket-public' }}
+      MEDIA_CORS_ORIGINS: ${{ vars.MEDIA_CORS_ORIGINS }}
+      GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
+          DEPLOY_USER="${DEPLOY_USER:-user1}"
+          INFRA_USER="${INFRA_USER:-shide}"
+          DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
+
+          if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::DEPLOY_HOST must be a hostname or IPv4 address"
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            echo "::error::DEPLOY_USER is invalid"
+            exit 1
+          fi
+          if [[ -z "$DEPLOY_PATH" ]]; then
+            DEPLOY_PATH="/home/${DEPLOY_USER}/flashmarket-media"
+            echo "DEPLOY_PATH=$DEPLOY_PATH" >> "$GITHUB_ENV"
+          fi
+          if [[ ! "$DEPLOY_PORT" =~ ^[0-9]+$ ]] ||
+            (( DEPLOY_PORT < 1 || DEPLOY_PORT > 65535 )); then
+            echo "::error::DEPLOY_PORT must be between 1 and 65535"
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::DEPLOY_PATH must be an absolute Unix path"
+            exit 1
+          fi
+          if [[ ! "$GATEWAY_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::GATEWAY_DOMAIN must contain only a DNS hostname"
+            exit 1
+          fi
+          if [[ ! "$INFRA_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            echo "::error::INFRA_USER is invalid"
+            exit 1
+          fi
+          if [[ ! "$MEDIA_S3_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; then
+            echo "::error::MEDIA_S3_BUCKET is invalid"
+            exit 1
+          fi
+          if [[ -z "$SSH_PRIVATE_KEY" ]]; then
+            echo "::error::DEPLOY_SSH_KEY is required"
+            exit 1
+          fi
+          if [[ -z "${{ needs.image.outputs.digest }}" ]]; then
+            echo "::error::Media image digest is missing"
+            exit 1
+          fi
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          cat > "$HOME/.ssh/config" <<'EOF'
+          Host *
+              StrictHostKeyChecking no
+              UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 "$HOME/.ssh/config"
+
+      - name: Render production environment
+        shell: bash
+        run: |
+          environment_file="$RUNNER_TEMP/flashmarket-media.env"
+          cors_origins="${MEDIA_CORS_ORIGINS:-[\"https://${GATEWAY_DOMAIN}\"]}"
+          umask 077
+          {
+            printf 'MEDIA_IMAGE=%s\n' "$MEDIA_IMAGE"
+            printf 'MEDIA_ENVIRONMENT=production\n'
+            printf 'MEDIA_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/media\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
+            printf 'MEDIA_S3_INTERNAL_ENDPOINT=http://shide-minio:9000\n'
+            printf 'MEDIA_S3_PUBLIC_ENDPOINT=https://%s/media-storage\n' "$GATEWAY_DOMAIN"
+            printf 'MEDIA_S3_BUCKET=%s\n' "$MEDIA_S3_BUCKET"
+            printf 'MEDIA_S3_REGION=us-east-1\n'
+            printf 'MEDIA_S3_ADDRESSING_STYLE=path\n'
+            printf 'MEDIA_PUBLIC_BASE_URL=https://%s/media-storage/%s\n' "$GATEWAY_DOMAIN" "$MEDIA_S3_BUCKET"
+            printf 'MEDIA_UPLOAD_TTL_SECONDS=600\n'
+            printf 'MEDIA_CLEANUP_INTERVAL_SECONDS=30\n'
+            printf 'MEDIA_CORS_ORIGINS=%s\n' "$cors_origins"
+            printf 'MEDIA_TRUSTED_HOSTS=["%s","media.%s","localhost","127.0.0.1","media","gateway"]\n' "$GATEWAY_DOMAIN" "$GATEWAY_DOMAIN"
+            printf 'MEDIA_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
+            printf 'MEDIA_JWT_PUBLIC_KEY_DIR=/var/lib/flashmarket/keys/public\n'
+            printf 'MEDIA_JWT_ALGORITHM=EdDSA\n'
+            printf 'MEDIA_JWT_ISSUER=flashmarket-auth\n'
+            printf 'MEDIA_JWT_AUDIENCE=flashmarket-api\n'
+            printf 'MEDIA_DEBUG=false\n'
+            printf 'MEDIA_DOCS_ENABLED=false\n'
+            printf 'INFRA_USER=%s\n' "$INFRA_USER"
+            printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
+          } > "$environment_file"
+          chmod 600 "$environment_file"
+
+      - name: Upload deployment files
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" "mkdir -p '$DEPLOY_PATH'"
+          scp -P "$DEPLOY_PORT" \
+            media/docker-compose.deploy.yml \
+            "$target:$DEPLOY_PATH/docker-compose.yml"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "umask 077; cat > '$DEPLOY_PATH/.env.next' && mv '$DEPLOY_PATH/.env.next' '$DEPLOY_PATH/.env'" \
+            < "$RUNNER_TEMP/flashmarket-media.env"
+
+      - name: Log server in to GHCR
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          printf '%s' "$GHCR_TOKEN" |
+            ssh -p "$DEPLOY_PORT" "$target" \
+              "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
+
+      - name: Deploy exact image digest
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "DEPLOY_PATH='$DEPLOY_PATH' MEDIA_IMAGE='$MEDIA_IMAGE' MEDIA_S3_BUCKET='$MEDIA_S3_BUCKET' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$DEPLOY_PATH"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+
+          if [[ ! -f .env ]]; then
+            echo "Missing $DEPLOY_PATH/.env"
+            exit 1
+          fi
+
+          get_container_env() {
+            container="$1"
+            name="$2"
+            prefix="${name}="
+            line="$(
+              docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" |
+                awk -v prefix="$prefix" 'index($0, prefix) == 1 { print substr($0, length(prefix) + 1); exit }'
+            )"
+            [[ -n "$line" ]] || {
+              echo "Required environment variable $name is missing from $container" >&2
+              return 1
+            }
+            printf '%s' "$line"
+          }
+
+          s3_access_key="$(get_container_env shide-minio MINIO_ROOT_USER)"
+          s3_secret_key="$(get_container_env shide-minio MINIO_ROOT_PASSWORD)"
+          runtime_env="$(mktemp "$DEPLOY_PATH/.env.runtime.XXXXXX")"
+          {
+            cat .env
+            printf 'MEDIA_S3_ACCESS_KEY=%s\n' "$s3_access_key"
+            printf 'MEDIA_S3_SECRET_KEY=%s\n' "$s3_secret_key"
+            printf 'S3_ACCESS_KEY=%s\n' "$s3_access_key"
+            printf 'S3_SECRET_KEY=%s\n' "$s3_secret_key"
+          } > "$runtime_env"
+          chmod 600 "$runtime_env"
+          mv "$runtime_env" .env
+
+          echo 'Preparing Media object-storage bucket...'
+          docker exec shide-minio mc alias set \
+            flashmarket-media-local \
+            http://localhost:9000 \
+            "$s3_access_key" \
+            "$s3_secret_key" >/dev/null
+          docker exec shide-minio mc mb --ignore-existing \
+            "flashmarket-media-local/$MEDIA_S3_BUCKET" >/dev/null
+          docker exec shide-minio mc anonymous set download \
+            "flashmarket-media-local/$MEDIA_S3_BUCKET" >/dev/null
+
+          export MEDIA_IMAGE
+          docker compose -f docker-compose.yml --env-file .env config --quiet
+          docker compose -f docker-compose.yml --env-file .env pull
+
+          echo 'Applying Media database migrations...'
+          timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps api migrate </dev/null
+          echo 'Database migrations complete.'
+
+          echo 'Starting Media API and cleanup worker...'
+          docker compose -f docker-compose.yml --env-file .env up \
+            -d \
+            --no-build \
+            --force-recreate \
+            --remove-orphans \
+            api cleanup
+
+          container="$(docker compose -f docker-compose.yml --env-file .env ps -q api)"
+          for attempt in $(seq 1 60); do
+            health="$(
+              docker inspect \
+                --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+                "$container"
+            )"
+            if [[ "$health" == "healthy" ]]; then
+              break
+            fi
+            if [[ "$health" == "unhealthy" || "$health" == "exited" ]]; then
+              docker compose -f docker-compose.yml --env-file .env logs --tail 100 api
+              exit 1
+            fi
+            sleep 2
+          done
+          final_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container")"
+          [[ "$final_health" == "healthy" ]] || {
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 api
+            exit 1
+          }
+          docker compose -f docker-compose.yml --env-file .env ps -a
+          REMOTE
+
+      - name: Verify public Media upstream
+        shell: bash
+        run: |
+          last_error=""
+          for _ in $(seq 1 30); do
+            if response="$(
+              curl --fail --silent --show-error \
+                "https://${GATEWAY_DOMAIN}/dev/status/media" 2>&1
+            )"; then
+              printf '%s\n' "$response"
+              exit 0
+            fi
+            last_error="$response"
+            sleep 2
+          done
+          echo "::error::Media is not reachable through the production gateway"
+          printf 'Last curl error: %s\n' "$last_error"
+          exit 1

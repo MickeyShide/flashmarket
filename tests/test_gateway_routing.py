@@ -305,3 +305,24 @@ def test_gw_011_local_storage_listener_streams_to_shared_minio() -> None:
         "http://127.0.0.1:8080",
     ):
         assert f"{origin}" in content
+
+
+def test_gw_012_same_origin_storage_route_strips_prefix_and_streams() -> None:
+    """GW-012: Production uploads share public TLS without entering the Media API."""
+    main = _main_server(_config())
+    storage = _location(main, "^~ /media-storage/")
+
+    for directive in (
+        "client_max_body_size 30m;",
+        "set $upstream_storage http://shide-minio:9000;",
+        "rewrite ^/media-storage(/.*)$ $1 break;",
+        "proxy_pass $upstream_storage$uri$is_args$args;",
+        "proxy_request_buffering off;",
+        "proxy_send_timeout 300s;",
+        "proxy_read_timeout 300s;",
+    ):
+        assert directive in storage
+
+    assert "limit_req zone=" not in storage
+    assert "proxy_pass $upstream_media" not in storage
+    assert "return 308 /media-storage/;" in _location(main, "= /media-storage")

@@ -53,6 +53,11 @@ mc admin config set <alias> api cors_allow_origin="https://shop.example.com,http
 mc admin service restart <alias>
 ```
 
+The default FlashMarket deployment avoids cross-origin storage entirely. Its public
+endpoint is `https://<gateway-domain>/media-storage`, which the gateway streams directly
+to MinIO after removing the prefix. Configure both `MEDIA_S3_PUBLIC_ENDPOINT` and
+`MEDIA_PUBLIC_BASE_URL` with this HTTPS route as shown in `.env.deploy.example`.
+
 `MEDIA_S3_PUBLIC_ENDPOINT` must be reachable by browsers, while
 `MEDIA_S3_INTERNAL_ENDPOINT` remains the private endpoint used for validation and
 cleanup. Do not use the internal Docker hostname in a browser-visible signed URL.
