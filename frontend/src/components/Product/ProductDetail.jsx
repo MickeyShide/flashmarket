@@ -4,6 +4,7 @@ import { formatPrice } from '../../utils/formatters';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { buildProductGallery } from './productGallery';
 
 export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
   const { addToCart, fetchStock } = useCart();
@@ -31,9 +32,8 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
         const item = await apiJson('/api/v1/products/' + encodeURIComponent(productSlug));
         if (!isMounted) return;
         setProduct(item);
-        const firstGalleryImage = [...(item.images || [])]
-          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))[0]?.url;
-        setSelectedImageUrl(item.cover_image || firstGalleryImage || null);
+        const firstGalleryImage = buildProductGallery(item.cover_image, item.images)[0]?.url;
+        setSelectedImageUrl(firstGalleryImage || null);
         setLoading(false);
 
         // Derive active variants if available
@@ -62,6 +62,10 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
   const activeVariants = useMemo(() => {
     return (product?.variants || []).filter(v => v.is_active !== false);
   }, [product]);
+
+  const galleryImages = useMemo(() => {
+    return buildProductGallery(product?.cover_image, product?.images);
+  }, [product?.cover_image, product?.images]);
 
   const availableSizes = useMemo(() => {
     const set = new Set();
@@ -185,49 +189,54 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-9">
-        {/* Left: Product Image Box */}
-        <div
-          className="w-full h-[280px] md:h-[420px] bg-black rounded flex flex-col items-center justify-center relative overflow-hidden"
-          style={selectedImageUrl ? { background: `url(${selectedImageUrl}) center/cover no-repeat #000` } : {}}
-        >
-          {!selectedImageUrl && (
-            <>
-              <svg className="w-16 h-16 stroke-white stroke-[1.2] fill-none opacity-90 mb-2" viewBox="0 0 24 24">
-                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-              </svg>
-              <span className="font-mono text-xs tracking-[2px] text-[#666666] uppercase">
-                {bName}
-              </span>
-            </>
-          )}
+      <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 md:gap-9">
+        {/* Left: Product gallery */}
+        <div className="min-w-0">
+          <div
+            className="w-full h-[280px] md:h-[420px] bg-black rounded flex flex-col items-center justify-center relative overflow-hidden"
+            style={selectedImageUrl ? { background: `url(${selectedImageUrl}) center/cover no-repeat #000` } : {}}
+          >
+            {!selectedImageUrl && (
+              <>
+                <svg className="w-16 h-16 stroke-white stroke-[1.2] fill-none opacity-90 mb-2" viewBox="0 0 24 24">
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                </svg>
+                <span className="font-mono text-xs tracking-[2px] text-[#666666] uppercase">
+                  {bName}
+                </span>
+              </>
+            )}
 
-          {dropInfo && (
-            <div className="absolute top-3 left-3 bg-purple-600 text-white font-extrabold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded shadow">
-              DROP: {dropInfo.name || dropInfo.slug}
+            {dropInfo && (
+              <div className="absolute top-3 left-3 bg-purple-600 text-white font-extrabold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded shadow">
+                DROP: {dropInfo.name || dropInfo.slug}
+              </div>
+            )}
+          </div>
+
+          {galleryImages.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {galleryImages.map(image => (
+                <button
+                  key={image.id || image.url}
+                  type="button"
+                  aria-label={image.isCover ? 'Выбрать обложку товара' : 'Выбрать изображение товара'}
+                  className={`w-14 h-14 rounded overflow-hidden border ${selectedImageUrl === image.url ? 'border-black' : 'border-border-color'}`}
+                  onClick={() => setSelectedImageUrl(image.url)}
+                >
+                  <img
+                    src={image.url}
+                    alt={image.isCover ? 'Обложка товара' : ''}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
             </div>
           )}
         </div>
 
-        {(product.images || []).length > 0 && (
-          <div className="flex gap-2 flex-wrap md:col-start-1">
-            {[...(product.images || [])]
-              .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-              .map(image => (
-                <button
-                  key={image.id || image.url}
-                  type="button"
-                  className={`w-14 h-14 rounded overflow-hidden border ${selectedImageUrl === image.url ? 'border-black' : 'border-border-color'}`}
-                  onClick={() => setSelectedImageUrl(image.url)}
-                >
-                  <img src={image.url} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-          </div>
-        )}
-
         {/* Right: Info & Controls */}
-        <div className="flex flex-col justify-center">
+        <div className="flex min-w-0 flex-col justify-start">
           <div className="text-[10.5px] font-extrabold tracking-[2px] uppercase text-text-muted mb-1.5 flex items-center gap-2">
             <span>{bName}{cName ? ' / ' + cName : ''}</span>
             {selectedVariant?.sku && <span className="font-mono text-[9px]">SKU: {selectedVariant.sku}</span>}

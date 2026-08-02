@@ -8,6 +8,7 @@ services:
       - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:80"
+      - "127.0.0.1:${MEDIA_STORAGE_PORT:-9000}:9000"
     environment:
       GATEWAY_DOMAIN: ${GATEWAY_DOMAIN:-localhost}
     healthcheck:

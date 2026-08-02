@@ -14,7 +14,7 @@ x-media-environment: &media-environment
   MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET:-flashmarket-public}
   MEDIA_S3_REGION: ${MEDIA_S3_REGION:-us-east-1}
   MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-http://localhost:9000/flashmarket-public}
-  MEDIA_CORS_ORIGINS: '["http://localhost:3000"]'
+  MEDIA_CORS_ORIGINS: '${MEDIA_CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000","http://localhost:8080","http://127.0.0.1:8080"]}'
   MEDIA_TRUSTED_HOSTS: '["localhost","127.0.0.1","media","gateway"]'
   MEDIA_ALLOW_INSECURE_INTERNAL_SERVICES: 'true'
   MEDIA_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public

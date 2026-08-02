@@ -5,6 +5,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 NGINX_CONF_PATH = PROJECT_ROOT / "gateway" / "nginx.conf"
+GATEWAY_COMPOSE_PATH = PROJECT_ROOT / "gateway" / "docker-compose.yml"
 
 
 def _config() -> str:
@@ -45,6 +46,15 @@ def _service_server(content: str, service: str) -> str:
     name_position = content.find(server_name)
     assert name_position >= 0, f"Missing subdomain server for {service}"
     server_position = content.rfind("server {", 0, name_position)
+    assert server_position >= 0
+    return _extract_braced_block(content, "server", start=server_position)
+
+
+def _storage_server(content: str) -> str:
+    """Extract the isolated local object-storage listener."""
+    listen_position = content.find("listen 9000;")
+    assert listen_position >= 0
+    server_position = content.rfind("server {", 0, listen_position)
     assert server_position >= 0
     return _extract_braced_block(content, "server", start=server_position)
 
@@ -263,3 +273,35 @@ def test_gw_010_developer_hub_readiness_routes_are_same_origin_and_read_only() -
     assert "proxy_connect_timeout 2s;" in status_location
     assert "proxy_read_timeout 3s;" in status_location
     assert "limit_req zone=" not in status_location
+
+
+def test_gw_011_local_storage_listener_streams_to_shared_minio() -> None:
+    """GW-011: Browser-visible uploads have a bounded listener outside the JSON API."""
+    storage = _storage_server(_config())
+
+    for directive in (
+        "client_max_body_size 30m;",
+        "set $upstream_storage http://shide-minio:9000;",
+        "proxy_pass $upstream_storage$request_uri;",
+        "proxy_set_header Host $http_host;",
+        "proxy_hide_header Access-Control-Allow-Origin;",
+        "add_header Access-Control-Allow-Origin $media_cors_origin always;",
+        'add_header Access-Control-Allow-Methods "GET, HEAD, POST, OPTIONS" always;',
+        "add_header Access-Control-Allow-Headers $http_access_control_request_headers always;",
+        "proxy_request_buffering off;",
+        "proxy_send_timeout 300s;",
+        "proxy_read_timeout 300s;",
+    ):
+        assert directive in storage
+
+    compose = GATEWAY_COMPOSE_PATH.read_text(encoding="utf-8")
+    assert '"127.0.0.1:${MEDIA_STORAGE_PORT:-9000}:9000"' in compose
+
+    content = _config()
+    for origin in (
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ):
+        assert f"{origin}" in content

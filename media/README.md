@@ -4,10 +4,10 @@ Backend-only service for public avatars, product images, brand logos, review ima
 drop images, and other public assets. It stores metadata in PostgreSQL and gives clients
 short-lived presigned POST forms for the existing S3-compatible MinIO deployment.
 
-The service deliberately does **not** create or run MinIO, create buckets, change bucket
+The service deliberately does **not** create or run MinIO, change production bucket
 policies, or own S3 volumes. Its containers join the external `shide-observability`
-network. The configured bucket and its public-read/no-list/CORS policy are infrastructure
-prerequisites.
+network. The configured production bucket and its public-read/no-list/CORS policy are
+infrastructure prerequisites.
 
 ## Upload flow
 
@@ -27,8 +27,35 @@ uv run alembic upgrade head
 uv run uvicorn media_service.main:app --reload
 ```
 
-The PostgreSQL database, `shide-observability` network, `shide-minio` endpoint, bucket,
-credentials, public endpoint, and bucket CORS/policy must already exist.
+The PostgreSQL database, `shide-observability` network, `shide-minio` endpoint, and
+credentials must already exist.
+
+The root `make up` command creates the local bucket, enables anonymous reads, and
+publishes the shared MinIO API through the FlashMarket gateway on
+`http://localhost:9000`. That listener supplies an explicit CORS allowlist for both
+`localhost` and `127.0.0.1` development origins without changing the global policy of
+the shared MinIO cluster.
+
+## Production storage CORS
+
+Direct browser uploads require CORS on the browser-visible object-storage endpoint in
+addition to `MEDIA_CORS_ORIGINS` on the Media API. For S3-compatible providers that
+support bucket CORS, copy `media/cors/production.example.xml`, replace the example
+origins with every HTTPS storefront/admin origin, and apply it with the provider's
+administration tool.
+
+MinIO Community does not implement per-bucket `PutBucketCors`. Configure its global API
+CORS allowlist with every origin used by every application sharing the cluster, then
+restart MinIO during an approved maintenance window:
+
+```bash
+mc admin config set <alias> api cors_allow_origin="https://shop.example.com,https://admin.example.com"
+mc admin service restart <alias>
+```
+
+`MEDIA_S3_PUBLIC_ENDPOINT` must be reachable by browsers, while
+`MEDIA_S3_INTERNAL_ENDPOINT` remains the private endpoint used for validation and
+cleanup. Do not use the internal Docker hostname in a browser-visible signed URL.
 
 ## Quality gates
 

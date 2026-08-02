@@ -12,8 +12,8 @@ storage POST in the local stack for two independent reasons:
 
 1. Media signs `http://localhost:9000`, while the shared MinIO container does not
    publish port 9000 to the host.
-2. The `flashmarket-public` bucket has no CORS configuration, so a browser response to
-   a cross-origin storage request cannot be read.
+2. The browser-visible storage endpoint does not return CORS permission for the local
+   storefront origins, so the browser cannot read the upload response.
 
 The fix must cover every caller of the shared upload helper, work from both supported
 local entry points, preserve direct-to-object-storage uploads, and retain a deployable
@@ -25,7 +25,7 @@ production configuration.
   create session, upload to storage, complete session.
 - Support the local storefront at `localhost` and `127.0.0.1`, on ports 3000 and 8080.
 - Keep FastAPI out of the uploaded-byte data path.
-- Make local bucket provisioning idempotent and fail fast when CORS cannot be applied.
+- Keep local CORS scoped to FlashMarket without mutating the shared MinIO cluster.
 - Keep production storage endpoints and allowed web origins explicit and configurable.
 - Return a useful frontend error when storage is unreachable or blocks browser access.
 
@@ -43,9 +43,10 @@ second local listener on host port 9000 and stream storage traffic to the extern
 `shide-minio` container. This supplies the browser-visible endpoint already used by
 Media without creating a second proxy container or changing frontend URLs.
 
-The local bootstrap performed by `make up` will apply a versioned bucket CORS document
-after creating the bucket and enabling anonymous downloads. The operation is
-idempotent and is performed on both PowerShell and POSIX Makefile paths.
+The local gateway listener owns CORS for the browser-visible proxy. This is required
+because the installed MinIO Community release does not implement per-bucket
+`PutBucketCors`, while changing its global CORS setting would affect every project that
+shares the cluster.
 
 Production continues to use `MEDIA_S3_PUBLIC_ENDPOINT` for the browser-visible storage
 endpoint and `MEDIA_PUBLIC_BASE_URL` for stable reads. Production operators must apply
@@ -68,27 +69,29 @@ longer than ordinary JSON API timeouts.
 The listener is separate from the main gateway server so the main API retains its
 small default request-body limit.
 
-### Bucket CORS bootstrap
+### Local storage CORS
 
-A versioned XML policy permits browser `POST`, `GET`, and `HEAD` requests from these
-local origins:
+The storage listener permits browser `POST`, `GET`, `HEAD`, and preflight `OPTIONS`
+requests from these local origins:
 
 - `http://localhost:3000`
 - `http://127.0.0.1:3000`
 - `http://localhost:8080`
 - `http://127.0.0.1:8080`
 
-The policy permits request headers needed by S3-compatible presigned forms and exposes
+The listener permits request headers needed by S3-compatible presigned forms and exposes
 `ETag` and request identifiers useful for diagnostics. It does not enable credentialed
 browser requests; authorization remains the short-lived signed form.
 
-`make up` pipes the policy to `mc cors set` inside `shide-minio`. Failure to connect,
-create the bucket, set public download access, or set CORS stops startup with an
-actionable message. Re-running startup safely reapplies the same desired state.
+Nginx reflects `Access-Control-Allow-Origin` only when the request origin matches the
+explicit allowlist. MinIO-provided CORS headers are hidden at this local boundary to
+avoid duplicate or broader responses. Recreating the FlashMarket gateway reapplies the
+same policy without restarting or reconfiguring shared MinIO.
 
-For production, the deployment example documents an equivalent policy containing the
-actual HTTPS storefront origins. The Media service does not mutate production bucket
-configuration at application startup.
+For production, the deployment example documents bucket CORS for S3-compatible
+providers that implement it. MinIO Community deployments instead use the server-wide
+`api cors_allow_origin` setting and must account for every tenant of that cluster. The
+Media service does not mutate production storage configuration at application startup.
 
 ### Media service configuration
 
@@ -134,8 +137,9 @@ Automated and local verification will cover:
 
 1. Docker Compose renders successfully and Nginx accepts the updated configuration.
 2. `localhost:9000` is reachable after `make up`.
-3. `mc cors get` returns the expected bucket policy after repeated startup.
-4. CORS responses allow each supported local origin for storage POSTs.
+3. CORS responses allow each supported local origin and omit permission for an unknown
+   origin.
+4. Preflight requests return the permitted methods and headers.
 5. A real presigned POST through the published endpoint stores the object, followed by
    successful HEAD/read/delete operations.
 6. The Media API lifecycle test still creates, completes, reads, and deletes assets.
@@ -149,8 +153,8 @@ Automated and local verification will cover:
 - Avatar, product, brand, drop, notification, and public-asset upload controls all use
   the repaired common path.
 - Successful uploads reach `READY` and return a browser-loadable `public_url`.
-- Restarting or recreating the FlashMarket stack retains working bucket CORS without
-  manual commands.
+- Restarting or recreating the FlashMarket stack retains working local storage CORS
+  without mutating the shared MinIO configuration.
 - Production configuration clearly specifies the public storage endpoint and exact
   storefront origins required for direct uploads.
 - API body-size protection remains unchanged outside the dedicated storage listener.

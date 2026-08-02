@@ -1,4 +1,7 @@
 import { apiJson } from './api';
+import { uploadPresignedFile } from './media-upload.js';
+
+export { uploadPresignedFile } from './media-upload.js';
 
 /**
  * Helper to perform full presigned media upload:
@@ -51,22 +54,7 @@ export async function uploadMediaAsset(file, purpose = 'general', entityType = n
   const uploadFields = initData.upload.fields || {};
 
   // 2. Direct FormData POST to S3/MinIO presigned URL (no authorization headers)
-  if (uploadUrl) {
-    const formData = new FormData();
-    Object.entries(uploadFields).forEach(([key, val]) => {
-      formData.append(key, val);
-    });
-    formData.append('file', file);
-
-    const uploadRes = await fetch(uploadUrl, {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!uploadRes.ok && uploadRes.status !== 204) {
-      throw new Error(`Ошибка загрузки файла на сервер хранения: ${uploadRes.status}`);
-    }
-  }
+  await uploadPresignedFile(file, uploadUrl, uploadFields);
 
   // 3. Mark completion
   const completedData = await apiJson(initData.complete_url || `/api/v1/media/assets/${assetId}/complete`, {

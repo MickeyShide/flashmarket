@@ -49,6 +49,7 @@ async def test_presign_upload_head_read_and_delete_existing_s3() -> None:
     key = f"{prefix}/{uuid.uuid4()}/probe.pdf"
     asset_id = str(uuid.uuid4())
     content = b"%PDF-1.4\n%%EOF\n"
+    browser_origin = os.getenv("MEDIA_TEST_S3_ORIGIN")
     post = await storage.create_presigned_post(
         key=key,
         content_type="application/pdf",
@@ -63,8 +64,11 @@ async def test_presign_upload_head_read_and_delete_existing_s3() -> None:
                 post.url,
                 data=post.fields,
                 files={"file": ("probe.pdf", content, "application/pdf")},
+                headers={"Origin": browser_origin} if browser_origin else None,
             )
         assert response.status_code in {200, 201, 204}, response.text
+        if browser_origin:
+            assert response.headers.get("access-control-allow-origin") == browser_origin
         head = await storage.head_object(key)
         assert head.size == len(content)
         assert head.metadata["asset-id"] == asset_id
