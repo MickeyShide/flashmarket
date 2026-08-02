@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DEFAULT_BRAND_COVERS } from '../../config/constants';
 
 export const BrandsGallery = ({ brandsData, onSelectBrand, activeCategoryId, activeBrandId }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   if (activeCategoryId || activeBrandId) return null; // Hidden when a category or brand filter is active
 
   if (!brandsData || brandsData.length === 0) {
@@ -12,10 +14,14 @@ export const BrandsGallery = ({ brandsData, onSelectBrand, activeCategoryId, act
     );
   }
 
+  const initialCount = 4; // Exactly 1 row on desktop
+  const visibleBrands = isExpanded ? brandsData : brandsData.slice(0, initialCount);
+  const hasMore = brandsData.length > initialCount;
+
   return (
     <div className="max-w-[1280px] mx-auto my-4 mb-6 md:mb-8 px-3.5 md:px-6">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 md:gap-4">
-        {brandsData.map(brand => {
+        {visibleBrands.map(brand => {
           const desc = brand.description || 'Коллекция эксклюзивных релизов бренда';
           const imgUrl = brand.logo_url || DEFAULT_BRAND_COVERS[brand.slug] || DEFAULT_BRAND_COVERS['flash-market'];
           const coverStyle = imgUrl
@@ -56,6 +62,32 @@ export const BrandsGallery = ({ brandsData, onSelectBrand, activeCategoryId, act
           );
         })}
       </div>
+
+      {hasMore && (
+        <div className="flex justify-center mt-3.5 md:mt-4">
+          {!isExpanded ? (
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="px-5 py-2 rounded-full border border-gray-300 bg-white text-xs font-black tracking-wider uppercase text-black hover:border-black hover:bg-black hover:text-white transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Показать ещё ({brandsData.length - initialCount})</span>
+              <svg className="w-3.5 h-3.5 stroke-current stroke-2 fill-none" viewBox="0 0 24 24">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="px-4 py-1.5 rounded-full text-[11px] font-extrabold tracking-wider uppercase text-text-muted hover:text-black transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <span>Свернуть</span>
+              <svg className="w-3.5 h-3.5 stroke-current stroke-2 fill-none" viewBox="0 0 24 24">
+                <polyline points="18 15 12 9 6 15"></polyline>
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
