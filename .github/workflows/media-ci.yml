@@ -252,6 +252,9 @@ jobs:
           scp -P "$DEPLOY_PORT" \
             media/docker-compose.deploy.yml \
             "$target:$DEPLOY_PATH/docker-compose.yml"
+          scp -P "$DEPLOY_PORT" \
+            media/policies/public-read-no-list.json.template \
+            "$target:$DEPLOY_PATH/public-read-no-list.json.template"
           ssh -p "$DEPLOY_PORT" "$target" \
             "umask 077; cat > '$DEPLOY_PATH/.env.next' && mv '$DEPLOY_PATH/.env.next' '$DEPLOY_PATH/.env'" \
             < "$RUNNER_TEMP/flashmarket-media.env"
@@ -315,8 +318,16 @@ jobs:
             "$s3_secret_key" >/dev/null
           docker exec shide-minio mc mb --ignore-existing \
             "flashmarket-media-local/$MEDIA_S3_BUCKET" >/dev/null
-          docker exec shide-minio mc anonymous set download \
+          policy_file="$(mktemp "$DEPLOY_PATH/public-read-no-list.XXXXXX.json")"
+          container_policy="/tmp/flashmarket-public-read-$$.json"
+          sed "s|\${MEDIA_S3_BUCKET}|$MEDIA_S3_BUCKET|g" \
+            public-read-no-list.json.template > "$policy_file"
+          docker cp "$policy_file" "shide-minio:$container_policy"
+          docker exec shide-minio mc anonymous set-json \
+            "$container_policy" \
             "flashmarket-media-local/$MEDIA_S3_BUCKET" >/dev/null
+          rm -f "$policy_file"
+          docker exec shide-minio rm -f "$container_policy"
 
           export MEDIA_IMAGE
           docker compose -f docker-compose.yml --env-file .env config --quiet

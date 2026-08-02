@@ -1,10 +1,14 @@
 """Contracts for immutable production deployment of the Media service."""
 
+import json
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW_PATH = PROJECT_ROOT / ".github" / "workflows" / "media-ci.yml"
 DEPLOY_COMPOSE_PATH = PROJECT_ROOT / "media" / "docker-compose.deploy.yml"
+PUBLIC_POLICY_PATH = (
+    PROJECT_ROOT / "media" / "policies" / "public-read-no-list.json.template"
+)
 
 
 def _workflow() -> str:
@@ -38,7 +42,21 @@ def test_media_deploy_renders_same_origin_storage_configuration() -> None:
     assert "get_container_env shide-minio MINIO_ROOT_USER" in workflow
     assert "get_container_env shide-minio MINIO_ROOT_PASSWORD" in workflow
     assert "mc mb --ignore-existing" in workflow
-    assert "mc anonymous set download" in workflow
+    assert "mc anonymous set-json" in workflow
+    assert "mc anonymous set download" not in workflow
+
+
+def test_public_storage_policy_allows_object_reads_without_bucket_listing() -> None:
+    rendered = PUBLIC_POLICY_PATH.read_text(encoding="utf-8").replace(
+        "${MEDIA_S3_BUCKET}", "flashmarket-public"
+    )
+    policy = json.loads(rendered)
+    statements = policy["Statement"]
+
+    assert len(statements) == 1
+    assert statements[0]["Action"] == ["s3:GetObject"]
+    assert statements[0]["Resource"] == ["arn:aws:s3:::flashmarket-public/*"]
+    assert "s3:ListBucket" not in rendered
 
 
 def test_media_deploy_migrates_starts_all_runtime_and_verifies_gateway() -> None:
