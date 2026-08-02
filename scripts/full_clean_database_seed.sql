@@ -1,12 +1,89 @@
 -- ==============================================================================
--- FLASHMARKET: FULL CLEAN DATABASE SEED SCRIPT
+-- FLASHMARKET: COMPLETE SELF-CONTAINED DATABASE SEED SCRIPT
+-- Creates tables and types automatically if running on a fresh/empty database!
 -- Live catalog from https://ru.marcelomiracles.com/
--- Ready to run on an EMPTY database in DBeaver (Alt + X)
 -- ==============================================================================
 
 BEGIN;
 
--- 1. CREATE BRAND: Marcelo Miracles
+-- ------------------------------------------------------------------------------
+-- 1. CREATE ENUM TYPES (IF NOT EXIST)
+-- ------------------------------------------------------------------------------
+DO $$ BEGIN
+    CREATE TYPE currency AS ENUM ('RUB', 'USD', 'EUR');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE product_status AS ENUM ('DRAFT', 'ACTIVE', 'HIDDEN', 'ARCHIVED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- ------------------------------------------------------------------------------
+-- 2. CREATE SCHEMAS / TABLES (IF NOT EXIST)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    parent_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS brands (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    logo_url VARCHAR(2048),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    price NUMERIC(12, 2) NOT NULL CHECK (price > 0),
+    currency currency NOT NULL DEFAULT 'RUB',
+    status product_status NOT NULL DEFAULT 'ACTIVE',
+    category_id UUID NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+    brand_id UUID REFERENCES brands(id) ON DELETE SET NULL,
+    cover_image VARCHAR(2048),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    published_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS product_images (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    url VARCHAR(2048) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS product_variants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    sku VARCHAR(100) NOT NULL UNIQUE,
+    size VARCHAR(20),
+    color VARCHAR(50),
+    color_hex VARCHAR(7),
+    material VARCHAR(100),
+    weight_grams INT,
+    price_override NUMERIC(12, 2),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_variant_product_size_color UNIQUE (product_id, size, color)
+);
+
+-- ------------------------------------------------------------------------------
+-- 3. SEED BRAND: Marcelo Miracles
+-- ------------------------------------------------------------------------------
 INSERT INTO brands (id, name, slug, description, logo_url, created_at)
 VALUES (
     '09021c8e-a988-4a45-bf06-fed27e0dcfeb',
@@ -21,7 +98,9 @@ ON CONFLICT (slug) DO UPDATE SET
     description = EXCLUDED.description,
     logo_url = EXCLUDED.logo_url;
 
--- 2. CREATE CATEGORIES
+-- ------------------------------------------------------------------------------
+-- 4. SEED CATEGORIES
+-- ------------------------------------------------------------------------------
 INSERT INTO categories (id, name, slug, created_at)
 VALUES 
     ('09021c8e-a988-4a45-bf06-fed27e0dcfe2', 'Куртки', 'jackets', NOW()),
@@ -35,7 +114,9 @@ VALUES
     ('019fc26c-109a-74c6-b8e5-4a252ecf4e12', 'Аксессуары', 'accessories', NOW())
 ON CONFLICT (slug) DO NOTHING;
 
--- 3. INSERT PRODUCTS FROM RU.MARCELOMIRACLES.COM
+-- ------------------------------------------------------------------------------
+-- 5. SEED PRODUCTS FROM RU.MARCELOMIRACLES.COM
+-- ------------------------------------------------------------------------------
 INSERT INTO products (
     id, name, slug, description, price, currency, status, category_id, brand_id, cover_image, created_at, updated_at, published_at
 )
@@ -342,7 +423,9 @@ ON CONFLICT (slug) DO UPDATE SET
     cover_image = EXCLUDED.cover_image,
     status = EXCLUDED.status;
 
--- 4. INSERT PRODUCT VARIANTS (FOR CLOTHING: S, M, L, XL)
+-- ------------------------------------------------------------------------------
+-- 6. SEED PRODUCT VARIANTS (FOR CLOTHING: S, M, L, XL)
+-- ------------------------------------------------------------------------------
 INSERT INTO product_variants (id, product_id, sku, size, color, is_active, sort_order, created_at)
 SELECT
     gen_random_uuid(),
@@ -360,7 +443,9 @@ CROSS JOIN (
 WHERE p.category_id != '09021c8e-a988-4a45-bf06-fed27e0dcfe1' -- НЕ обувь
 ON CONFLICT (sku) DO NOTHING;
 
--- 5. INSERT PRODUCT VARIANTS (FOR SHOES: 40, 41, 42, 43, 44)
+-- ------------------------------------------------------------------------------
+-- 7. SEED PRODUCT VARIANTS (FOR SHOES: 40, 41, 42, 43, 44)
+-- ------------------------------------------------------------------------------
 INSERT INTO product_variants (id, product_id, sku, size, color, is_active, sort_order, created_at)
 SELECT
     gen_random_uuid(),
