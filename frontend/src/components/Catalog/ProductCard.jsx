@@ -6,10 +6,6 @@ export const ProductCard = ({ product, onClick }) => {
   const { isWished, toggleWishlist } = useWishlist();
   const wished = isWished(product.id);
 
-  const coverStyle = product.cover_image
-    ? { background: `url(${product.cover_image}) center/cover no-repeat #000` }
-    : {};
-
   const brandTag = product.brand_name
     ? product.brand_name.toUpperCase()
     : (product.category_name ? product.category_name.toUpperCase() : 'FLASH MARKET');
@@ -30,10 +26,9 @@ export const ProductCard = ({ product, onClick }) => {
       className="flex flex-col items-center text-center cursor-pointer relative group"
       onClick={onClick}
     >
-      {/* Black Thumbnail Box */}
+      {/* Thumbnail Box */}
       <div
-        className="w-full aspect-[3/4] max-h-[320px] bg-black rounded flex flex-col items-center justify-center relative mb-3 overflow-hidden"
-        style={coverStyle}
+        className="w-full aspect-[3/4] max-h-[320px] bg-gray-100 rounded flex flex-col items-center justify-center relative mb-3 overflow-hidden"
       >
         {/* Heart Wishlist Button */}
         <button
@@ -49,17 +44,22 @@ export const ProductCard = ({ product, onClick }) => {
           </svg>
         </button>
 
-        {/* Fallback Icon */}
-        {!product.cover_image && (
-          <svg className="w-9 md:w-12 h-9 md:h-12 stroke-white stroke-[1.2] fill-none opacity-90 mb-1.5" viewBox="0 0 24 24">
-            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-          </svg>
+        {product.cover_image ? (
+          <img
+            src={product.cover_image}
+            alt={product.name}
+            className="w-full h-full object-contain p-2"
+          />
+        ) : (
+          <>
+            <svg className="w-9 md:w-12 h-9 md:h-12 stroke-gray-400 stroke-[1.2] fill-none opacity-90 mb-1.5" viewBox="0 0 24 24">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+            </svg>
+            <span className="absolute bottom-[10px] font-mono text-[8.5px] tracking-[1.5px] text-[#666666] uppercase">
+              {brandTag}
+            </span>
+          </>
         )}
-
-        {/* Brand Tag Overlay */}
-        <span className="absolute bottom-[10px] font-mono text-[8.5px] tracking-[1.5px] text-[#666666] uppercase">
-          {brandTag}
-        </span>
       </div>
 
       {/* Brand Subtitle */}

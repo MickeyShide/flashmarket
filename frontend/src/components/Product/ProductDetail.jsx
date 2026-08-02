@@ -192,13 +192,16 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
       <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 md:gap-9">
         {/* Left: Product gallery */}
         <div className="min-w-0">
-          <div
-            className="w-full h-[280px] md:h-[420px] bg-black rounded flex flex-col items-center justify-center relative overflow-hidden"
-            style={selectedImageUrl ? { background: `url(${selectedImageUrl}) center/cover no-repeat #000` } : {}}
-          >
-            {!selectedImageUrl && (
+          <div className="w-full h-[280px] md:h-[420px] bg-gray-100 rounded-lg flex flex-col items-center justify-center relative overflow-hidden">
+            {selectedImageUrl ? (
+              <img
+                src={selectedImageUrl}
+                alt={product.name}
+                className="w-full h-full object-contain p-2"
+              />
+            ) : (
               <>
-                <svg className="w-16 h-16 stroke-white stroke-[1.2] fill-none opacity-90 mb-2" viewBox="0 0 24 24">
+                <svg className="w-16 h-16 stroke-gray-400 stroke-[1.2] fill-none opacity-90 mb-2" viewBox="0 0 24 24">
                   <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
                 </svg>
                 <span className="font-mono text-xs tracking-[2px] text-[#666666] uppercase">
@@ -221,13 +224,15 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
                   key={image.id || image.url}
                   type="button"
                   aria-label={image.isCover ? 'Выбрать обложку товара' : 'Выбрать изображение товара'}
-                  className={`w-14 h-14 rounded overflow-hidden border ${selectedImageUrl === image.url ? 'border-black' : 'border-border-color'}`}
+                  className={`w-14 h-14 rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center cursor-pointer transition-all ${
+                    selectedImageUrl === image.url ? 'border-black ring-2 ring-black' : 'border-border-color hover:border-gray-400'
+                  }`}
                   onClick={() => setSelectedImageUrl(image.url)}
                 >
                   <img
                     src={image.url}
                     alt={image.isCover ? 'Обложка товара' : ''}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain p-1"
                   />
                 </button>
               ))}
