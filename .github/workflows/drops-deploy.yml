@@ -229,6 +229,9 @@ jobs:
           Host *
               StrictHostKeyChecking no
               UserKnownHostsFile /dev/null
+              ConnectTimeout 15
+              ServerAliveInterval 15
+              ServerAliveCountMax 4
           EOF
           chmod 600 "$HOME/.ssh/config"
 
@@ -279,7 +282,8 @@ jobs:
         shell: bash
         run: |
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
-          ssh -p "$DEPLOY_PORT" "$target" \
+          timeout --signal=TERM --kill-after=30s 900 \
+            ssh -p "$DEPLOY_PORT" "$target" \
             "DEPLOY_PATH='$DEPLOY_PATH' DROPS_IMAGE='$DROPS_IMAGE' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           cd "$DEPLOY_PATH"
