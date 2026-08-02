@@ -2,7 +2,7 @@ import React from 'react';
 import { formatPrice } from '../../utils/formatters';
 import { useWishlist } from '../../context/WishlistContext';
 
-export const ProductCard = ({ product, onClick }) => {
+export const ProductCard = ({ product, onClick, eager = false }) => {
   const { isWished, toggleWishlist } = useWishlist();
   const wished = isWished(product.id);
 
@@ -48,6 +48,9 @@ export const ProductCard = ({ product, onClick }) => {
           <img
             src={product.cover_image}
             alt={product.name}
+            loading={eager ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={eager ? 'high' : 'auto'}
             className="w-full h-full object-contain p-2"
           />
         ) : (

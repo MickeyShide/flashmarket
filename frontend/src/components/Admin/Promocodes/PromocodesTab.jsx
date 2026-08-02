@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { apiJson } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
 import { formatPrice } from '../../../utils/formatters';
+import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
+import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+
+const PAGE_SIZE = 25;
 
 export const PromocodesTab = () => {
   const { triggerToast } = useToast();
-  const [promocodes, setPromocodes] = useState([]);
-  const [loading, setLoading] = useState(true);
-
   const [editingPromo, setEditingPromo] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -25,17 +26,21 @@ export const PromocodesTab = () => {
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const loadPromocodes = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiJson('/api/v1/promocodes/?limit=100');
-      setPromocodes(Array.isArray(data) ? data : (data.items || []));
-    } catch (err) {
-      console.warn('Failed to load promocodes:', err);
-    } finally {
-      setLoading(false);
-    }
+  const fetchPromocodesPage = useCallback(({ limit, offset, signal }) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    return apiJson(`/api/v1/promocodes/?${params}`, { signal });
   }, []);
+
+  const {
+    items: promocodes,
+    total,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    reload: loadPromocodes,
+    loadMore
+  } = usePaginatedResource({ fetchPage: fetchPromocodesPage, pageSize: PAGE_SIZE });
 
   useEffect(() => {
     loadPromocodes();
@@ -154,7 +159,7 @@ export const PromocodesTab = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <h3 className="text-sm font-black uppercase">Промокоды ({promocodes.length})</h3>
+        <h3 className="text-sm font-black uppercase">Промокоды ({total})</h3>
         <button
           className="bg-black text-white px-4 py-2 rounded text-xs font-black uppercase tracking-wider hover:bg-gray-800 w-full sm:w-auto cursor-pointer"
           onClick={handleOpenCreate}
@@ -162,6 +167,10 @@ export const PromocodesTab = () => {
           + Создать промокод
         </button>
       </div>
+
+      {error && promocodes.length === 0 && (
+        <button className="text-xs font-bold uppercase text-red-700" onClick={loadPromocodes}>Повторить загрузку</button>
+      )}
 
       {/* Create / Edit Form */}
       {(isCreating || editingPromo) && (
@@ -416,6 +425,13 @@ export const PromocodesTab = () => {
           </tbody>
         </table>
       </div>
+
+      <InfiniteScrollTrigger
+        hasMore={hasMore}
+        loading={loadingMore}
+        error={promocodes.length > 0 ? error : null}
+        onLoadMore={loadMore}
+      />
     </div>
   );
 };

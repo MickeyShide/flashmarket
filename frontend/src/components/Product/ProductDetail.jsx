@@ -197,6 +197,9 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
               <img
                 src={selectedImageUrl}
                 alt={product.name}
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
                 className="w-full h-full object-contain p-2"
               />
             ) : (
@@ -232,6 +235,8 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
                   <img
                     src={image.url}
                     alt={image.isCover ? 'Обложка товара' : ''}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-contain p-1"
                   />
                 </button>

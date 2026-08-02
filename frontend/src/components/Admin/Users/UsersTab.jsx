@@ -1,24 +1,29 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { apiJson } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
 import { formatDate } from '../../../utils/formatters';
+import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
+import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+
+const PAGE_SIZE = 25;
 
 export const UsersTab = () => {
   const { triggerToast } = useToast();
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiJson('/admin/users?limit=100');
-      setUsers(Array.isArray(data) ? data : (data.items || []));
-    } catch (err) {
-      console.warn('Failed to load users list:', err);
-    } finally {
-      setLoading(false);
-    }
+  const fetchUsersPage = useCallback(({ limit, offset, signal }) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    return apiJson(`/admin/users?${params}`, { signal });
   }, []);
+
+  const {
+    items: users,
+    total,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    reload: loadUsers,
+    loadMore
+  } = usePaginatedResource({ fetchPage: fetchUsersPage, pageSize: PAGE_SIZE });
 
   useEffect(() => {
     loadUsers();
@@ -61,7 +66,11 @@ export const UsersTab = () => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-black uppercase">Управление пользователями ({users.length})</h3>
+      <h3 className="text-sm font-black uppercase">Управление пользователями ({total})</h3>
+
+      {error && users.length === 0 && (
+        <button className="text-xs font-bold uppercase text-red-700" onClick={loadUsers}>Повторить загрузку</button>
+      )}
 
       {/* Mobile User Cards List (< md screens) */}
       <div className="md:hidden space-y-3">
@@ -164,6 +173,13 @@ export const UsersTab = () => {
           </tbody>
         </table>
       </div>
+
+      <InfiniteScrollTrigger
+        hasMore={hasMore}
+        loading={loadingMore}
+        error={users.length > 0 ? error : null}
+        onLoadMore={loadMore}
+      />
     </div>
   );
 };

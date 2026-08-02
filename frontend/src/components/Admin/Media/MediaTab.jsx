@@ -2,29 +2,43 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { apiJson } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
 import { formatDate } from '../../../utils/formatters';
+import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
+import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+
+const PAGE_SIZE = 25;
 
 export const MediaTab = () => {
   const { triggerToast } = useToast();
-  const [assets, setAssets] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [purposeFilter, setPurposeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [debouncedPurpose, setDebouncedPurpose] = useState('');
 
-  const loadAssets = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiJson('/api/v1/media/admin/assets?limit=100');
-      setAssets(Array.isArray(data) ? data : (data.items || []));
-    } catch (err) {
-      console.warn('Failed to load media assets:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedPurpose(purposeFilter.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [purposeFilter]);
+
+  const fetchAssetsPage = useCallback(({ limit, offset, signal }) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (debouncedPurpose) params.set('purpose', debouncedPurpose);
+    if (statusFilter) params.set('asset_status', statusFilter);
+    return apiJson(`/api/v1/media/admin/assets?${params}`, { signal });
+  }, [debouncedPurpose, statusFilter]);
+
+  const {
+    items: assets,
+    total,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    reload: loadAssets,
+    loadMore
+  } = usePaginatedResource({ fetchPage: fetchAssetsPage, pageSize: PAGE_SIZE });
 
   useEffect(() => {
     loadAssets();
-  }, [loadAssets]);
+  }, [debouncedPurpose, statusFilter, loadAssets]);
 
   const handleDeleteAsset = async (assetId) => {
     if (!window.confirm('Удалить этот медиа файл?')) return;
@@ -39,14 +53,11 @@ export const MediaTab = () => {
 
   if (loading) return <div className="spinner"></div>;
 
-  const visibleAssets = assets.filter(asset =>
-    (!purposeFilter || asset.purpose === purposeFilter) &&
-    (!statusFilter || asset.status === statusFilter)
-  );
+  const visibleAssets = assets;
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-black uppercase">Медиа файлы и ассеты ({assets.length})</h3>
+      <h3 className="text-sm font-black uppercase">Медиа файлы и ассеты ({total})</h3>
       <div className="flex gap-2">
         <input className="border rounded px-2 py-1 text-xs" placeholder="purpose" value={purposeFilter} onChange={(e) => setPurposeFilter(e.target.value)} />
         <select className="border rounded px-2 py-1 text-xs" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -57,6 +68,10 @@ export const MediaTab = () => {
           <option value="DELETED">DELETED</option>
         </select>
       </div>
+
+      {error && assets.length === 0 && (
+        <button className="text-xs font-bold uppercase text-red-700" onClick={loadAssets}>Повторить загрузку</button>
+      )}
 
       {/* Mobile Media Cards List (< md screens) */}
       <div className="md:hidden space-y-3">
@@ -69,7 +84,7 @@ export const MediaTab = () => {
             <div key={a.id} className="bg-white border border-border-color rounded-lg p-3.5 flex items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 {a.public_url ? (
-                  <img src={a.public_url} alt="" className="w-12 h-12 object-cover rounded bg-black shrink-0" />
+                  <img src={a.public_url} alt="" loading="lazy" decoding="async" className="w-12 h-12 object-cover rounded bg-black shrink-0" />
                 ) : (
                   <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-[9px] font-mono text-gray-400 shrink-0">
                     NO URL
@@ -121,7 +136,7 @@ export const MediaTab = () => {
               <tr key={a.id} className="hover:bg-gray-50 transition-colors">
                 <td className="p-3">
                   {a.public_url ? (
-                    <img src={a.public_url} alt="" className="w-10 h-10 object-cover rounded bg-black" />
+                    <img src={a.public_url} alt="" loading="lazy" decoding="async" className="w-10 h-10 object-cover rounded bg-black" />
                   ) : (
                     <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-[9px] font-mono text-gray-400">
                       NO URL
@@ -157,6 +172,13 @@ export const MediaTab = () => {
           </tbody>
         </table>
       </div>
+
+      <InfiniteScrollTrigger
+        hasMore={hasMore}
+        loading={loadingMore}
+        error={assets.length > 0 ? error : null}
+        onLoadMore={loadMore}
+      />
     </div>
   );
 };

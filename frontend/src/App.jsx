@@ -11,20 +11,22 @@ import { BrandActiveBanner } from './components/Catalog/BrandActiveBanner';
 import { BrandsGallery } from './components/Catalog/BrandsGallery';
 import { CatalogControls } from './components/Catalog/CatalogControls';
 import { ProductGrid } from './components/Catalog/ProductGrid';
-import { CategoriesView } from './components/Catalog/CategoriesView';
 import { flattenCategories } from './utils/formatters';
 
-import { ProductDetail } from './components/Product/ProductDetail';
-import { CartView } from './components/Cart/CartView';
-import { CheckoutView } from './components/Checkout/CheckoutView';
-import { ProfileView } from './components/Profile/ProfileView';
-import { OrderDetailView } from './components/Order/OrderDetailView';
-
 import { DropsSection } from './components/Drops/DropsSection';
-import { DropDetail } from './components/Drops/DropDetail';
-import { AdminView } from './components/Admin/AdminView';
+import { usePaginatedResource } from './hooks/usePaginatedResource';
+
+const lazyNamed = (loader, exportName) => lazy(() => loader().then(module => ({ default: module[exportName] })));
 
 const DevHub = lazy(() => import('./components/DevHub/DevHub'));
+const CategoriesView = lazyNamed(() => import('./components/Catalog/CategoriesView'), 'CategoriesView');
+const ProductDetail = lazyNamed(() => import('./components/Product/ProductDetail'), 'ProductDetail');
+const CartView = lazyNamed(() => import('./components/Cart/CartView'), 'CartView');
+const CheckoutView = lazyNamed(() => import('./components/Checkout/CheckoutView'), 'CheckoutView');
+const ProfileView = lazyNamed(() => import('./components/Profile/ProfileView'), 'ProfileView');
+const OrderDetailView = lazyNamed(() => import('./components/Order/OrderDetailView'), 'OrderDetailView');
+const DropDetail = lazyNamed(() => import('./components/Drops/DropDetail'), 'DropDetail');
+const AdminView = lazyNamed(() => import('./components/Admin/AdminView'), 'AdminView');
 
 export const App = () => {
   // Navigation & View Routing
@@ -34,6 +36,7 @@ export const App = () => {
     }
     return 'catalog';
   }); // 'catalog' | 'product' | 'cart' | 'checkout' | 'auth' | 'order-detail' | 'dev' | 'drops' | 'drop-detail' | 'admin'
+  const isDeveloperView = currentView === 'dev';
 
   const [selectedProductSlug, setSelectedProductSlug] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
@@ -81,13 +84,6 @@ export const App = () => {
   const [activeSearch, setActiveSearch] = useState('');
 
   // Catalog State & Pagination
-  const [productsList, setProductsList] = useState([]);
-  const [catalogOffset, setCatalogOffset] = useState(0);
-  const [catalogTotal, setCatalogTotal] = useState(0);
-  const [loadingCatalog, setLoadingCatalog] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [errorCatalog, setErrorCatalog] = useState(null);
-
   // Scroll to top on view change
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -104,7 +100,7 @@ export const App = () => {
 
   // Initial load: Categories & Brands
   useEffect(() => {
-    if (currentView === 'dev') return undefined;
+    if (isDeveloperView) return undefined;
     async function initData() {
       try {
         const [cats, bnd] = await Promise.all([
@@ -119,73 +115,48 @@ export const App = () => {
     }
     initData();
     return undefined;
-  }, [currentView]);
+  }, [isDeveloperView]);
 
   // Fetch Catalog Products
-  const loadCatalog = useCallback(async (replace = true, offsetToUse = 0) => {
-    if (currentView === 'dev') return;
-    if (replace) {
-      setLoadingCatalog(true);
-      setErrorCatalog(null);
-    } else {
-      setLoadingMore(true);
-    }
+  const fetchCatalogPage = useCallback(async ({ limit, offset, signal }) => {
+    const params = new URLSearchParams();
+    params.set('limit', limit);
+    params.set('offset', offset);
+    if (activeCategoryId) params.set('category_id', activeCategoryId);
+    if (activeBrandId) params.set('brand_id', activeBrandId);
+    if (activeSize) params.set('size', activeSize);
+    if (activePriceFrom) params.set('price_from', activePriceFrom);
+    if (activePriceTo) params.set('price_to', activePriceTo);
 
-    try {
-      const params = new URLSearchParams();
-      params.set('limit', CATALOG_LIMIT);
-      params.set('offset', offsetToUse);
-      if (activeCategoryId) params.set('category_id', activeCategoryId);
-      if (activeBrandId) params.set('brand_id', activeBrandId);
-      if (activeSize) params.set('size', activeSize);
-      if (activePriceFrom) params.set('price_from', activePriceFrom);
-      if (activePriceTo) params.set('price_to', activePriceTo);
-
-      if (activeSearch) {
-        params.set('search', activeSearch);
-        params.set('sort_by', 'relevance');
-      } else if (activeSort) {
-        if (activeSort.startsWith('price_')) {
-          params.set('sort_by', 'price');
-          params.set('sort_order', activeSort.endsWith('_asc') ? 'asc' : 'desc');
-        } else {
-          params.set('sort_by', activeSort);
-        }
-      }
-
-      const data = await apiJson('/api/v1/products?' + params.toString());
-      const items = Array.isArray(data) ? data : (data.items || []);
-      const total = data.total || items.length || 0;
-
-      setCatalogTotal(total);
-
-      if (replace) {
-        setProductsList(items);
-        setCatalogOffset(0);
+    if (activeSearch) {
+      params.set('search', activeSearch);
+      params.set('sort_by', 'relevance');
+    } else if (activeSort) {
+      if (activeSort.startsWith('price_')) {
+        params.set('sort_by', 'price');
+        params.set('sort_order', activeSort.endsWith('_asc') ? 'asc' : 'desc');
       } else {
-        setProductsList(prev => [...prev, ...items]);
-        setCatalogOffset(offsetToUse);
+        params.set('sort_by', activeSort);
       }
-    } catch (err) {
-      if (replace) {
-        setErrorCatalog(err.message);
-      }
-    } finally {
-      setLoadingCatalog(false);
-      setLoadingMore(false);
     }
-  }, [activeCategoryId, activeBrandId, activeSize, activePriceFrom, activePriceTo, activeSort, activeSearch, currentView]);
 
-  // Re-fetch catalog on filter changes
+    return apiJson('/api/v1/products?' + params.toString(), { signal });
+  }, [activeCategoryId, activeBrandId, activeSize, activePriceFrom, activePriceTo, activeSort, activeSearch]);
+
+  const {
+    items: productsList,
+    loading: loadingCatalog,
+    loadingMore,
+    error: errorCatalog,
+    hasMore: catalogHasMore,
+    reload: reloadCatalog,
+    loadMore: handleLoadMore
+  } = usePaginatedResource({ fetchPage: fetchCatalogPage, pageSize: CATALOG_LIMIT });
+
+  const catalogEnabled = !isDeveloperView;
   useEffect(() => {
-    loadCatalog(true, 0);
-  }, [loadCatalog]);
-
-  // Load More Handler
-  const handleLoadMore = () => {
-    const nextOffset = catalogOffset + CATALOG_LIMIT;
-    loadCatalog(false, nextOffset);
-  };
+    if (catalogEnabled) reloadCatalog();
+  }, [catalogEnabled, activeCategoryId, activeBrandId, activeSize, activePriceFrom, activePriceTo, activeSort, activeSearch, reloadCatalog]);
 
   // Filter actions
   const handleFilterCategory = (catId) => {
@@ -274,6 +245,7 @@ export const App = () => {
 
       {/* Main Content Area */}
       <main className="flex-1">
+        <Suspense fallback={<div className="spinner" aria-label="Загрузка страницы" />}>
         {currentView === 'catalog' && (
           <>
             <BrandActiveBanner
@@ -313,10 +285,11 @@ export const App = () => {
             <ProductGrid
               productsList={productsList}
               loading={loadingCatalog}
-              error={errorCatalog}
-              onRetry={() => loadCatalog(true, 0)}
+              error={productsList.length === 0 ? errorCatalog?.message : null}
+              loadMoreError={productsList.length > 0 ? errorCatalog : null}
+              onRetry={reloadCatalog}
               onOpenProduct={(slug) => handleOpenProduct(slug, null)}
-              hasMore={catalogOffset + CATALOG_LIMIT < catalogTotal}
+              hasMore={catalogHasMore}
               loadingMore={loadingMore}
               onLoadMore={handleLoadMore}
             />
@@ -407,6 +380,7 @@ export const App = () => {
             onBack={() => setCurrentView('catalog')}
           />
         )}
+        </Suspense>
       </main>
 
       <Toast />

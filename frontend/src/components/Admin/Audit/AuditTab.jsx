@@ -1,22 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { apiJson } from '../../../services/api';
 import { formatDate } from '../../../utils/formatters';
+import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
+import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+
+const PAGE_SIZE = 25;
+const auditKey = log => log.id || `${log.event_type}-${log.created_at}-${log.actor_user_id}`;
 
 export const AuditTab = () => {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadAuditLogs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiJson('/admin/audit-events?limit=100');
-      setLogs(Array.isArray(data) ? data : (data.items || []));
-    } catch (err) {
-      console.warn('Failed to load audit logs:', err);
-    } finally {
-      setLoading(false);
-    }
+  const fetchAuditPage = useCallback(({ limit, offset, signal }) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    return apiJson(`/admin/audit-events?${params}`, { signal });
   }, []);
+
+  const {
+    items: logs,
+    total,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    reload: loadAuditLogs,
+    loadMore
+  } = usePaginatedResource({ fetchPage: fetchAuditPage, pageSize: PAGE_SIZE, getKey: auditKey });
 
   useEffect(() => {
     loadAuditLogs();
@@ -26,7 +32,11 @@ export const AuditTab = () => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-black uppercase">Журнал аудит-событий ({logs.length})</h3>
+      <h3 className="text-sm font-black uppercase">Журнал аудит-событий ({total})</h3>
+
+      {error && logs.length === 0 && (
+        <button className="text-xs font-bold uppercase text-red-700" onClick={loadAuditLogs}>Повторить загрузку</button>
+      )}
 
       {/* Mobile Audit Cards List (< md screens) */}
       <div className="md:hidden space-y-2.5 font-mono text-xs">
@@ -81,6 +91,13 @@ export const AuditTab = () => {
           </tbody>
         </table>
       </div>
+
+      <InfiniteScrollTrigger
+        hasMore={hasMore}
+        loading={loadingMore}
+        error={logs.length > 0 ? error : null}
+        onLoadMore={loadMore}
+      />
     </div>
   );
 };

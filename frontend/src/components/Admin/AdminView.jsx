@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { AdminNav } from './AdminNav';
 
-import { ProductsTab } from './Catalog/ProductsTab';
-import { BrandsTab } from './Catalog/BrandsTab';
-import { CategoriesTab } from './Catalog/CategoriesTab';
-import { DropsTab } from './Drops/DropsTab';
-import { PromocodesTab } from './Promocodes/PromocodesTab';
-import { MediaTab } from './Media/MediaTab';
-import { UsersTab } from './Users/UsersTab';
-import { AuditTab } from './Audit/AuditTab';
-import { NotificationsAdminTab } from './Notifications/NotificationsAdminTab';
+const lazyNamed = (loader, exportName) => lazy(() => loader().then(module => ({ default: module[exportName] })));
+
+const ProductsTab = lazyNamed(() => import('./Catalog/ProductsTab'), 'ProductsTab');
+const BrandsTab = lazyNamed(() => import('./Catalog/BrandsTab'), 'BrandsTab');
+const CategoriesTab = lazyNamed(() => import('./Catalog/CategoriesTab'), 'CategoriesTab');
+const DropsTab = lazyNamed(() => import('./Drops/DropsTab'), 'DropsTab');
+const PromocodesTab = lazyNamed(() => import('./Promocodes/PromocodesTab'), 'PromocodesTab');
+const MediaTab = lazyNamed(() => import('./Media/MediaTab'), 'MediaTab');
+const UsersTab = lazyNamed(() => import('./Users/UsersTab'), 'UsersTab');
+const AuditTab = lazyNamed(() => import('./Audit/AuditTab'), 'AuditTab');
+const NotificationsAdminTab = lazyNamed(() => import('./Notifications/NotificationsAdminTab'), 'NotificationsAdminTab');
 
 export const AdminView = ({ onBack }) => {
   const { user } = useAuth();
@@ -53,15 +55,17 @@ export const AdminView = ({ onBack }) => {
       <AdminNav activeTab={activeTab} onSelectTab={setActiveTab} />
 
       <main className="mt-6">
-        {activeTab === 'catalog' && <ProductsTab />}
-        {activeTab === 'brands' && <BrandsTab />}
-        {activeTab === 'categories' && <CategoriesTab />}
-        {activeTab === 'drops' && <DropsTab />}
-        {activeTab === 'promocodes' && <PromocodesTab />}
-        {activeTab === 'media' && <MediaTab />}
-        {activeTab === 'users' && <UsersTab />}
-        {activeTab === 'audit' && <AuditTab />}
-        {activeTab === 'notifications' && <NotificationsAdminTab />}
+        <Suspense fallback={<div className="spinner" aria-label="Загрузка раздела" />}>
+          {activeTab === 'catalog' && <ProductsTab />}
+          {activeTab === 'brands' && <BrandsTab />}
+          {activeTab === 'categories' && <CategoriesTab />}
+          {activeTab === 'drops' && <DropsTab />}
+          {activeTab === 'promocodes' && <PromocodesTab />}
+          {activeTab === 'media' && <MediaTab />}
+          {activeTab === 'users' && <UsersTab />}
+          {activeTab === 'audit' && <AuditTab />}
+          {activeTab === 'notifications' && <NotificationsAdminTab />}
+        </Suspense>
       </main>
     </div>
   );

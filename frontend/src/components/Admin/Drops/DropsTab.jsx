@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { apiJson } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
 import { MediaUploader } from '../../Media/MediaUploader';
+import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
+import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+
+const PAGE_SIZE = 20;
 
 export const DropsTab = () => {
   const { triggerToast } = useToast();
-  const [drops, setDrops] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('ALL');
 
   const [editingDrop, setEditingDrop] = useState(null);
@@ -28,17 +30,22 @@ export const DropsTab = () => {
   const [searchProductQuery, setSearchProductQuery] = useState('');
   const [dropItems, setDropItems] = useState([]); // [{ product_id, order }]
 
-  const loadDrops = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiJson('/api/v1/admin/drops/?limit=100');
-      setDrops(Array.isArray(data) ? data : (data.items || []));
-    } catch (err) {
-      console.warn('Failed to load drops:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchDropsPage = useCallback(({ limit, offset, signal }) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (filterStatus !== 'ALL') params.set('status', filterStatus);
+    return apiJson(`/api/v1/admin/drops/?${params}`, { signal });
+  }, [filterStatus]);
+
+  const {
+    items: drops,
+    total,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    reload: loadDrops,
+    loadMore
+  } = usePaginatedResource({ fetchPage: fetchDropsPage, pageSize: PAGE_SIZE });
 
   const loadProducts = useCallback(async () => {
     try {
@@ -49,10 +56,10 @@ export const DropsTab = () => {
 
   useEffect(() => {
     loadDrops();
-    loadProducts();
-  }, [loadDrops, loadProducts]);
+  }, [filterStatus, loadDrops]);
 
   const handleOpenCreate = () => {
+    if (allProducts.length === 0) loadProducts();
     setEditingDrop(null);
     setIsCreating(true);
     setName('');
@@ -67,6 +74,7 @@ export const DropsTab = () => {
   };
 
   const handleOpenEdit = (drop) => {
+    if (allProducts.length === 0) loadProducts();
     setEditingDrop(drop);
     setIsCreating(false);
     setName(drop.name || drop.title || '');
@@ -175,7 +183,7 @@ export const DropsTab = () => {
     }
   };
 
-  const filteredDrops = drops.filter(d => filterStatus === 'ALL' || d.status === filterStatus);
+  const filteredDrops = drops;
 
   if (loading) return <div className="spinner"></div>;
 
@@ -183,7 +191,7 @@ export const DropsTab = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-black uppercase">Управление дропами ({drops.length})</h3>
+          <h3 className="text-sm font-black uppercase">Управление дропами ({total})</h3>
           <select
             className="border p-1.5 rounded text-xs font-bold uppercase"
             value={filterStatus}
@@ -205,6 +213,10 @@ export const DropsTab = () => {
           + Создать Дроп
         </button>
       </div>
+
+      {error && drops.length === 0 && (
+        <button className="text-xs font-bold uppercase text-red-700" onClick={loadDrops}>Повторить загрузку</button>
+      )}
 
       {/* Form modal/card */}
       {(isCreating || editingDrop) && (
@@ -544,6 +556,13 @@ export const DropsTab = () => {
           </tbody>
         </table>
       </div>
+
+      <InfiniteScrollTrigger
+        hasMore={hasMore}
+        loading={loadingMore}
+        error={drops.length > 0 ? error : null}
+        onLoadMore={loadMore}
+      />
     </div>
   );
 };

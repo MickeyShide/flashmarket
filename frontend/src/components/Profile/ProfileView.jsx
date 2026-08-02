@@ -64,7 +64,7 @@ export const ProfileView = ({ activeTab = 'profile', setActiveTab, onSelectOrder
           <div className="relative group cursor-pointer">
             <div className="w-16 h-16 rounded-full bg-white/15 overflow-hidden flex items-center justify-center text-xl font-black border-2 border-white/30 relative">
               {userAvatar ? (
-                <img src={userAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={userAvatar} alt="Avatar" decoding="async" className="w-full h-full object-cover" />
               ) : (
                 <span>{initial}</span>
               )}

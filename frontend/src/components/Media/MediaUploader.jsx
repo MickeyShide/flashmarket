@@ -38,7 +38,7 @@ export const MediaUploader = ({
           {/\.pdf(?:\?|$)/i.test(currentUrl) ? (
             <a href={currentUrl} target="_blank" rel="noreferrer" className="w-full h-full flex items-center justify-center text-white text-xs font-bold">PDF</a>
           ) : (
-            <img src={currentUrl} alt="Preview" className="w-full h-full object-cover" />
+            <img src={currentUrl} alt="Preview" decoding="async" className="w-full h-full object-cover" />
           )}
         </div>
       )}

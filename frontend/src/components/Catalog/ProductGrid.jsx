@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProductCard } from './ProductCard';
+import { InfiniteScrollTrigger } from '../Common/InfiniteScrollTrigger';
 
 export const ProductGrid = ({
   productsList,
@@ -9,6 +10,7 @@ export const ProductGrid = ({
   onOpenProduct,
   hasMore,
   loadingMore,
+  loadMoreError,
   onLoadMore
 }) => {
   return (
@@ -32,27 +34,24 @@ export const ProductGrid = ({
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-y-7 gap-x-2.5 md:gap-x-4.5">
-            {productsList.map(p => (
+            {productsList.map((p, index) => (
               <ProductCard
                 key={p.id}
                 product={p}
+                eager={index < 4}
                 onClick={() => onOpenProduct(p.slug)}
               />
             ))}
           </div>
 
-          {/* Load More Pagination Button */}
-          {hasMore && (
-            <div className="text-center mt-10">
-              <button
-                className="bg-black text-white px-8 py-3 rounded text-[11px] font-black tracking-[1.5px] uppercase cursor-pointer hover:bg-gray-900 disabled:opacity-50 transition-colors"
-                disabled={loadingMore}
-                onClick={onLoadMore}
-              >
-                {loadingMore ? 'ЗАГРУЗКА...' : 'ЗАГРУЗИТЬ ЕЩЁ'}
-              </button>
-            </div>
-          )}
+          <InfiniteScrollTrigger
+            hasMore={hasMore}
+            loading={loadingMore}
+            error={loadMoreError}
+            onLoadMore={onLoadMore}
+            showButton
+            className="text-center mt-10"
+          />
         </>
       )}
     </div>

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test tests/devhub.test.js tests/media.test.js tests/product-gallery.test.js",
+    "test": "node --test tests/devhub.test.js tests/media.test.js tests/product-gallery.test.js tests/lazy-loading.test.js",
     "test:devhub": "node --test tests/devhub.test.js",
     "test:media": "node --test tests/media.test.js",
     "preview": "vite preview"

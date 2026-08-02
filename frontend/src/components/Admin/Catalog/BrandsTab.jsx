@@ -113,7 +113,7 @@ export const BrandsTab = () => {
               <div key={b.id} className="py-3 flex items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-3">
                   {b.logo_url ? (
-                    <img src={b.logo_url} alt={b.name} className="w-8 h-8 object-contain rounded bg-black" />
+                    <img src={b.logo_url} alt={b.name} loading="lazy" decoding="async" className="w-8 h-8 object-contain rounded bg-black" />
                   ) : (
                     <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center font-bold font-mono">
                       {b.name.charAt(0)}

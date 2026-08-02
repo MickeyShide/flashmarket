@@ -5,6 +5,11 @@ import { useToast } from '../../../context/ToastContext';
 import { MediaUploader } from '../../Media/MediaUploader';
 import { VariantsTab } from './VariantsTab';
 import { StockTab } from '../Inventory/StockTab';
+import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
+import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+
+const PAGE_SIZE = 10;
+const PRODUCT_STATUSES = ['ACTIVE', 'HIDDEN', 'ARCHIVED'];
 
 const flattenCategoryTree = (nodes, depth = 0) => nodes.flatMap(category => [
   { ...category, depth },
@@ -13,10 +18,8 @@ const flattenCategoryTree = (nodes, depth = 0) => nodes.flatMap(category => [
 
 export const ProductsTab = () => {
   const { triggerToast } = useToast();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   const [categories, setCategories] = useState([]);
@@ -37,32 +40,53 @@ export const ProductsTab = () => {
   const [images, setImages] = useState([]);
   const [saving, setSaving] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [activeData, hiddenData, archivedData, catsData, brandsData] = await Promise.all([
-        apiJson('/api/v1/products?limit=100&status=ACTIVE'),
-        apiJson('/api/v1/products?limit=100&status=HIDDEN'),
-        apiJson('/api/v1/products?limit=100&status=ARCHIVED'),
-        apiJson('/api/v1/categories').catch(() => []),
-        apiJson('/api/v1/brands').catch(() => [])
-      ]);
-      const productItems = [activeData, hiddenData, archivedData]
-        .flatMap(data => Array.isArray(data) ? data : (data.items || []));
-      setProducts(productItems);
-      setTotal(productItems.length);
-      setCategories(Array.isArray(catsData) ? catsData : []);
-      setBrands(Array.isArray(brandsData) ? brandsData : []);
-    } catch (err) {
-      triggerToast('Ошибка загрузки каталога: ' + err.message, true);
-    } finally {
-      setLoading(false);
-    }
-  }, [triggerToast]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  const fetchProductsPage = useCallback(async ({ limit, offset, signal }) => {
+    const statuses = statusFilter === 'ALL' ? PRODUCT_STATUSES : [statusFilter];
+    const pages = await Promise.all(statuses.map(productStatus => {
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+        status: productStatus
+      });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      return apiJson(`/api/v1/products?${params}`, { signal });
+    }));
+
+    return {
+      items: pages.flatMap(page => Array.isArray(page) ? page : (page.items || [])),
+      total: pages.reduce((sum, page) => sum + (Array.isArray(page) ? page.length : (page.total || 0)), 0)
+    };
+  }, [debouncedSearch, statusFilter]);
+
+  const {
+    items: products,
+    total,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    reload: loadData,
+    loadMore
+  } = usePaginatedResource({ fetchPage: fetchProductsPage, pageSize: PAGE_SIZE });
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [debouncedSearch, statusFilter, loadData]);
+
+  useEffect(() => {
+    Promise.all([
+      apiJson('/api/v1/categories').catch(() => []),
+      apiJson('/api/v1/brands').catch(() => [])
+    ]).then(([catsData, brandsData]) => {
+      setCategories(Array.isArray(catsData) ? catsData : []);
+      setBrands(Array.isArray(brandsData) ? brandsData : []);
+    });
+  }, []);
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
@@ -163,12 +187,7 @@ export const ProductsTab = () => {
 
   if (loading) return <div className="spinner"></div>;
 
-  const visibleProducts = products.filter(product => {
-    const matchesStatus = statusFilter === 'ALL' || product.status === statusFilter;
-    const phrase = search.trim().toLowerCase();
-    const matchesSearch = !phrase || `${product.name} ${product.slug}`.toLowerCase().includes(phrase);
-    return matchesStatus && matchesSearch;
-  });
+  const visibleProducts = products;
   const flatCategories = flattenCategoryTree(categories);
 
   return (
@@ -192,6 +211,10 @@ export const ProductsTab = () => {
           </button>
         </div>
       </div>
+
+      {error && products.length === 0 && (
+        <button className="text-xs font-bold uppercase text-red-700" onClick={loadData}>Повторить загрузку</button>
+      )}
 
       {/* Product Edit / Create Modal or Card */}
       {(isCreating || editingProduct) && (
@@ -312,7 +335,7 @@ export const ProductsTab = () => {
               <div className="flex gap-2 flex-wrap mb-2">
                 {images.map((image, index) => (
                   <div key={`${image.url}-${index}`} className="relative w-16 h-16">
-                    <img src={image.url} alt="" className="w-full h-full object-cover rounded" />
+                    <img src={image.url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover rounded" />
                     <button
                       type="button"
                       className="absolute -top-1 -right-1 bg-black text-white rounded-full w-5 h-5 text-[10px]"
@@ -364,7 +387,7 @@ export const ProductsTab = () => {
             <div key={p.id} className="bg-white border border-border-color rounded-lg p-3.5 flex flex-col justify-between gap-3 shadow-sm">
               <div className="flex items-start gap-3">
                 {p.cover_image ? (
-                  <img src={p.cover_image} alt="" className="w-14 h-14 object-cover rounded bg-black shrink-0" />
+                  <img src={p.cover_image} alt="" loading="lazy" decoding="async" className="w-14 h-14 object-cover rounded bg-black shrink-0" />
                 ) : (
                   <div className="w-14 h-14 bg-black text-white text-[9px] font-bold rounded flex items-center justify-center shrink-0">
                     NO IMG
@@ -432,7 +455,7 @@ export const ProductsTab = () => {
                 <td className="p-3 font-extrabold uppercase">
                   <div className="flex items-center gap-3">
                     {p.cover_image ? (
-                      <img src={p.cover_image} alt="" className="w-9 h-9 object-cover rounded bg-black" />
+                      <img src={p.cover_image} alt="" loading="lazy" decoding="async" className="w-9 h-9 object-cover rounded bg-black" />
                     ) : (
                       <div className="w-9 h-9 bg-black text-white text-[9px] font-bold rounded flex items-center justify-center">
                         NO IMG
@@ -477,6 +500,13 @@ export const ProductsTab = () => {
           </tbody>
         </table>
       </div>
+
+      <InfiniteScrollTrigger
+        hasMore={hasMore}
+        loading={loadingMore}
+        error={products.length > 0 ? error : null}
+        onLoadMore={loadMore}
+      />
     </div>
   );
 };
