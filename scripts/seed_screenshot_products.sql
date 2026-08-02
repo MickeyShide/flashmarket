@@ -1,32 +1,13 @@
--- SQL Seed script to insert Marcelo Miracles streetwear collection from screenshots
--- Connect to catalog DB (or multi-db setup) and run:
--- psql -d catalog -f scripts/seed_screenshot_products.sql
+-- ==============================================================================
+-- FLASHMARKET: SQL SEED SCRIPT FOR DBEAVER
+-- Inserts Marcelo Miracles collection (Bombers, Fur Coats, Hoodies) with variants
+-- Ready to run directly in DBeaver script editor (Ctrl+Enter / Alt+X)
+-- ==============================================================================
 
-BEGIN;
-
--- 1. Create/Ensure Brand exists
-INSERT INTO brands (id, name, slug, description, logo_url, created_at)
-VALUES (
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
-    'Marcelo Miracles',
-    'marcelo-miracles',
-    'Российский стритвир-бренд лимитированных дропов.',
-    'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80',
-    NOW()
-)
-ON CONFLICT (slug) DO UPDATE
-SET name = EXCLUDED.name, description = EXCLUDED.description;
-
--- 2. Create/Ensure Categories exist
-INSERT INTO categories (id, name, slug, created_at)
-VALUES 
-    ('c1111111-1111-1111-1111-111111111111', 'Верхняя одежда', 'outerwear', NOW()),
-    ('c2222222-2222-2222-2222-222222222222', 'Худи и свитеры', 'hoodies', NOW())
-ON CONFLICT (slug) DO NOTHING;
-
--- 3. Insert Products from Screenshots
+-- 1. Insert Products
 INSERT INTO products (id, name, slug, description, price, currency, status, category_id, brand_id, cover_image, created_at, updated_at, published_at)
 VALUES
+-- 1. SIBERIA BOMBER in BLACK (12 000 руб)
 (
     'p1000000-0000-0000-0000-000000000001',
     'SIBERIA BOMBER in BLACK',
@@ -35,11 +16,12 @@ VALUES
     12000.00,
     'RUB',
     'ACTIVE',
-    'c1111111-1111-1111-1111-111111111111',
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+    COALESCE((SELECT id FROM categories WHERE name = 'Куртки' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfe2'::uuid),
+    COALESCE((SELECT id FROM brands WHERE name = 'Marcelo Miracles' OR slug = 'marcelo_miracles' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfeb'::uuid),
     'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=800&q=80',
     NOW(), NOW(), NOW()
 ),
+-- 2. SIBERIA BOMBER in BLUE (12 000 руб)
 (
     'p1000000-0000-0000-0000-000000000002',
     'SIBERIA BOMBER in BLUE',
@@ -48,11 +30,12 @@ VALUES
     12000.00,
     'RUB',
     'ACTIVE',
-    'c1111111-1111-1111-1111-111111111111',
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+    COALESCE((SELECT id FROM categories WHERE name = 'Куртки' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfe2'::uuid),
+    COALESCE((SELECT id FROM brands WHERE name = 'Marcelo Miracles' OR slug = 'marcelo_miracles' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfeb'::uuid),
     'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=800&q=80',
     NOW(), NOW(), NOW()
 ),
+-- 3. EDEC FUR COAT in RED (50 000 руб)
 (
     'p1000000-0000-0000-0000-000000000003',
     'EDEC FUR COAT in RED',
@@ -61,11 +44,12 @@ VALUES
     50000.00,
     'RUB',
     'ACTIVE',
-    'c1111111-1111-1111-1111-111111111111',
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+    COALESCE((SELECT id FROM categories WHERE name = 'Куртки' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfe2'::uuid),
+    COALESCE((SELECT id FROM brands WHERE name = 'Marcelo Miracles' OR slug = 'marcelo_miracles' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfeb'::uuid),
     'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?auto=format&fit=crop&w=800&q=80',
     NOW(), NOW(), NOW()
 ),
+-- 4. REVERSIBLE FUR ZIP HOODIE in BLACK/BROWN (12 900 руб)
 (
     'p1000000-0000-0000-0000-000000000004',
     'REVERSIBLE FUR ZIP HOODIE in BLACK/BROWN',
@@ -74,11 +58,12 @@ VALUES
     12900.00,
     'RUB',
     'ACTIVE',
-    'c2222222-2222-2222-2222-222222222222',
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+    COALESCE((SELECT id FROM categories WHERE name = 'Худи' LIMIT 1), '019fc26b-cf03-7037-8029-f617d4c135a1'::uuid),
+    COALESCE((SELECT id FROM brands WHERE name = 'Marcelo Miracles' OR slug = 'marcelo_miracles' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfeb'::uuid),
     'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
     NOW(), NOW(), NOW()
 ),
+-- 5. REVERSIBLE FUR ZIP HOODIE in GREY (12 900 руб)
 (
     'p1000000-0000-0000-0000-000000000005',
     'REVERSIBLE FUR ZIP HOODIE in GREY',
@@ -87,11 +72,12 @@ VALUES
     12900.00,
     'RUB',
     'ACTIVE',
-    'c2222222-2222-2222-2222-222222222222',
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+    COALESCE((SELECT id FROM categories WHERE name = 'Худи' LIMIT 1), '019fc26b-cf03-7037-8029-f617d4c135a1'::uuid),
+    COALESCE((SELECT id FROM brands WHERE name = 'Marcelo Miracles' OR slug = 'marcelo_miracles' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfeb'::uuid),
     'https://images.unsplash.com/photo-1509967419530-da38b4704bc6?auto=format&fit=crop&w=800&q=80',
     NOW(), NOW(), NOW()
 ),
+-- 6. 10 YEARS GOTHIC LOGO HOODIE in BLACK (10 000 руб)
 (
     'p1000000-0000-0000-0000-000000000006',
     '10 YEARS GOTHIC LOGO HOODIE in BLACK',
@@ -100,11 +86,12 @@ VALUES
     10000.00,
     'RUB',
     'ACTIVE',
-    'c2222222-2222-2222-2222-222222222222',
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+    COALESCE((SELECT id FROM categories WHERE name = 'Худи' LIMIT 1), '019fc26b-cf03-7037-8029-f617d4c135a1'::uuid),
+    COALESCE((SELECT id FROM brands WHERE name = 'Marcelo Miracles' OR slug = 'marcelo_miracles' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfeb'::uuid),
     'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=800&q=80',
     NOW(), NOW(), NOW()
 ),
+-- 7. 10 YEARS GOTHIC LOGO HOODIE in GREY (10 000 руб)
 (
     'p1000000-0000-0000-0000-000000000007',
     '10 YEARS GOTHIC LOGO HOODIE in GREY',
@@ -113,11 +100,12 @@ VALUES
     10000.00,
     'RUB',
     'ACTIVE',
-    'c2222222-2222-2222-2222-222222222222',
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+    COALESCE((SELECT id FROM categories WHERE name = 'Худи' LIMIT 1), '019fc26b-cf03-7037-8029-f617d4c135a1'::uuid),
+    COALESCE((SELECT id FROM brands WHERE name = 'Marcelo Miracles' OR slug = 'marcelo_miracles' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfeb'::uuid),
     'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&w=800&q=80',
     NOW(), NOW(), NOW()
 ),
+-- 8. REVERSIBLE FUR ZIP HOODIE in BLACK (19 000 руб)
 (
     'p1000000-0000-0000-0000-000000000008',
     'REVERSIBLE FUR ZIP HOODIE in BLACK',
@@ -126,11 +114,12 @@ VALUES
     19000.00,
     'RUB',
     'ACTIVE',
-    'c2222222-2222-2222-2222-222222222222',
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+    COALESCE((SELECT id FROM categories WHERE name = 'Худи' LIMIT 1), '019fc26b-cf03-7037-8029-f617d4c135a1'::uuid),
+    COALESCE((SELECT id FROM brands WHERE name = 'Marcelo Miracles' OR slug = 'marcelo_miracles' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfeb'::uuid),
     'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80',
     NOW(), NOW(), NOW()
 ),
+-- 9. REVERSIBLE FUR ZIP HOODIE in BROWN (19 000 руб)
 (
     'p1000000-0000-0000-0000-000000000009',
     'REVERSIBLE FUR ZIP HOODIE in BROWN',
@@ -139,8 +128,8 @@ VALUES
     19000.00,
     'RUB',
     'ACTIVE',
-    'c2222222-2222-2222-2222-222222222222',
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+    COALESCE((SELECT id FROM categories WHERE name = 'Худи' LIMIT 1), '019fc26b-cf03-7037-8029-f617d4c135a1'::uuid),
+    COALESCE((SELECT id FROM brands WHERE name = 'Marcelo Miracles' OR slug = 'marcelo_miracles' LIMIT 1), '09021c8e-a988-4a45-bf06-fed27e0dcfeb'::uuid),
     'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=80',
     NOW(), NOW(), NOW()
 )
@@ -151,7 +140,7 @@ ON CONFLICT (slug) DO UPDATE SET
     cover_image = EXCLUDED.cover_image,
     status = EXCLUDED.status;
 
--- 4. Insert Variants (S, M, L, XL for each product)
+-- 2. Insert Product Variants (S, M, L, XL for each product)
 INSERT INTO product_variants (id, product_id, sku, size, color, is_active, sort_order, created_at)
 VALUES
 -- Siberia Bomber Black
@@ -208,5 +197,3 @@ VALUES
 ('v1000000-0009-0000-0000-000000000003', 'p1000000-0000-0000-0000-000000000009', 'REV-FUR-ZIP-BRN-L', 'L', 'Brown', true, 2, NOW()),
 ('v1000000-0009-0000-0000-000000000004', 'p1000000-0000-0000-0000-000000000009', 'REV-FUR-ZIP-BRN-XL', 'XL', 'Brown', true, 3, NOW())
 ON CONFLICT (sku) DO NOTHING;
-
-COMMIT;
