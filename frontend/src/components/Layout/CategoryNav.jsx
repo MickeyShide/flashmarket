@@ -9,56 +9,45 @@ export const CategoryNav = ({
   filterCategory,
   mobileNavOpen,
   closeMobileNav,
+  currentView,
   setCurrentView,
   switchProfileTab
 }) => {
   const { user, unreadNotifCount } = useAuth();
-  const flatCategories = flattenCategories(categoriesData);
 
   return (
     <nav className={`border-t border-border-color bg-white w-full transition-all duration-250 ${mobileNavOpen ? 'max-h-[500px] border-t' : 'max-h-0 md:max-h-none overflow-hidden md:overflow-visible border-t-0 md:border-t'}`}>
       <div className="max-w-[1280px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-center gap-3.5 md:gap-8 px-4 md:px-6 py-3.5 md:py-3 whitespace-nowrap">
         {/* ВСЕ ТОВАРЫ */}
         <button
-          className={`text-[12px] md:text-[11.5px] font-extrabold tracking-[1.5px] uppercase cursor-pointer py-1 relative w-full md:w-auto text-left md:text-center ${!activeCategoryId && !activeBrandId ? 'text-black' : 'text-text-main'}`}
+          className={`text-[12px] md:text-[11.5px] font-extrabold tracking-[1.5px] uppercase cursor-pointer py-1 relative w-full md:w-auto text-left md:text-center ${currentView === 'catalog' && !activeCategoryId && !activeBrandId ? 'text-black' : 'text-text-main'}`}
           onClick={() => {
             filterCategory(null);
+            setCurrentView('catalog');
             closeMobileNav();
           }}
         >
           ВСЕ ТОВАРЫ
-          {!activeCategoryId && !activeBrandId && (
+          {currentView === 'catalog' && !activeCategoryId && !activeBrandId && (
+            <span className="hidden md:block absolute -bottom-[2px] left-0 right-0 h-[2px] bg-black"></span>
+          )}
+        </button>
+
+        {/* КАТЕГОРИИ */}
+        <button
+          className={`text-[12px] md:text-[11.5px] font-extrabold tracking-[1.5px] uppercase cursor-pointer py-1 relative w-full md:w-auto text-left md:text-center ${currentView === 'categories' || activeCategoryId ? 'text-black' : 'text-text-main'}`}
+          onClick={() => {
+            setCurrentView('categories');
+            closeMobileNav();
+          }}
+        >
+          КАТЕГОРИИ
+          {(currentView === 'categories' || activeCategoryId) && (
             <span className="hidden md:block absolute -bottom-[2px] left-0 right-0 h-[2px] bg-black"></span>
           )}
         </button>
 
         {/* ДРОПЫ */}
-        <button
-          className="text-[12px] md:text-[11.5px] font-extrabold tracking-[1.5px] uppercase text-purple-600 hover:text-purple-800 cursor-pointer py-1 w-full md:w-auto text-left md:text-center flex items-center gap-1"
-          onClick={() => {
-            setCurrentView('drops');
-            closeMobileNav();
-          }}
-        >
-          <span>🔥</span> ДРОПЫ
-        </button>
-
-        {/* Dynamic categories */}
-        {flatCategories.map(cat => (
-          <button
-            key={cat.id}
-            className={`text-[12px] md:text-[11.5px] font-extrabold tracking-[1.5px] uppercase cursor-pointer py-1 relative w-full md:w-auto text-left md:text-center ${activeCategoryId === cat.id ? 'text-black' : 'text-text-main'}`}
-            onClick={() => {
-              filterCategory(cat.id);
-              closeMobileNav();
-            }}
-          >
-            {cat.name.toUpperCase()}
-            {activeCategoryId === cat.id && (
-              <span className="hidden md:block absolute -bottom-[2px] left-0 right-0 h-[2px] bg-black"></span>
-            )}
-          </button>
-        ))}
 
         {/* ИЗБРАННОЕ */}
         <button
@@ -100,6 +89,35 @@ export const CategoryNav = ({
           }}
         >
           {user ? 'ПРОФИЛЬ' : 'ВОЙТИ'}
+        </button>
+
+        {/* Mobile-only Admin Button */}
+        {user?.role === 'ADMIN' && (
+          <button
+            className="md:hidden text-[12px] font-extrabold tracking-[1.5px] uppercase cursor-pointer py-1 w-full text-left text-red-600 flex items-center gap-2"
+            onClick={() => {
+              setCurrentView('admin');
+              closeMobileNav();
+            }}
+          >
+            <span className="px-1.5 py-0.5 text-[9px] font-mono font-black bg-red-600 text-white rounded">ADMIN</span>
+            АДМИН ПАНЕЛЬ
+          </button>
+        )}
+
+        {/* Mobile-only Dev Hub Button */}
+        <button
+          className="md:hidden text-[12px] font-extrabold tracking-[1.5px] uppercase cursor-pointer py-1 w-full text-left flex items-center gap-2"
+          onClick={() => {
+            setCurrentView('dev');
+            if (window.location.pathname !== '/dev') {
+              window.history.pushState({}, '', '/dev');
+            }
+            closeMobileNav();
+          }}
+        >
+          <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-black text-[#BFF532] rounded border border-black">DEV</span>
+          DEVELOPER HUB
         </button>
       </div>
     </nav>

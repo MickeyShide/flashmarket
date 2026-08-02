@@ -56,7 +56,7 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
           {user?.role === 'ADMIN' && (
             <button
               onClick={() => setCurrentView('admin')}
-              className="px-2.5 py-1 text-[10px] font-mono font-extrabold uppercase tracking-wider bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer transition-colors"
+              className="hidden md:inline-flex px-2.5 py-1 text-[10px] font-mono font-extrabold uppercase tracking-wider bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer transition-colors"
               title="Админ панель"
             >
               ADMIN
@@ -154,11 +154,11 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
                 window.history.pushState({}, '', '/dev');
               }
             }}
-            className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider bg-black text-[#BFF532] hover:bg-zinc-800 rounded transition-colors flex items-center gap-1 border border-black cursor-pointer"
+            className="hidden md:inline-flex px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider bg-black text-[#BFF532] hover:bg-zinc-800 rounded transition-colors items-center gap-1 border border-black cursor-pointer"
             title="Developer Hub API Explorer (/dev)"
           >
             <span>DEV</span>
-            <span className="hidden md:inline">HUB</span>
+            <span>HUB</span>
           </button>
 
           {/* Cart Icon Button */}
