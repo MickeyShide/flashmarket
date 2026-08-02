@@ -1,29 +1,24 @@
 -- ==============================================================================
 -- FLASHMARKET: COMPLETE SELF-CONTAINED DATABASE SEED SCRIPT
--- Creates tables and types automatically if running on a fresh/empty database!
+-- Resets aborted DBeaver transactions and creates tables before seeding.
 -- Live catalog from https://ru.marcelomiracles.com/
 -- ==============================================================================
 
-BEGIN;
+-- 0. RESET ANY PREVIOUS ABORTED TRANSACTION IN DBEAVER
+ROLLBACK;
 
--- ------------------------------------------------------------------------------
 -- 1. CREATE ENUM TYPES (IF NOT EXIST)
--- ------------------------------------------------------------------------------
-DO $$ BEGIN
-    CREATE TYPE currency AS ENUM ('RUB', 'USD', 'EUR');
-EXCEPTION
-    WHEN duplicate_object THEN null;
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'currency') THEN
+        CREATE TYPE currency AS ENUM ('RUB', 'USD', 'EUR');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'product_status') THEN
+        CREATE TYPE product_status AS ENUM ('DRAFT', 'ACTIVE', 'HIDDEN', 'ARCHIVED');
+    END IF;
 END $$;
 
-DO $$ BEGIN
-    CREATE TYPE product_status AS ENUM ('DRAFT', 'ACTIVE', 'HIDDEN', 'ARCHIVED');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
--- ------------------------------------------------------------------------------
--- 2. CREATE SCHEMAS / TABLES (IF NOT EXIST)
--- ------------------------------------------------------------------------------
+-- 2. CREATE TABLES (IF NOT EXIST)
 CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
@@ -81,9 +76,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
     CONSTRAINT uq_variant_product_size_color UNIQUE (product_id, size, color)
 );
 
--- ------------------------------------------------------------------------------
 -- 3. SEED BRAND: Marcelo Miracles
--- ------------------------------------------------------------------------------
 INSERT INTO brands (id, name, slug, description, logo_url, created_at)
 VALUES (
     '09021c8e-a988-4a45-bf06-fed27e0dcfeb',
@@ -98,9 +91,7 @@ ON CONFLICT (slug) DO UPDATE SET
     description = EXCLUDED.description,
     logo_url = EXCLUDED.logo_url;
 
--- ------------------------------------------------------------------------------
 -- 4. SEED CATEGORIES
--- ------------------------------------------------------------------------------
 INSERT INTO categories (id, name, slug, created_at)
 VALUES 
     ('09021c8e-a988-4a45-bf06-fed27e0dcfe2', 'Куртки', 'jackets', NOW()),
@@ -114,9 +105,7 @@ VALUES
     ('019fc26c-109a-74c6-b8e5-4a252ecf4e12', 'Аксессуары', 'accessories', NOW())
 ON CONFLICT (slug) DO NOTHING;
 
--- ------------------------------------------------------------------------------
 -- 5. SEED PRODUCTS FROM RU.MARCELOMIRACLES.COM
--- ------------------------------------------------------------------------------
 INSERT INTO products (
     id, name, slug, description, price, currency, status, category_id, brand_id, cover_image, created_at, updated_at, published_at
 )
@@ -423,9 +412,7 @@ ON CONFLICT (slug) DO UPDATE SET
     cover_image = EXCLUDED.cover_image,
     status = EXCLUDED.status;
 
--- ------------------------------------------------------------------------------
 -- 6. SEED PRODUCT VARIANTS (FOR CLOTHING: S, M, L, XL)
--- ------------------------------------------------------------------------------
 INSERT INTO product_variants (id, product_id, sku, size, color, is_active, sort_order, created_at)
 SELECT
     gen_random_uuid(),
@@ -440,12 +427,10 @@ FROM products p
 CROSS JOIN (
     VALUES ('S', 0), ('M', 1), ('L', 2), ('XL', 3)
 ) AS s(size, sort)
-WHERE p.category_id != '09021c8e-a988-4a45-bf06-fed27e0dcfe1' -- НЕ обувь
+WHERE p.category_id != '09021c8e-a988-4a45-bf06-fed27e0dcfe1'
 ON CONFLICT (sku) DO NOTHING;
 
--- ------------------------------------------------------------------------------
 -- 7. SEED PRODUCT VARIANTS (FOR SHOES: 40, 41, 42, 43, 44)
--- ------------------------------------------------------------------------------
 INSERT INTO product_variants (id, product_id, sku, size, color, is_active, sort_order, created_at)
 SELECT
     gen_random_uuid(),
@@ -460,7 +445,5 @@ FROM products p
 CROSS JOIN (
     VALUES ('40', 0), ('41', 1), ('42', 2), ('43', 3), ('44', 4)
 ) AS s(size, sort)
-WHERE p.category_id = '09021c8e-a988-4a45-bf06-fed27e0dcfe1' -- Обувь
+WHERE p.category_id = '09021c8e-a988-4a45-bf06-fed27e0dcfe1'
 ON CONFLICT (sku) DO NOTHING;
-
-COMMIT;
