@@ -1,0 +1,56 @@
+name: flashmarket-drops
+
+x-drops-runtime: &drops-runtime
+  image: ${DROPS_IMAGE:?DROPS_IMAGE must contain the image digest}
+  pull_policy: always
+  env_file:
+    - ${DROPS_ENV_FILE:-.env}
+
+services:
+  api:
+    <<: *drops-runtime
+    networks:
+      backend:
+        aliases:
+          - drops
+    volumes:
+      - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  scheduler:
+    <<: *drops-runtime
+    networks:
+      - backend
+    command:
+      - consumer
+      - drops.scheduler
+    restart: unless-stopped
+
+  outbox:
+    <<: *drops-runtime
+    networks:
+      - backend
+    command:
+      - outbox
+      - drops.outbox_worker
+    restart: unless-stopped
+
+networks:
+  backend:
+    external: true
+    name: shide-observability
+
+volumes:
+  auth-jwt-keys-public:
+    external: true
+    name: flashmarket-auth-jwt-keys-public
