@@ -49,3 +49,12 @@ def test_shared_ssh_configuration_is_strict_and_resilient() -> None:
         "ServerAliveCountMax 4",
     ):
         assert setting in contents
+
+
+def test_production_deployments_are_serialized() -> None:
+    workflows = _deployment_workflows()
+    assert workflows
+    for workflow in workflows:
+        contents = workflow.read_text(encoding="utf-8")
+        assert "group: flashmarket-production-deploy" in contents, workflow
+        assert "cancel-in-progress: false" in contents, workflow
