@@ -190,10 +190,9 @@ class MediaAssetService:
                 raise UploadValidationFailed(
                     "Stored object metadata does not match the upload session"
                 )
+
             async def read_and_validate():  # type: ignore[no-untyped-def]
-                content = await self._storage.read_object(
-                    asset.object_key, asset.expected_size
-                )
+                content = await self._storage.read_object(asset.object_key, asset.expected_size)
                 if len(content) != asset.expected_size:
                     raise UploadValidationFailed(
                         "Stored object size does not match the upload session"
