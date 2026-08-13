@@ -1,0 +1,105 @@
+name: Reliability Operations Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/prometheus/**
+      - deploy/systemd/**
+      - scripts/flashmarket_worker_watchdog.py
+      - scripts/install-worker-watchdog.sh
+      - scripts/configure-deploy-ssh.sh
+      - .github/workflows/reliability-ops-deploy.yml
+  workflow_dispatch:
+
+concurrency:
+  group: reliability-ops-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST || '176.108.242.100' }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER || 'user1' }}
+      DEPLOY_PATH: ${{ vars.RELIABILITY_DEPLOY_PATH }}
+      PROMETHEUS_RULES_DIR: ${{ vars.PROMETHEUS_RULES_DIR }}
+      PROMETHEUS_CONTAINER: ${{ vars.PROMETHEUS_CONTAINER || 'shide-prometheus' }}
+      SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate configuration
+        shell: bash
+        run: |
+          DEPLOY_PATH="${DEPLOY_PATH:-/home/${DEPLOY_USER}/flashmarket-reliability}"
+          echo "DEPLOY_PATH=$DEPLOY_PATH" >> "$GITHUB_ENV"
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$DEPLOY_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]] &&
+            (( DEPLOY_PORT >= 1 && DEPLOY_PORT <= 65535 ))
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          if [[ -n "$PROMETHEUS_RULES_DIR" ]]; then
+            [[ "$PROMETHEUS_RULES_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          fi
+          [[ "$PROMETHEUS_CONTAINER" =~ ^[A-Za-z0-9_.-]+$ ]]
+
+      - name: Configure SSH
+        run: bash scripts/configure-deploy-ssh.sh
+
+      - name: Upload reliability bundle
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "install -d -m 0755 '$DEPLOY_PATH/scripts' '$DEPLOY_PATH/deploy/systemd' '$DEPLOY_PATH/deploy/prometheus'"
+          scp -P "$DEPLOY_PORT" \
+            scripts/flashmarket_worker_watchdog.py \
+            scripts/install-worker-watchdog.sh \
+            "$target:$DEPLOY_PATH/scripts/"
+          scp -P "$DEPLOY_PORT" deploy/systemd/* \
+            "$target:$DEPLOY_PATH/deploy/systemd/"
+          scp -P "$DEPLOY_PORT" deploy/prometheus/* \
+            "$target:$DEPLOY_PATH/deploy/prometheus/"
+
+      - name: Install and verify worker watchdog
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "sudo sh '$DEPLOY_PATH/scripts/install-worker-watchdog.sh' '$DEPLOY_PATH' &&
+             sudo systemctl is-enabled --quiet flashmarket-worker-watchdog.timer &&
+             sudo systemctl is-active --quiet flashmarket-worker-watchdog.timer &&
+             sudo systemctl start flashmarket-worker-watchdog.service"
+
+      - name: Install and reload Prometheus rules
+        if: env.PROMETHEUS_RULES_DIR != ''
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "PROMETHEUS_RULES_DIR='$PROMETHEUS_RULES_DIR' PROMETHEUS_CONTAINER='$PROMETHEUS_CONTAINER' DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          sudo install -d -m 0755 "$PROMETHEUS_RULES_DIR"
+          sudo install -m 0644 \
+            "$DEPLOY_PATH/deploy/prometheus/flashmarket-reliability.rules.yml" \
+            "$PROMETHEUS_RULES_DIR/flashmarket-reliability.rules.yml"
+          docker exec "$PROMETHEUS_CONTAINER" promtool check rules \
+            /etc/prometheus/rules/flashmarket-reliability.rules.yml
+          docker kill --signal HUP "$PROMETHEUS_CONTAINER" >/dev/null
+          REMOTE
+
+      - name: Show protection status
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "sudo systemctl --no-pager status flashmarket-worker-watchdog.timer |
+             sed -n '1,12p'; docker ps --filter label=flashmarket.autoheal=true \
+             --format 'table {{.Names}}\t{{.Status}}'"

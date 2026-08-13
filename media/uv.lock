@@ -495,7 +495,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cryptography", specifier = ">=42.0.0" },
+    { name = "cryptography", specifier = ">=50,<51" },
     { name = "fastapi", specifier = ">=0.110.0" },
     { name = "pyjwt", specifier = ">=2.8.0" },
 ]

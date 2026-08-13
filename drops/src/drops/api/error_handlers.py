@@ -17,7 +17,7 @@ ERROR_STATUS: dict[type[DropError], int] = {
     InvalidDropState: status.HTTP_409_CONFLICT,
     DuplicateDropSlug: status.HTTP_409_CONFLICT,
     ProductAlreadyInDrop: status.HTTP_409_CONFLICT,
-    DropTimeConflict: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    DropTimeConflict: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 
 

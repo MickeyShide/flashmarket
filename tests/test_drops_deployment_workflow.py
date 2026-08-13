@@ -40,8 +40,7 @@ def test_drops_deploy_renders_strict_production_configuration() -> None:
 
     assert "DEPLOY_SSH_KEY is required" in workflow
     assert "Drops image digest is missing" in workflow
-    assert "ServerAliveInterval 15" in workflow
-    assert "ServerAliveCountMax 4" in workflow
+    assert "bash scripts/configure-deploy-ssh.sh" in workflow
     assert "timeout --signal=TERM --kill-after=30s 900" in workflow
 
 

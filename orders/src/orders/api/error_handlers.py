@@ -23,11 +23,11 @@ ERROR_STATUS: dict[type[Exception], int] = {
     InvalidOrderState: status.HTTP_409_CONFLICT,
     DuplicateOrder: status.HTTP_409_CONFLICT,
     PromocodeNotFound: status.HTTP_404_NOT_FOUND,
-    PromocodeExpired: status.HTTP_422_UNPROCESSABLE_ENTITY,
-    PromocodeDisabled: status.HTTP_422_UNPROCESSABLE_ENTITY,
-    PromocodeLimitReached: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    PromocodeExpired: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    PromocodeDisabled: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    PromocodeLimitReached: status.HTTP_422_UNPROCESSABLE_CONTENT,
     PromocodeAlreadyUsed: status.HTTP_409_CONFLICT,
-    PromocodeMinAmountNotMet: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    PromocodeMinAmountNotMet: status.HTTP_422_UNPROCESSABLE_CONTENT,
     DuplicatePromocodeCode: status.HTTP_409_CONFLICT,
 }
 

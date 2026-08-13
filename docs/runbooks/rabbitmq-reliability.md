@@ -14,6 +14,14 @@
    `deploy/prometheus/scrape-config.example.yml` into its configuration. Route both
    `warning` and `critical` alerts to the production Alertmanager receiver.
 
+The `Reliability Operations Deploy` workflow uploads the bundle and installs the
+watchdog idempotently. Configure the protected server host key as the
+`DEPLOY_KNOWN_HOSTS` environment secret (the literal `known_hosts` line verified out of
+band). Set `PROMETHEUS_RULES_DIR` only when the host directory is mounted at
+`/etc/prometheus/rules` in `shide-prometheus`; the workflow validates the rules inside
+the running container before sending `SIGHUP`. The example scrape jobs still need to be
+merged once because they depend on the external observability Compose topology.
+
 ## Fast checks
 
 ```bash

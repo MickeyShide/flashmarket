@@ -12,6 +12,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 class TestKeyStore:
     """Helper to generate temporary Ed25519 keys and signed JWT tokens for unit/integration tests."""
 
+    __test__ = False
+
     def __init__(self, key_dir: Path, key_id: str = "test-key") -> None:
         self.key_dir = key_dir
         self.key_id = key_id

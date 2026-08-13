@@ -238,6 +238,7 @@ jobs:
       DEPLOY_USER: ${{ vars.DEPLOY_USER || 'user1' }}
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GHCR_USERNAME: ${{ github.actor }}
       INFRA_USER: ${{ vars.INFRA_USER || 'shide' }}
@@ -245,9 +246,9 @@ jobs:
       GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
       AUTH_CORS_ORIGINS: ${{ vars.AUTH_CORS_ORIGINS }}
       AUTH_JWT_KEY_ID: ${{ vars.AUTH_JWT_KEY_ID || 'flashmarket-auth-ed25519-v1' }}
-      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'flashmarket_postgres_pass_2026' }}
-      DEPLOY_REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD || 'flashmarket_redis_pass_2026' }}
-      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD || 'flashmarket_rabbitmq_pass_2026' }}
+      DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      DEPLOY_REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -259,9 +260,9 @@ jobs:
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           AUTH_DOMAIN="auth.${GATEWAY_DOMAIN}"
           INFRA_USER="${INFRA_USER:-shide}"
-          DEPLOY_POSTGRES_PASSWORD="${DEPLOY_POSTGRES_PASSWORD:-flashmarket_postgres_pass_2026}"
-          DEPLOY_REDIS_PASSWORD="${DEPLOY_REDIS_PASSWORD:-flashmarket_redis_pass_2026}"
-          DEPLOY_RABBITMQ_PASSWORD="${DEPLOY_RABBITMQ_PASSWORD:-flashmarket_rabbitmq_pass_2026}"
+          : "${DEPLOY_POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+          : "${DEPLOY_REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+          : "${DEPLOY_RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
 
           if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
             echo "::error::DEPLOY_HOST must be a hostname or IPv4 address"
@@ -296,16 +297,7 @@ jobs:
 
       - name: Configure SSH
         shell: bash
-        run: |
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
-          chmod 600 "$HOME/.ssh/id_ed25519"
-          cat > "$HOME/.ssh/config" <<'EOF'
-          Host *
-              StrictHostKeyChecking no
-              UserKnownHostsFile /dev/null
-          EOF
-          chmod 600 "$HOME/.ssh/config"
+        run: bash scripts/configure-deploy-ssh.sh
 
       - name: Render production environment
         shell: bash

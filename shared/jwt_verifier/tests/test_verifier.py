@@ -116,7 +116,7 @@ def test_malformed_jwt_and_headers(
 
     bad_alg = jwt.encode(
         {"sub": str(uuid.uuid7()), "type": "access", "role": "CUSTOMER"},
-        "secret",
+        "test-only-hmac-key-at-least-32-bytes-long",
         algorithm="HS256",
         headers={"kid": "key1"},
     )

@@ -13,7 +13,7 @@ from wishlist.domain.exceptions import (
 ERROR_STATUS: dict[type[WishlistError], int] = {
     ItemAlreadyInWishlist: status.HTTP_409_CONFLICT,
     ItemNotInWishlist: status.HTTP_404_NOT_FOUND,
-    WishlistLimitReached: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    WishlistLimitReached: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 
 
