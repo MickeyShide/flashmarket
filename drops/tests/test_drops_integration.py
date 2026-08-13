@@ -101,7 +101,7 @@ async def test_drop_008_scheduler_auto_transitions(
 
 @pytest.mark.asyncio
 async def test_drop_010_outbox_worker_retries(
-    session_factory: async_sessionmaker[AsyncSession]
+    session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """DROP-010: Outbox worker retries failed drop events."""
     async with session_factory() as session, session.begin():

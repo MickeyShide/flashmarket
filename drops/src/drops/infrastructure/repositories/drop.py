@@ -35,9 +35,7 @@ class DropRepository:
     async def get_by_id(self, drop_id: UUID) -> DropModel | None:
         """Retrieve a drop by ID with eagerly loaded items."""
         stmt = (
-            select(DropModel)
-            .options(selectinload(DropModel.items))
-            .where(DropModel.id == drop_id)
+            select(DropModel).options(selectinload(DropModel.items)).where(DropModel.id == drop_id)
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -45,9 +43,7 @@ class DropRepository:
     async def get_by_slug(self, slug: str) -> DropModel | None:
         """Retrieve a drop by slug with eagerly loaded items."""
         stmt = (
-            select(DropModel)
-            .options(selectinload(DropModel.items))
-            .where(DropModel.slug == slug)
+            select(DropModel).options(selectinload(DropModel.items)).where(DropModel.slug == slug)
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -80,9 +76,7 @@ class DropRepository:
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def list_all(
-        self, limit: int, offset: int, status: DropStatus | None = None
-    ) -> DropPage:
+    async def list_all(self, limit: int, offset: int, status: DropStatus | None = None) -> DropPage:
         """List all drops with pagination and optional status filter."""
         count_stmt = select(func.count()).select_from(DropModel)
         stmt = select(DropModel).options(selectinload(DropModel.items))

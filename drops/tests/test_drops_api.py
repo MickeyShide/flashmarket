@@ -135,7 +135,5 @@ async def test_add_and_remove_drop_items_api(client: AsyncClient) -> None:
     assert res_add.status_code == 201
     assert res_add.json()["product_id"] == str(prod_id)
 
-    res_del = await client.delete(
-        f"/api/v1/admin/drops/{drop_id}/items/{prod_id}"
-    )
+    res_del = await client.delete(f"/api/v1/admin/drops/{drop_id}/items/{prod_id}")
     assert res_del.status_code == 204

@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 
-from rabbitmq_reliability import touch_heartbeat
+from rabbitmq_reliability import periodic_heartbeat
 
 from drops.domain.entities import DropEventType, DropStatus
 from drops.infrastructure.database import SessionFactory, utc_now
@@ -64,14 +64,17 @@ async def main() -> None:
     """Scheduler main loop."""
     setup_metrics()
     logger.info("Starting drops scheduler loop...")
-    while True:
-        try:
-            await run_scheduler_tick()
-        except Exception:
-            logger.exception("Error in scheduler tick")
-        else:
-            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "drops_scheduler")
-        await asyncio.sleep(10)
+    async with periodic_heartbeat(
+        "/tmp/flashmarket-heartbeat.json",
+        interval_seconds=10,
+        phase="drops_scheduler",
+    ):
+        while True:
+            try:
+                await run_scheduler_tick()
+            except Exception:
+                logger.exception("Error in scheduler tick")
+            await asyncio.sleep(10)
 
 
 if __name__ == "__main__":

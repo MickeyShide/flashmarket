@@ -195,6 +195,7 @@ async def request_observability_middleware(
 def metrics_endpoint() -> Response:
     """Prometheus metrics endpoint handler."""
     import os
+
     if "PROMETHEUS_MULTIPROC_DIR" in os.environ:
         registry = CollectorRegistry()
         multiprocess.MultiProcessCollector(registry)
