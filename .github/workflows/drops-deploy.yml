@@ -272,7 +272,7 @@ jobs:
         shell: bash
         run: |
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
-          timeout --signal=TERM --kill-after=30s 900 \
+          timeout --signal=TERM --kill-after=30s 2400 \
             ssh -p "$DEPLOY_PORT" "$target" \
             "DEPLOY_PATH='$DEPLOY_PATH' DROPS_IMAGE='$DROPS_IMAGE' bash -s" <<'REMOTE'
           set -Eeuo pipefail

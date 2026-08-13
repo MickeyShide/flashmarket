@@ -62,3 +62,4 @@ def test_production_deployments_are_serialized() -> None:
         contents = workflow.read_text(encoding="utf-8")
         assert "exec 9>/tmp/flashmarket-production-deploy.lock" in contents, workflow
         assert "flock -w 1800 9" in contents, workflow
+        assert "timeout --signal=TERM --kill-after=30s 900" not in contents, workflow
