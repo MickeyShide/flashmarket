@@ -377,9 +377,6 @@ jobs:
               if [[ "$health" == "healthy" ]]; then
                 return 0
               fi
-              if [[ "$health" == "unhealthy" || "$health" == "exited" ]]; then
-                break
-              fi
               sleep 2
             done
             docker compose --env-file .env logs --tail 100 "$service"

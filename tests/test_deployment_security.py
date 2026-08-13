@@ -63,3 +63,12 @@ def test_production_deployments_are_serialized() -> None:
         assert "exec 9>/tmp/flashmarket-production-deploy.lock" in contents, workflow
         assert "flock -w 1800 9" in contents, workflow
         assert "timeout --signal=TERM --kill-after=30s 900" not in contents, workflow
+
+
+def test_deployment_readiness_tolerates_transient_unhealthy_state() -> None:
+    for workflow in _deployment_workflows():
+        contents = workflow.read_text(encoding="utf-8")
+        assert '"$health" == "unhealthy" || "$health" == "exited"' not in contents
+        assert '"$worker_health" == "unhealthy"' not in contents
+        assert '"$outbox_health" == "unhealthy"' not in contents
+        assert '"$cleanup_health" == "unhealthy"' not in contents

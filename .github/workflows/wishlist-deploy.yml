@@ -320,10 +320,6 @@ jobs:
             if [[ "$health" == "healthy" ]]; then
               break
             fi
-            if [[ "$health" == "unhealthy" || "$health" == "exited" ]]; then
-              docker compose -f docker-compose.yml --env-file .env logs --tail 100 api
-              exit 1
-            fi
             sleep 2
           done
           final_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$api_container")"
@@ -345,7 +341,6 @@ jobs:
           for attempt in $(seq 1 30); do
             outbox_health="$(docker inspect --format '{{.State.Health.Status}}' "$outbox_container")"
             [[ "$outbox_health" == "healthy" ]] && break
-            [[ "$outbox_health" == "unhealthy" ]] && break
             sleep 2
           done
           if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$outbox_container")" != "healthy" ]]; then
