@@ -41,7 +41,7 @@ def test_drops_deploy_renders_strict_production_configuration() -> None:
     assert "DEPLOY_SSH_KEY is required" in workflow
     assert "Drops image digest is missing" in workflow
     assert "bash scripts/configure-deploy-ssh.sh" in workflow
-    assert "timeout --signal=TERM --kill-after=30s 900" in workflow
+    assert "timeout --signal=TERM --kill-after=30s 2400" in workflow
 
 
 def test_drops_deploy_migrates_starts_all_runtime_and_verifies_gateway() -> None:
@@ -49,6 +49,8 @@ def test_drops_deploy_migrates_starts_all_runtime_and_verifies_gateway() -> None
 
     assert "run --rm --no-deps api migrate" in workflow
     assert "api scheduler outbox" in workflow
+    assert "for attempt in $(seq 1 60)" in workflow
+    assert ".State.Health.Log" in workflow
     assert "/dev/status/drops" in workflow
     assert "Drops is not reachable through the production gateway" in workflow
 
