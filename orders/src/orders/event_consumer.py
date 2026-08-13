@@ -12,6 +12,16 @@ from typing import Any
 import aio_pika
 from aio_pika import ExchangeType
 from aio_pika.abc import AbstractIncomingMessage
+from rabbitmq_reliability import (
+    PermanentMessageError,
+    ReliabilityConfig,
+    declare_consumer_topology,
+    decode_json_object,
+    original_routing_key,
+    periodic_heartbeat,
+    process_with_retries,
+    run_forever,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from orders.config import get_settings
@@ -166,16 +176,16 @@ async def process_message(
     session_factory: async_sessionmaker[AsyncSession] = SessionFactory,
 ) -> None:
     """Route an incoming message to its handler."""
-    async with message.process(reject_on_redelivered=False):
-        body = json.loads(message.body.decode("utf-8"))
-        routing_key = message.routing_key or ""
-        handler = HANDLERS.get(routing_key)
-        if handler is None:
-            logger.warning("No handler for routing key %s", routing_key)
-            return
-
+    body = decode_json_object(message)
+    routing_key = original_routing_key(message)
+    handler = HANDLERS.get(routing_key)
+    if handler is None:
+        raise PermanentMessageError(f"unsupported routing key: {routing_key}")
+    try:
         async with session_factory() as session, session.begin():
             await handler(session, body)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PermanentMessageError("invalid orders event payload") from exc
 
 
 async def run_consumer() -> None:
@@ -183,34 +193,40 @@ async def run_consumer() -> None:
     settings = get_settings()
     connection = await aio_pika.connect_robust(settings.rabbitmq_url)
     async with connection:
-        channel = await connection.channel()
+        channel = await connection.channel(publisher_confirms=True, on_return_raises=True)
         await channel.set_qos(prefetch_count=10)
         exchange = await channel.declare_exchange(
             settings.rabbitmq_exchange,
             ExchangeType.TOPIC,
             durable=True,
         )
-        queue = await channel.declare_queue(
-            "orders.events",
-            durable=True,
+        topology = await declare_consumer_topology(
+            channel,
+            queue_name="orders.events",
+            topic_exchange=exchange,
+            routing_keys=tuple(HANDLERS),
+            config=ReliabilityConfig(),
         )
-        for routing_key in HANDLERS:
-            await queue.bind(exchange, routing_key=routing_key)
-
-        async with queue.iterator() as iterator:
-            async for message in iterator:
-                try:
-                    await process_message(message)
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    logger.exception("Failed to process message")
+        async with periodic_heartbeat("/tmp/flashmarket-heartbeat.json"):
+            async with topology.queue.iterator() as iterator:
+                async for message in iterator:
+                    try:
+                        await process_with_retries(
+                            message,
+                            handler=process_message,
+                            topology=topology,
+                            config=ReliabilityConfig(),
+                        )
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        logger.exception("Failed to process message")
 
 
 async def run() -> None:
     """Start the consumer coroutine."""
     try:
-        await run_consumer()
+        await run_forever(run_consumer, label="Orders consumer")
     finally:
         await engine.dispose()
 

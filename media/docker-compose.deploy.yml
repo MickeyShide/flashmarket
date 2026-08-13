@@ -48,6 +48,12 @@ services:
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-m", "media_service.worker_health", "90"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 90s
 
 networks:
   backend:

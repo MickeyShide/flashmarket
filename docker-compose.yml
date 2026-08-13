@@ -155,6 +155,12 @@ services:
       service: consumer
     depends_on: !reset {}
 
+  wishlist-outbox:
+    extends:
+      file: wishlist/docker-compose.yml
+      service: outbox
+    depends_on: !reset {}
+
   # -----------------------------------------------------------
   # DROPS MICROSERVICE
   # -----------------------------------------------------------

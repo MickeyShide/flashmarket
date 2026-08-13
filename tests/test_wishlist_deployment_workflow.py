@@ -54,11 +54,14 @@ def test_wishlist_deploy_migrates_starts_runtime_and_verifies_gateway() -> None:
 
     assert "timeout 120 docker compose" in workflow
     assert "run --rm --no-deps api migrate" in workflow
-    assert "api consumer" in workflow
+    assert "api consumer outbox" in workflow
     assert "State.Running" in workflow
     assert "initial_consumer_restarts" in workflow
     assert "final_consumer_restarts" in workflow
     assert "Wishlist consumer restarted during deployment verification" in workflow
+    assert "initial_outbox_restarts" in workflow
+    assert "final_outbox_restarts" in workflow
+    assert "Wishlist outbox restarted during deployment verification" in workflow
     assert "/dev/status/wishlist" in workflow
     assert "Wishlist is not reachable through the production gateway" in workflow
 
@@ -68,6 +71,7 @@ def test_wishlist_deploy_compose_owns_runtime_and_gateway_alias() -> None:
 
     assert "  api:" in compose
     assert "  consumer:" in compose
+    assert "  outbox:" in compose
     assert "${WISHLIST_IMAGE:?WISHLIST_IMAGE must contain the image digest}" in compose
     assert "      aliases:\n        - wishlist" in compose
     assert "name: shide-observability" in compose

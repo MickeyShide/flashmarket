@@ -3,6 +3,8 @@
 import asyncio
 import logging
 
+from rabbitmq_reliability import touch_heartbeat
+
 from inventory.application.services.stock import InventoryService
 from inventory.config import get_settings
 from inventory.infrastructure.database import SessionFactory, engine
@@ -36,6 +38,8 @@ async def run() -> None:
                 raise
             except Exception:
                 logger.exception("Reservation expiry tick failed")
+            else:
+                touch_heartbeat("/tmp/flashmarket-heartbeat.json", "tick_complete")
             await asyncio.sleep(settings.expiry_poll_interval_seconds)
     finally:
         await redis_client.aclose()

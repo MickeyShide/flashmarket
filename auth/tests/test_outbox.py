@@ -20,10 +20,11 @@ class CapturingExchange:
         routing_key: str,
         *,
         mandatory: bool,
-    ) -> None:
+    ) -> bool:
         if self.error is not None:
             raise self.error
         self.published.append((message, routing_key, mandatory))
+        return True
 
 
 async def _add_event(

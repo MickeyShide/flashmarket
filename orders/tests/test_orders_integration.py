@@ -199,8 +199,9 @@ async def test_ord_016_outbox_worker_retries(
         def __init__(self) -> None:
             self.published = 0
 
-        async def publish(self, message: any, routing_key: str, mandatory: bool = True) -> None:
+        async def publish(self, message: any, routing_key: str, mandatory: bool = True) -> bool:
             self.published += 1
+            return True
 
     mock_exchange = MockExchange()
     count = await publish_outbox_batch(mock_exchange, session_factory=session_factory)

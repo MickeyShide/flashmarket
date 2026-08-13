@@ -47,6 +47,26 @@ services:
       - consumer
       - wishlist.event_consumer
     restart: unless-stopped
+    healthcheck: &worker-health
+      test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "45"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 45s
+
+  outbox:
+    <<: *wishlist-runtime
+    mem_limit: ${WISHLIST_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${WISHLIST_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${WISHLIST_WORKER_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
+    command:
+      - outbox
+      - wishlist.outbox_worker
+    restart: unless-stopped
+    healthcheck: *worker-health
 
 networks:
   backend:

@@ -117,6 +117,8 @@ class OutboxEvent(Base):
     )
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(String(1000))
+    claim_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class LoginSession(Base):

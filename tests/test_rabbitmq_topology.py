@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import urllib.error
 from pathlib import Path
@@ -128,3 +129,46 @@ def test_vhost_bootstrap_failure_is_fatal() -> None:
         module._ensure_vhost_and_permissions(
             "amqp://user:pass@rabbitmq:5672/flashmarket"
         )
+
+
+def test_bootstrap_declares_reliability_exchanges_and_queue_policies() -> None:
+    module = _load_init_infra()
+    requests: list[object] = []
+
+    class Response:
+        status = 201
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    def capture(request, *, timeout: float):
+        assert timeout == 10.0
+        requests.append(request)
+        return Response()
+
+    with (
+        patch.object(module, "resolve_host_ipv4", return_value="127.0.0.1"),
+        patch.object(module.urllib.request, "urlopen", side_effect=capture),
+    ):
+        module._ensure_vhost_and_permissions(
+            "amqp://user:pass@rabbitmq:5672/flashmarket"
+        )
+
+    urls = [request.full_url for request in requests]
+    assert any("/exchanges/flashmarket/flashmarket.retry" in url for url in urls)
+    assert any("/exchanges/flashmarket/flashmarket.dead-letter" in url for url in urls)
+    dlq_requests = [request for request in requests if "/queues/flashmarket/" in request.full_url]
+    binding_requests = [
+        request for request in requests if "/bindings/flashmarket/e/" in request.full_url
+    ]
+    assert len(dlq_requests) == 5
+    assert len(binding_requests) == 5
+    assert all(request.get_method() == "POST" for request in binding_requests)
+    policies = [request for request in requests if "/policies/flashmarket/" in request.full_url]
+    assert len(policies) == 5
+    definitions = [json.loads(request.data)["definition"] for request in policies]
+    assert all(definition["overflow"] == "reject-publish-dlx" for definition in definitions)
+    assert all(definition["dead-letter-exchange"] == "flashmarket.dead-letter" for definition in definitions)

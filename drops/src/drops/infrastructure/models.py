@@ -39,9 +39,7 @@ class DropModel(Base):
     slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     cover_image: Mapped[str | None] = mapped_column(String(2048), nullable=True)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=DropStatus.DRAFT
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default=DropStatus.DRAFT)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     max_per_user: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -62,9 +60,7 @@ class DropItemModel(Base):
     """Product associated with a flash-sale drop."""
 
     __tablename__ = "drop_items"
-    __table_args__ = (
-        UniqueConstraint("drop_id", "product_id", name="uq_drop_items_drop_product"),
-    )
+    __table_args__ = (UniqueConstraint("drop_id", "product_id", name="uq_drop_items_drop_product"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
     drop_id: Mapped[uuid.UUID] = mapped_column(
@@ -101,3 +97,7 @@ class OutboxEventModel(Base):
         default=0,
         server_default="0",
     )
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    claim_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

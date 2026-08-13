@@ -8,7 +8,13 @@ import logging
 import aio_pika
 from aio_pika import DeliveryMode, ExchangeType, Message
 from aio_pika.abc import AbstractExchange
-from sqlalchemy import select
+from rabbitmq_reliability import (
+    claim_outbox_event,
+    publish_confirmed,
+    record_outbox_result,
+    run_forever,
+    touch_heartbeat,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from payments.config import get_settings, utc_now
@@ -24,6 +30,7 @@ EVENT_ROUTING_KEYS: dict[str, str] = {
     PaymentEventType.PAYMENT_FAILED: "payments.PaymentFailed",
     PaymentEventType.PAYMENT_CANCELLED: "payments.PaymentCancelled",
 }
+ROUTED_EVENTS = {"payments.PaymentSucceeded", "payments.PaymentFailed"}
 
 
 async def publish_outbox_batch(
@@ -33,52 +40,43 @@ async def publish_outbox_batch(
 ) -> int:
     """Publish one batch of pending outbox events."""
     settings = get_settings()
-    now = utc_now()
-    async with session_factory() as db, db.begin():
-        events = (
-            await db.scalars(
-                select(OutboxEventModel)
-                .where(OutboxEventModel.status.in_(["pending", "failed"]))
-                .order_by(OutboxEventModel.created_at)
-                .limit(settings.outbox_batch_size)
-                .with_for_update(skip_locked=True)
-            )
-        ).all()
-        for event in events:
+    processed = 0
+    for _ in range(settings.outbox_batch_size):
+        claimed = await claim_outbox_event(session_factory, OutboxEventModel, utc_now())
+        if claimed is None:
+            break
+        event, token = claimed
+        error: Exception | None = None
+        try:
             routing_key = EVENT_ROUTING_KEYS.get(
                 event.event_type,
                 f"payments.{event.event_type}",
             )
-            try:
-                await exchange.publish(
-                    Message(
-                        body=event.payload.encode("utf-8"),
-                        content_type="application/json",
-                        delivery_mode=DeliveryMode.PERSISTENT,
-                        message_id=str(event.id),
-                        type=event.event_type,
-                        timestamp=event.created_at,
-                        headers={"event_id": str(event.id)},
-                    ),
-                    routing_key=routing_key,
-                    mandatory=False,
-                )
-            except Exception as exc:
-                event.status = "failed"
-                event.attempts = (event.attempts or 0) + 1
-                event.published_at = None
-                await db.flush()
-                logger.warning(
-                    "Failed to publish outbox event %s: %s",
-                    event.id,
-                    exc,
-                )
-            else:
-                event.status = "published"
-                event.attempts = (event.attempts or 0) + 1
-                event.published_at = now
-                await db.flush()
-        return len(events)
+            await publish_confirmed(
+                exchange,
+                Message(
+                    body=event.payload.encode("utf-8"),
+                    content_type="application/json",
+                    delivery_mode=DeliveryMode.PERSISTENT,
+                    message_id=str(event.id),
+                    type=event.event_type,
+                    timestamp=event.created_at,
+                    headers={"event_id": str(event.id)},
+                ),
+                routing_key,
+                timeout_seconds=5.0,
+                mandatory=routing_key in ROUTED_EVENTS,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            error = exc
+            logger.warning("Failed to publish outbox event %s: %s", event.id, exc)
+        await record_outbox_result(
+            session_factory, OutboxEventModel, event.id, token, utc_now(), error
+        )
+        processed += 1
+    return processed
 
 
 async def run_connected_worker() -> None:
@@ -88,6 +86,7 @@ async def run_connected_worker() -> None:
     async with connection:
         channel = await connection.channel(
             publisher_confirms=True,
+            on_return_raises=True,
         )
         exchange = await channel.declare_exchange(
             settings.rabbitmq_exchange,
@@ -103,27 +102,20 @@ async def run_connected_worker() -> None:
                 logger.exception("Outbox batch failed")
                 await asyncio.sleep(settings.outbox_poll_interval_seconds)
                 continue
-            if processed == 0:
-                await asyncio.sleep(settings.outbox_poll_interval_seconds)
-            else:
+            if processed:
                 logger.info("Processed %d outbox event(s)", processed)
+            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "poll_complete")
+            await asyncio.sleep(settings.outbox_poll_interval_seconds)
 
 
 async def run_worker() -> None:
     """Reconnect the outbox worker after broker failures."""
     settings = get_settings()
-    retry_delay = settings.outbox_poll_interval_seconds
-    while True:
-        try:
-            await run_connected_worker()
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("Outbox connection failed")
-            await asyncio.sleep(retry_delay)
-            retry_delay = min(30.0, retry_delay * 2)
-        else:
-            retry_delay = settings.outbox_poll_interval_seconds
+    await run_forever(
+        run_connected_worker,
+        initial_delay=settings.outbox_poll_interval_seconds,
+        label="Payments outbox",
+    )
 
 
 async def run() -> None:

@@ -85,8 +85,11 @@ Modify `docker/init-infra.py` and repository topology tests:
 5. Do not delete or redeclare existing queues.
 6. Unit-test request paths and policy bodies without network access.
 
-New retry queues receive max length 5,000 and max bytes 32 MiB in their declare
-arguments. DLQs stay unbounded and have no TTL.
+New retry queues receive only their finite stage TTL and return-to-main DLX
+arguments. RabbitMQ exposes one DLX destination per queue, so an independent
+overflow-to-DLQ route would conflict with normal retry expiry and create either
+loss or a hot requeue loop. DLQs stay unbounded and have no TTL; retry depth is
+monitored.
 
 ## Task 5: Outbox schema and reusable scheduling
 
@@ -122,7 +125,8 @@ For each relay:
 1. Select only due, unpublished, unclaimed/expired rows.
 2. Claim rows in a short transaction with a unique token and lease expiry.
 3. Publish claimed events one at a time outside the claim transaction.
-4. Use `mandatory=True`, confirms, return exceptions, and timeout.
+4. Use confirms, return exceptions, and timeout; require `mandatory=True` for
+   downstream integration events and classify terminal events explicitly.
 5. Complete success/failure in a short compare-by-claim-token transaction.
 6. Schedule failure with exponential full jitter capped at five minutes.
 7. Clear claims on completion and recover expired claims after crashes.

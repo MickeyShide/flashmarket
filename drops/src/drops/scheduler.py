@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 
+from rabbitmq_reliability import touch_heartbeat
+
 from drops.domain.entities import DropEventType, DropStatus
 from drops.infrastructure.database import SessionFactory, utc_now
 from drops.infrastructure.models import OutboxEventModel
@@ -67,6 +69,8 @@ async def main() -> None:
             await run_scheduler_tick()
         except Exception:
             logger.exception("Error in scheduler tick")
+        else:
+            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "tick_complete")
         await asyncio.sleep(10)
 
 

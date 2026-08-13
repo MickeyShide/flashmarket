@@ -12,6 +12,7 @@ WORKDIR /app
 
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
+COPY shared/rabbitmq_reliability /shared/rabbitmq_reliability
 COPY auth/pyproject.toml auth/uv.lock auth/README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 

@@ -9,6 +9,7 @@ from media_service.config import get_settings
 from media_service.infrastructure.database import SessionFactory, engine
 from media_service.infrastructure.repositories import MediaAssetRepository
 from media_service.observability import CLEANUP_FAILURES, setup_observability
+from media_service.worker_health import touch
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,8 @@ async def run() -> None:
             except Exception:
                 CLEANUP_FAILURES.inc()
                 logger.exception("media cleanup batch failed")
+            else:
+                touch("tick_complete")
             await asyncio.sleep(settings.cleanup_interval_seconds)
     finally:
         await engine.dispose()

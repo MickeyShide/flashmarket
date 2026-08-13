@@ -14,10 +14,12 @@ dependencies = [
     "sqlalchemy>=2.0,<3",
     "uvicorn[standard]>=0.51,<1",
     "jwt_verifier",
+    "rabbitmq_reliability",
 ]
 
 [tool.uv.sources]
 jwt_verifier = { path = "../shared/jwt_verifier" }
+rabbitmq_reliability = { path = "../shared/rabbitmq_reliability" }
 
 [dependency-groups]
 dev = [

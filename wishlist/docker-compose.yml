@@ -64,6 +64,21 @@ services:
     mem_reservation: ${WISHLIST_WORKER_MEMORY_RESERVATION:-56m}
     pids_limit: ${WISHLIST_WORKER_PIDS_LIMIT:-64}
 
+  outbox:
+    <<: *wishlist-runtime
+    environment:
+      <<: *wishlist-environment
+      WISHLIST_LOG_FILE_PATH: /var/log/shide/wishlist-outbox.log
+    command:
+      - outbox
+      - wishlist.outbox_worker
+    volumes:
+      - backend-logs-local:/var/log/shide
+    restart: unless-stopped
+    mem_limit: ${WISHLIST_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${WISHLIST_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${WISHLIST_WORKER_PIDS_LIMIT:-64}
+
 volumes:
   auth-jwt-keys-public:
   backend-logs-local:

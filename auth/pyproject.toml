@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "aio-pika>=10,<11",
+    "rabbitmq_reliability",
     "alembic>=1.18,<2",
     "argon2-cffi>=25.1,<26",
     "asyncpg>=0.31,<1",
@@ -19,6 +20,9 @@ dependencies = [
     "sqlalchemy>=2.0,<3",
     "uvicorn[standard]>=0.51,<1",
 ]
+
+[tool.uv.sources]
+rabbitmq_reliability = { path = "../shared/rabbitmq_reliability" }
 
 [dependency-groups]
 dev = [

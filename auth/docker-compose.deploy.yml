@@ -101,11 +101,17 @@ services:
       - cleanup
       - sh
       - -c
-      - while true; do .venv/bin/python -m auth_service.cli cleanup-expired; sleep 3600; done
+      - while true; do .venv/bin/python -m auth_service.cli cleanup-expired && .venv/bin/python -c "from rabbitmq_reliability import touch_heartbeat; touch_heartbeat('/tmp/flashmarket-heartbeat.json', 'tick_complete')"; sleep 3600; done
     depends_on:
       api:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "3700"]
+      interval: 60s
+      timeout: 3s
+      retries: 3
+      start_period: 120s
 
   outbox:
     <<: *auth-runtime
@@ -122,6 +128,12 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "45"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 45s
 
 networks:
   frontend:

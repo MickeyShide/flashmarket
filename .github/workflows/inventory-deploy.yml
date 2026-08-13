@@ -406,11 +406,15 @@ jobs:
             --no-build \
             --force-recreate \
             --remove-orphans \
-            api consumer outbox nginx
+            api consumer outbox expiry nginx
           echo 'Inventory runtime containers started.'
 
           echo 'Waiting for Inventory API...'
           wait_for_healthy api
+          echo 'Waiting for Inventory workers...'
+          wait_for_healthy consumer
+          wait_for_healthy outbox
+          wait_for_healthy expiry
           echo 'Waiting for internal Nginx...'
           wait_for_healthy nginx
           docker compose --env-file .env ps -a

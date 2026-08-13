@@ -1,12 +1,13 @@
 """Repository for managing wishlist items in database."""
 
+import json
 from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from wishlist.infrastructure.models import WishlistItemModel
+from wishlist.infrastructure.models import OutboxEventModel, WishlistItemModel
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,3 +99,38 @@ class WishlistRepository:
             .distinct()
         )
         return list(result.all())
+
+    async def stage_drop_notifications(
+        self,
+        *,
+        drop_id: str,
+        drop_name: str,
+        drop_slug: str,
+        user_ids: list[UUID],
+    ) -> int:
+        """Stage idempotent per-user notification events in the current transaction."""
+        staged = 0
+        for user_id in user_ids:
+            event_key = f"drop:{drop_id}:user:{user_id}"
+            exists = await self._session.scalar(
+                select(OutboxEventModel.id).where(OutboxEventModel.event_key == event_key)
+            )
+            if exists is not None:
+                continue
+            payload = {
+                "event_key": event_key,
+                "user_id": str(user_id),
+                "drop_id": drop_id,
+                "drop_name": drop_name,
+                "drop_slug": drop_slug,
+            }
+            self._session.add(
+                OutboxEventModel(
+                    event_key=event_key,
+                    event_type="DropAvailable",
+                    payload=json.dumps(payload, separators=(",", ":")),
+                )
+            )
+            staged += 1
+        await self._session.flush()
+        return staged

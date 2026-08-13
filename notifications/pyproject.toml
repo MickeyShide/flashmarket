@@ -15,10 +15,12 @@ dependencies = [
     "aio-pika>=9.5,<10",
     "httpx>=0.28,<1",
     "jwt_verifier",
+    "rabbitmq_reliability",
 ]
 
 [tool.uv.sources]
 jwt_verifier = { path = "../shared/jwt_verifier" }
+rabbitmq_reliability = { path = "../shared/rabbitmq_reliability" }
 
 [dependency-groups]
 dev = [

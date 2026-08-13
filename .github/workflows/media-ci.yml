@@ -366,6 +366,21 @@ jobs:
             docker compose -f docker-compose.yml --env-file .env logs --tail 100 api
             exit 1
           }
+          cleanup_container="$(docker compose -f docker-compose.yml --env-file .env ps -q cleanup)"
+          if [[ -z "$cleanup_container" ]]; then
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 cleanup
+            exit 1
+          fi
+          for attempt in $(seq 1 60); do
+            cleanup_health="$(docker inspect --format '{{.State.Health.Status}}' "$cleanup_container")"
+            [[ "$cleanup_health" == "healthy" ]] && break
+            [[ "$cleanup_health" == "unhealthy" ]] && break
+            sleep 2
+          done
+          [[ -n "$cleanup_container" ]] && [[ "$(docker inspect --format '{{.State.Health.Status}}' "$cleanup_container")" == "healthy" ]] || {
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 cleanup
+            exit 1
+          }
           docker compose -f docker-compose.yml --env-file .env ps -a
           REMOTE
 

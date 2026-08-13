@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     max_items_per_user: int = 200
     rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672/flashmarket"
     rabbitmq_exchange: str = "flashmarket.events"
+    rabbitmq_publish_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
+    outbox_batch_size: int = Field(default=100, ge=1, le=1000)
+    outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
     jwt_public_key_dir: Path = Path("keys/public")
     jwt_algorithm: str = "EdDSA"
     jwt_issuer: str = "flashmarket-auth"

@@ -158,8 +158,6 @@ Main and retry queues receive configurable limits with conservative defaults:
 
 - main queue maximum length: 20,000 messages;
 - main queue maximum bytes: 128 MiB;
-- retry queue maximum length: 5,000 messages per stage;
-- retry queue maximum bytes: 32 MiB per stage;
 - overflow mode: `reject-publish-dlx` where supported by the installed RabbitMQ
   version.
 
@@ -167,7 +165,14 @@ A dedicated dead-letter exchange routes overflow from a main or retry queue to
 that consumer's DLQ. The DLQ is not assigned a destructive maximum length or
 TTL in this package: silently dropping the oldest failure would contradict the
 retention goal. Operators instead alert on any DLQ message and on queue depth.
-The limits are environment-configurable for later tuning.
+The main queue limits are environment-configurable for later tuning. Retry
+queues are instead bounded temporally by their 5/30/120-second TTL. RabbitMQ
+supports only one dead-letter destination per queue: adding an overflow DLX to
+a retry queue would conflict with the DLX that must return normally expired
+messages to the main queue. A retry queue therefore has no separate length/byte
+limit; its depth is monitored, and its short finite residence time prevents
+normal sustained accumulation. This avoids either silently dropping a retry or
+turning saturation into an immediate hot requeue loop.
 
 Existing queues may have been declared without these immutable arguments.
 Redeclaring them with different arguments would raise `PRECONDITION_FAILED`.
@@ -183,13 +188,15 @@ All outbox relays open channels with:
 
 - publisher confirms enabled;
 - returned messages raised to the caller;
-- `mandatory=True` for every event;
+- `mandatory=True` for events with a declared downstream consumer;
+- publisher confirms with `mandatory=False` for explicitly classified terminal domain
+  events which intentionally have no subscriber;
 - a configurable publish timeout, default five seconds.
 
-An event is marked published only after a positive confirmation. An unroutable
-message, broker NACK, channel failure, or timeout remains pending with diagnostic
-state. Consumers use the same confirmed-publish helper when moving a failed
-message into retry or DLQ.
+An event is marked published only after a positive confirmation. For routed
+integration events, an unroutable message, broker NACK, channel failure, or timeout
+remains pending with diagnostic state. Consumers use the same confirmed-publish
+helper when moving a failed message into retry or DLQ.
 
 Wishlist's `DropStarted` fan-out currently publishes notification events inside
 the inbound message handler. This package moves that fan-out to a Wishlist

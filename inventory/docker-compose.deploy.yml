@@ -70,6 +70,12 @@ services:
       - inventory.event_consumer
     depends_on: {}
     restart: unless-stopped
+    healthcheck: &worker-health
+      test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "45"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 45s
 
   outbox:
     <<: *inventory-runtime
@@ -85,6 +91,7 @@ services:
       - inventory.outbox_worker
     depends_on: {}
     restart: unless-stopped
+    healthcheck: *worker-health
 
   expiry:
     <<: *inventory-runtime
@@ -102,6 +109,7 @@ services:
       - inventory.expiry_worker
     depends_on: {}
     restart: unless-stopped
+    healthcheck: *worker-health
 
   nginx:
     image: nginx:1.30-alpine

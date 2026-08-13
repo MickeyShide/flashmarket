@@ -422,6 +422,9 @@ jobs:
 
           echo 'Waiting for Auth API...'
           wait_for_healthy api
+          echo 'Waiting for Auth workers...'
+          wait_for_healthy outbox
+          wait_for_healthy cleanup
           echo 'Waiting for internal Nginx...'
           wait_for_healthy nginx
           docker compose -f docker-compose.yml --env-file .env ps -a

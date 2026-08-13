@@ -13,6 +13,7 @@ WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
 COPY shared/jwt_verifier /shared/jwt_verifier
+COPY shared/rabbitmq_reliability /shared/rabbitmq_reliability
 COPY payments/pyproject.toml payments/uv.lock payments/README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 

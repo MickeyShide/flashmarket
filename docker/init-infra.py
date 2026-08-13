@@ -7,12 +7,15 @@ import base64
 import inspect
 import json
 import os
+import re
 import socket
 import sys
 import time
 import urllib.parse
 import urllib.request
 from urllib.parse import urlparse
+
+import asyncpg
 
 
 def resolve_host_ipv4(host: str, port: int = 5432) -> str:
@@ -21,11 +24,9 @@ def resolve_host_ipv4(host: str, port: int = 5432) -> str:
         infos = socket.getaddrinfo(host, port, family=socket.AF_INET, type=socket.SOCK_STREAM)
         if infos:
             return infos[0][4][0]
-    except Exception as err:
+    except OSError as err:
         print(f"Warning: IPv4 resolution for {host}:{port} failed: {err}", file=sys.stderr)
     return host
-
-import asyncpg
 
 MAX_RETRIES = 30
 RETRY_DELAY_SECONDS = 2
@@ -42,7 +43,7 @@ def retry(message: str):
                     last_exc = exc
                     print(f"{message} (attempt {attempt}/{MAX_RETRIES}): {exc}")
                     if attempt < MAX_RETRIES:
-                        time.sleep(RETRY_DELAY_SECONDS)
+                        await asyncio.sleep(RETRY_DELAY_SECONDS)
             raise last_exc  # type: ignore[misc]
 
         def sync_wrapper(*args, **kwargs):  # type: ignore[no-untyped-def]
@@ -186,6 +187,97 @@ def _ensure_vhost_and_permissions(raw_url: str) -> None:
                 f"with HTTP {resp.status}"
             )
     print(f"Granted permissions for user '{user}' on vhost '{vhost}'")
+
+    for exchange_name, exchange_type in (
+        ("flashmarket.retry", "direct"),
+        ("flashmarket.dead-letter", "direct"),
+    ):
+        encoded_exchange = urllib.parse.quote(exchange_name, safe="")
+        exchange_url = f"{base}/exchanges/{encoded_vhost}/{encoded_exchange}"
+        exchange_body = json.dumps(
+            {
+                "type": exchange_type,
+                "durable": True,
+                "auto_delete": False,
+                "internal": False,
+                "arguments": {},
+            }
+        ).encode("utf-8")
+        exchange_req = urllib.request.Request(
+            exchange_url, headers=headers, method="PUT", data=exchange_body
+        )
+        with urllib.request.urlopen(exchange_req, timeout=10.0) as resp:
+            if resp.status not in (200, 201, 204):
+                raise RuntimeError(
+                    f"RabbitMQ rejected exchange '{exchange_name}' with HTTP {resp.status}"
+                )
+        print(f"Declared RabbitMQ exchange '{exchange_name}'")
+
+    queue_policies = {
+        "inventory.events": "inventory.events.dlq",
+        "orders.events": "orders.events.dlq",
+        "payments.events": "payments.events.dlq",
+        "notifications.events": "notifications.events.dlq",
+        "wishlist.drop-events": "wishlist.drop-events.dlq",
+    }
+    for queue_name, dlq_name in queue_policies.items():
+        encoded_dlq = urllib.parse.quote(dlq_name, safe="")
+        queue_url = f"{base}/queues/{encoded_vhost}/{encoded_dlq}"
+        queue_body = json.dumps(
+            {"durable": True, "auto_delete": False, "arguments": {}}
+        ).encode("utf-8")
+        queue_req = urllib.request.Request(
+            queue_url, headers=headers, method="PUT", data=queue_body
+        )
+        with urllib.request.urlopen(queue_req, timeout=10.0) as resp:
+            if resp.status not in (200, 201, 204):
+                raise RuntimeError(
+                    f"RabbitMQ rejected DLQ '{dlq_name}' with HTTP {resp.status}"
+                )
+
+        encoded_dlx = urllib.parse.quote("flashmarket.dead-letter", safe="")
+        binding_url = f"{base}/bindings/{encoded_vhost}/e/{encoded_dlx}/q/{encoded_dlq}"
+        binding_body = json.dumps(
+            {"routing_key": dlq_name, "arguments": {}}
+        ).encode("utf-8")
+        binding_req = urllib.request.Request(
+            binding_url, headers=headers, method="POST", data=binding_body
+        )
+        with urllib.request.urlopen(binding_req, timeout=10.0) as resp:
+            if resp.status not in (200, 201, 204):
+                raise RuntimeError(
+                    f"RabbitMQ rejected DLQ binding '{dlq_name}' with HTTP {resp.status}"
+                )
+
+        policy_name = f"flashmarket-{queue_name}-limits"
+        encoded_policy = urllib.parse.quote(policy_name, safe="")
+        policy_url = f"{base}/policies/{encoded_vhost}/{encoded_policy}"
+        policy_body = json.dumps(
+            {
+                "pattern": f"^{re.escape(queue_name)}$",
+                "apply-to": "queues",
+                "priority": 50,
+                "definition": {
+                    "max-length": 20_000,
+                    "max-length-bytes": 128 * 1024 * 1024,
+                    "overflow": "reject-publish-dlx",
+                    "dead-letter-exchange": "flashmarket.dead-letter",
+                    "dead-letter-routing-key": dlq_name,
+                },
+            }
+        ).encode("utf-8")
+        policy_req = urllib.request.Request(
+            policy_url,
+            headers=headers,
+            method="PUT",
+            data=policy_body,
+        )
+        with urllib.request.urlopen(policy_req, timeout=10.0) as resp:
+            if resp.status not in (200, 201, 204):
+                raise RuntimeError(
+                    f"RabbitMQ rejected queue policy '{policy_name}' with HTTP {resp.status}"
+                )
+        print(f"Applied RabbitMQ queue policy '{policy_name}'")
 
 
 @retry("Waiting for RabbitMQ management API")

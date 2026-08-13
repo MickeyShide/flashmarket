@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from aio_pika.abc import AbstractExchange
@@ -34,7 +34,7 @@ class CapturingExchange:
         if self.error is not None:
             raise self.error
         self.published.append((message, routing_key, mandatory))
-        return None
+        return True
 
 
 async def _add_event(
@@ -93,3 +93,40 @@ async def test_outbox_publisher_schedules_retry_after_failure(
         assert event.status == "failed"
         assert event.published_at is None
         assert event.attempts == 1
+
+
+async def test_outbox_does_not_steal_active_claim(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    event_id = await _add_event(session_factory)
+    async with session_factory() as db:
+        event = await db.get(OutboxEventModel, event_id)
+        assert event is not None
+        event.claim_token = uuid.uuid7()
+        event.claimed_until = datetime.now(UTC) + timedelta(minutes=1)
+        await db.commit()
+
+    exchange: AbstractExchange = CapturingExchange()  # type: ignore[assignment]
+    assert await publish_outbox_batch(exchange, session_factory=session_factory) == 0
+    assert not exchange.published  # type: ignore[attr-defined]
+
+
+async def test_outbox_recovers_expired_claim(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    event_id = await _add_event(session_factory)
+    async with session_factory() as db:
+        event = await db.get(OutboxEventModel, event_id)
+        assert event is not None
+        event.claim_token = uuid.uuid7()
+        event.claimed_until = datetime.now(UTC) - timedelta(seconds=1)
+        await db.commit()
+
+    exchange: AbstractExchange = CapturingExchange()  # type: ignore[assignment]
+    assert await publish_outbox_batch(exchange, session_factory=session_factory) == 1
+    async with session_factory() as db:
+        event = await db.get(OutboxEventModel, event_id)
+        assert event is not None
+        assert event.status == "published"
+        assert event.claim_token is None
+        assert event.claimed_until is None

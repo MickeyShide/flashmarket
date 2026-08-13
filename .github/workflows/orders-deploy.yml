@@ -407,6 +407,9 @@ jobs:
 
           echo 'Waiting for Orders API...'
           wait_for_healthy api
+          echo 'Waiting for Orders workers...'
+          wait_for_healthy consumer
+          wait_for_healthy outbox
           echo 'Waiting for internal Nginx...'
           wait_for_healthy nginx
           docker compose --env-file .env ps -a
