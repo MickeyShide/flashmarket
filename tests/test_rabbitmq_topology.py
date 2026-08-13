@@ -1,0 +1,130 @@
+"""Contracts for the shared FlashMarket RabbitMQ virtual host."""
+
+from __future__ import annotations
+
+import importlib.util
+import os
+import urllib.error
+from pathlib import Path
+from types import ModuleType
+from unittest.mock import patch
+
+import pytest
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SHARED_RABBITMQ_PATH = "/flashmarket"
+
+WORKFLOWS = (
+    "auth-deploy.yml",
+    "catalog-deploy.yml",
+    "drops-deploy.yml",
+    "inventory-deploy.yml",
+    "notifications-deploy.yml",
+    "orders-deploy.yml",
+    "payments-deploy.yml",
+    "wishlist-deploy.yml",
+)
+
+EXAMPLES = (
+    "auth/.env.example",
+    "auth/.env.deploy.example",
+    "catalog/.env.example",
+    "catalog/.env.deploy.example",
+    "drops/.env.example",
+    "inventory/.env.example",
+    "inventory/.env.deploy.example",
+    "notifications/.env.example",
+    "notifications/.env.deploy.example",
+    "orders/.env.example",
+    "orders/.env.deploy.example",
+    "payments/.env.example",
+    "payments/.env.deploy.example",
+)
+
+RUNTIME_CONFIGURATION = (
+    "auth/src/auth_service/config.py",
+    "drops/src/drops/config.py",
+    "inventory/src/inventory/config.py",
+    "notifications/src/notifications/config.py",
+    "orders/src/orders/config.py",
+    "payments/src/payments/config.py",
+    "wishlist/src/wishlist/config.py",
+    "auth/docker-compose.yml",
+    "drops/docker-compose.yml",
+    "inventory/docker-compose.yml",
+    "notifications/docker-compose.yml",
+    "orders/docker-compose.yml",
+    "payments/docker-compose.yml",
+    "wishlist/docker-compose.yml",
+)
+
+
+def _load_init_infra() -> ModuleType:
+    path = PROJECT_ROOT / "docker" / "init-infra.py"
+    spec = importlib.util.spec_from_file_location("flashmarket_init_infra", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_all_production_workflows_use_shared_vhost() -> None:
+    for workflow_name in WORKFLOWS:
+        content = (PROJECT_ROOT / ".github" / "workflows" / workflow_name).read_text(
+            encoding="utf-8"
+        )
+        rabbitmq_lines = [line for line in content.splitlines() if "RABBITMQ_URL=" in line]
+        assert rabbitmq_lines, f"{workflow_name} does not render a RabbitMQ URL"
+        assert all(SHARED_RABBITMQ_PATH in line for line in rabbitmq_lines), workflow_name
+
+
+def test_all_environment_examples_use_shared_vhost() -> None:
+    for relative_path in EXAMPLES:
+        content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+        rabbitmq_lines = [line for line in content.splitlines() if "RABBITMQ_URL=" in line]
+        assert rabbitmq_lines, f"{relative_path} does not define a RabbitMQ URL"
+        assert all(SHARED_RABBITMQ_PATH in line for line in rabbitmq_lines), relative_path
+
+
+def test_runtime_defaults_and_local_compose_use_shared_vhost() -> None:
+    for relative_path in RUNTIME_CONFIGURATION:
+        content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+        rabbitmq_lines = [
+            line
+            for line in content.splitlines()
+            if "rabbitmq_url: str =" in line.lower() or "RABBITMQ_URL:" in line
+        ]
+        assert rabbitmq_lines, f"{relative_path} does not define a RabbitMQ URL"
+        assert all(SHARED_RABBITMQ_PATH in line for line in rabbitmq_lines), relative_path
+
+
+def test_amqp_uri_maps_to_exactly_one_vhost() -> None:
+    module = _load_init_infra()
+
+    assert module._rabbitmq_vhost_from_url("amqp://user:pass@rabbitmq:5672/flashmarket") == (
+        "flashmarket"
+    )
+    assert module._rabbitmq_vhost_from_url("amqp://user:pass@rabbitmq:5672/%2F") == "/"
+    assert module._rabbitmq_vhost_from_url("amqp://user:pass@rabbitmq:5672/") == "/"
+
+
+def test_wishlist_rabbitmq_url_is_discovered() -> None:
+    module = _load_init_infra()
+    url = "amqp://user:pass@rabbitmq:5672/flashmarket"
+
+    with patch.dict(os.environ, {"WISHLIST_RABBITMQ_URL": url}, clear=True):
+        assert module._get_rabbitmq_urls() == [url]
+
+
+def test_vhost_bootstrap_failure_is_fatal() -> None:
+    module = _load_init_infra()
+    error = urllib.error.URLError("management API unavailable")
+
+    with (
+        patch.object(module, "resolve_host_ipv4", return_value="127.0.0.1"),
+        patch.object(module.urllib.request, "urlopen", side_effect=error),
+        pytest.raises(urllib.error.URLError),
+    ):
+        module._ensure_vhost_and_permissions(
+            "amqp://user:pass@rabbitmq:5672/flashmarket"
+        )

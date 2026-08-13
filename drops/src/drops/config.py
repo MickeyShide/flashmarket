@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
     database_url: str = "postgresql+asyncpg://shide:shide@shide-postgres:5432/drops"
-    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672/drop"
+    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672/flashmarket"
     rabbitmq_exchange: str = "flashmarket.events"
     outbox_batch_size: int = 50
     outbox_poll_interval_seconds: float = 1.0

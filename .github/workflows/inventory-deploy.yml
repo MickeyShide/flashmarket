@@ -319,7 +319,7 @@ jobs:
             printf 'INVENTORY_DOMAIN=%s\n' "$INVENTORY_DOMAIN"
             printf 'INVENTORY_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/inventory\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
             printf 'INVENTORY_REDIS_URL=redis://:%s@shide-redis:6379/2\n' "$DEPLOY_REDIS_PASSWORD"
-            printf 'INVENTORY_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//inventory\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'INVENTORY_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672/flashmarket\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'INVENTORY_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'INVENTORY_DEBUG=false\n'
             printf 'INVENTORY_DOCS_ENABLED=false\n'

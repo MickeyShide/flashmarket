@@ -56,6 +56,9 @@ def test_wishlist_deploy_migrates_starts_runtime_and_verifies_gateway() -> None:
     assert "run --rm --no-deps api migrate" in workflow
     assert "api consumer" in workflow
     assert "State.Running" in workflow
+    assert "initial_consumer_restarts" in workflow
+    assert "final_consumer_restarts" in workflow
+    assert "Wishlist consumer restarted during deployment verification" in workflow
     assert "/dev/status/wishlist" in workflow
     assert "Wishlist is not reachable through the production gateway" in workflow
 

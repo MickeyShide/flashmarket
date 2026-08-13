@@ -311,6 +311,12 @@ jobs:
             api consumer
 
           api_container="$(docker compose -f docker-compose.yml --env-file .env ps -q api)"
+          consumer_container="$(docker compose -f docker-compose.yml --env-file .env ps -q consumer)"
+          if [[ -z "$consumer_container" ]]; then
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 consumer
+            exit 1
+          fi
+          initial_consumer_restarts="$(docker inspect --format '{{.RestartCount}}' "$consumer_container")"
           for attempt in $(seq 1 60); do
             health="$(
               docker inspect \
@@ -332,8 +338,13 @@ jobs:
             exit 1
           fi
 
-          consumer_container="$(docker compose -f docker-compose.yml --env-file .env ps -q consumer)"
           if [[ -z "$consumer_container" ]] || [[ "$(docker inspect --format '{{.State.Running}}' "$consumer_container")" != "true" ]]; then
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 consumer
+            exit 1
+          fi
+          final_consumer_restarts="$(docker inspect --format '{{.RestartCount}}' "$consumer_container")"
+          if [[ "$final_consumer_restarts" != "$initial_consumer_restarts" ]]; then
+            echo "Wishlist consumer restarted during deployment verification"
             docker compose -f docker-compose.yml --env-file .env logs --tail 100 consumer
             exit 1
           fi

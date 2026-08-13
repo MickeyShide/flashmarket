@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from uuid import UUID
 
 import aio_pika
@@ -16,6 +17,9 @@ from wishlist.infrastructure.database import SessionFactory, engine
 from wishlist.infrastructure.repositories.wishlist import WishlistRepository
 
 logger = logging.getLogger(__name__)
+
+INITIAL_RECONNECT_DELAY_SECONDS = 1.0
+MAX_RECONNECT_DELAY_SECONDS = 30.0
 
 
 async def process_drop_started(
@@ -71,9 +75,36 @@ async def run_consumer() -> None:
                     logger.exception("Failed to process drop event")
 
 
+async def run_consumer_forever(
+    *,
+    consumer: Callable[[], Awaitable[None]] = run_consumer,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+) -> None:
+    """Keep retrying initial broker connections without restarting the container."""
+    retry_delay = INITIAL_RECONNECT_DELAY_SECONDS
+    while True:
+        try:
+            await consumer()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "Wishlist consumer connection failed; retrying in %.1f seconds",
+                retry_delay,
+            )
+        else:
+            logger.warning(
+                "Wishlist consumer stopped without cancellation; retrying in %.1f seconds",
+                retry_delay,
+            )
+
+        await sleep(retry_delay)
+        retry_delay = min(MAX_RECONNECT_DELAY_SECONDS, retry_delay * 2)
+
+
 async def run() -> None:
     try:
-        await run_consumer()
+        await run_consumer_forever()
     finally:
         await engine.dispose()
 

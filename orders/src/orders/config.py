@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     docs_enabled: bool = True
     trusted_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
     cors_origins: list[str] = Field(default_factory=list)
-    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672//orders"
+    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672/flashmarket"
     rabbitmq_exchange: str = "flashmarket.events"
     allow_insecure_internal_services: bool = False
     payment_timeout_seconds: int = 300

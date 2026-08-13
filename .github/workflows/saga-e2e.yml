@@ -91,13 +91,6 @@ jobs:
             sleep 1
           done
 
-          # Create additional RabbitMQ vhosts used by payments and notifications
-          for vhost in payments notifications; do
-            docker exec shide-rabbitmq rabbitmqctl add_vhost "$vhost" 2>/dev/null || true
-            docker exec shide-rabbitmq rabbitmqctl set_permissions -p "$vhost" shide ".*" ".*" ".*" 2>/dev/null || true
-            echo "Created RabbitMQ vhost: $vhost"
-          done
-
       - name: Start Full Docker Compose Stack
         run: |
           docker compose up -d --build

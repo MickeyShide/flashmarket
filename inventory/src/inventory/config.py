@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     drops_base_url: str = "http://drops:8000"
     drops_timeout_seconds: float = Field(default=1.0, gt=0, le=10)
     expiry_poll_interval_seconds: float = Field(default=5.0, ge=1, le=300)
-    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672//inventory"
+    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672/flashmarket"
     rabbitmq_exchange: str = "flashmarket.events"
     allow_insecure_internal_services: bool = False
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)

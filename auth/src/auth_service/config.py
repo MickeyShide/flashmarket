@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     debug: bool = False
     database_url: str = "postgresql+asyncpg://shide:shide@shide-postgres:5432/auth"
     redis_url: str = "redis://shide-redis:6379/0"
-    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672//auth"
+    rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672/flashmarket"
     allow_insecure_internal_services: bool = False
     rabbitmq_exchange: str = "flashmarket.events"
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)

@@ -245,7 +245,7 @@ jobs:
             printf 'DROPS_IMAGE=%s\n' "$DROPS_IMAGE"
             printf 'DROPS_ENVIRONMENT=production\n'
             printf 'DROPS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/drops\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'DROPS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//drops\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'DROPS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672/flashmarket\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'DROPS_CORS_ORIGINS=%s\n' "$cors_origins"
             printf 'DROPS_TRUSTED_HOSTS=["%s","drops.%s","localhost","127.0.0.1","drops","gateway"]\n' "$GATEWAY_DOMAIN" "$GATEWAY_DOMAIN"
             printf 'DROPS_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'

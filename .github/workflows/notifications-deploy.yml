@@ -316,7 +316,7 @@ jobs:
             printf 'NOTIFICATIONS_ENVIRONMENT=production\n'
             printf 'NOTIFICATIONS_DOMAIN=%s\n' "$NOTIFICATIONS_DOMAIN"
             printf 'NOTIFICATIONS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/notifications\n' "$INFRA_USER" "$DEPLOY_POSTGRES_PASSWORD"
-            printf 'NOTIFICATIONS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//notifications\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
+            printf 'NOTIFICATIONS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672/flashmarket\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'NOTIFICATIONS_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
             printf 'NOTIFICATIONS_DEBUG=false\n'
             printf 'NOTIFICATIONS_DOCS_ENABLED=false\n'
@@ -449,4 +449,3 @@ jobs:
             "cd '$DEPLOY_PATH' && docker compose --env-file .env ps -a && ss -ltn '( sport = :4922 )' || true; docker compose --env-file .env logs --tail 100 api nginx"
           exit 1
 
-          

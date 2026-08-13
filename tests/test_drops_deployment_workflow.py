@@ -30,7 +30,7 @@ def test_drops_deploy_renders_strict_production_configuration() -> None:
     for setting in (
         "DROPS_ENVIRONMENT=production",
         "DROPS_DATABASE_URL=postgresql+asyncpg://%s:%s@shide-postgres:5432/drops",
-        "DROPS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672//drops",
+        "DROPS_RABBITMQ_URL=amqp://%s:%s@shide-rabbitmq:5672/flashmarket",
         "DROPS_ALLOW_INSECURE_INTERNAL_SERVICES=true",
         "DROPS_DEBUG=false",
         "DROPS_DOCS_ENABLED=false",
