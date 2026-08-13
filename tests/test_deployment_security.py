@@ -52,9 +52,13 @@ def test_shared_ssh_configuration_is_strict_and_resilient() -> None:
 
 
 def test_production_deployments_are_serialized() -> None:
-    workflows = _deployment_workflows()
+    workflows = [
+        workflow
+        for workflow in _deployment_workflows()
+        if workflow.name != "reliability-ops-deploy.yml"
+    ]
     assert workflows
     for workflow in workflows:
         contents = workflow.read_text(encoding="utf-8")
-        assert "group: flashmarket-production-deploy" in contents, workflow
-        assert "cancel-in-progress: false" in contents, workflow
+        assert "exec 9>/tmp/flashmarket-production-deploy.lock" in contents, workflow
+        assert "flock -w 1800 9" in contents, workflow

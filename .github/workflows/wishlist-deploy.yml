@@ -137,9 +137,6 @@ jobs:
 
   deploy:
     name: Deploy production
-    concurrency:
-      group: flashmarket-production-deploy
-      cancel-in-progress: false
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.ref == 'refs/heads/main' ||
@@ -279,6 +276,8 @@ jobs:
             ssh -p "$DEPLOY_PORT" "$target" \
             "DEPLOY_PATH='$DEPLOY_PATH' WISHLIST_IMAGE='$WISHLIST_IMAGE' bash -s" <<'REMOTE'
           set -Eeuo pipefail
+          exec 9>/tmp/flashmarket-production-deploy.lock
+          flock -w 1800 9
           cd "$DEPLOY_PATH"
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
