@@ -4,7 +4,6 @@ from pathlib import Path
 
 from scripts.test_runner import E2ERunner
 
-
 WORKFLOW = Path(__file__).parents[1] / ".github" / "workflows" / "saga-e2e.yml"
 
 
