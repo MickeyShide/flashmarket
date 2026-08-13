@@ -8,6 +8,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from datetime import UTC, datetime
+from logging.handlers import RotatingFileHandler
 
 from fastapi import Request, Response
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
@@ -76,7 +77,12 @@ def setup_observability() -> None:
 
         log_path = Path(settings.log_file_path)
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        file_handler = logging.FileHandler(log_path, encoding="utf-8")
+        file_handler = RotatingFileHandler(
+            log_path,
+            maxBytes=10 * 1024 * 1024,
+            backupCount=3,
+            encoding="utf-8",
+        )
         file_handler.setFormatter(formatter)
         handlers.append(file_handler)
 

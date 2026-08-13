@@ -13,6 +13,14 @@ x-media-runtime: &media-runtime
 services:
   api:
     <<: *media-runtime
+    mem_limit: ${MEDIA_API_MEMORY_LIMIT:-384m}
+    mem_reservation: ${MEDIA_API_MEMORY_RESERVATION:-128m}
+    pids_limit: ${MEDIA_API_PIDS_LIMIT:-128}
+    init: true
+    stop_grace_period: 30s
+    logging: &bounded-logging
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
     environment:
       MEDIA_JWT_PUBLIC_KEY_DIR: /var/lib/flashmarket/keys/public
       MEDIA_JWT_ALGORITHM: EdDSA
@@ -30,6 +38,12 @@ services:
 
   cleanup:
     <<: *media-runtime
+    mem_limit: ${MEDIA_MAINTENANCE_MEMORY_LIMIT:-128m}
+    mem_reservation: ${MEDIA_MAINTENANCE_MEMORY_RESERVATION:-40m}
+    pids_limit: ${MEDIA_MAINTENANCE_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
     command: ["cleanup", "python", "-m", "media_service.cleanup_worker"]
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro

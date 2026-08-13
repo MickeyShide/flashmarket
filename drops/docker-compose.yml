@@ -3,6 +3,11 @@ name: flashmarket-drops
 x-drops-runtime: &drops-runtime
   image: flashmarket-drops-api:local
   pull_policy: never
+  init: true
+  stop_grace_period: 20s
+  logging:
+    driver: json-file
+    options: {max-size: 10m, max-file: "3"}
 
 x-drops-environment: &drops-environment
   DROPS_ENVIRONMENT: development
@@ -41,6 +46,9 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
+    mem_limit: ${DROPS_API_MEMORY_LIMIT:-192m}
+    mem_reservation: ${DROPS_API_MEMORY_RESERVATION:-72m}
+    pids_limit: ${DROPS_API_PIDS_LIMIT:-96}
 
   scheduler:
     <<: *drops-runtime
@@ -53,6 +61,9 @@ services:
       - consumer
       - drops.scheduler
     restart: unless-stopped
+    mem_limit: ${DROPS_MAINTENANCE_MEMORY_LIMIT:-128m}
+    mem_reservation: ${DROPS_MAINTENANCE_MEMORY_RESERVATION:-40m}
+    pids_limit: ${DROPS_MAINTENANCE_PIDS_LIMIT:-64}
 
   outbox:
     <<: *drops-runtime
@@ -65,6 +76,9 @@ services:
       - outbox
       - drops.outbox_worker
     restart: unless-stopped
+    mem_limit: ${DROPS_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${DROPS_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${DROPS_WORKER_PIDS_LIMIT:-64}
 
 volumes:
   auth-jwt-keys-public:

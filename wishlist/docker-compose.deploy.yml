@@ -15,6 +15,14 @@ x-wishlist-runtime: &wishlist-runtime
 services:
   api:
     <<: *wishlist-runtime
+    mem_limit: ${WISHLIST_API_MEMORY_LIMIT:-192m}
+    mem_reservation: ${WISHLIST_API_MEMORY_RESERVATION:-72m}
+    pids_limit: ${WISHLIST_API_PIDS_LIMIT:-96}
+    init: true
+    stop_grace_period: 20s
+    logging: &bounded-logging
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
     healthcheck:
       test:
         - CMD
@@ -29,6 +37,12 @@ services:
 
   consumer:
     <<: *wishlist-runtime
+    mem_limit: ${WISHLIST_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${WISHLIST_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${WISHLIST_WORKER_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
     command:
       - consumer
       - wishlist.event_consumer

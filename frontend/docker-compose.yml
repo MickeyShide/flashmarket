@@ -26,6 +26,14 @@ services:
       retries: 10
       start_period: 5s
     restart: unless-stopped
+    mem_limit: ${FRONTEND_DEV_MEMORY_LIMIT:-256m}
+    mem_reservation: ${FRONTEND_DEV_MEMORY_RESERVATION:-64m}
+    pids_limit: ${FRONTEND_DEV_PIDS_LIMIT:-128}
+    init: true
+    stop_grace_period: 10s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
 
 volumes:
   frontend-node-modules:

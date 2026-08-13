@@ -3,6 +3,11 @@ name: flashmarket-auth
 x-auth-runtime: &auth-runtime
   image: flashmarket-auth-api:local
   pull_policy: never
+  init: true
+  stop_grace_period: 20s
+  logging: &bounded-logging
+    driver: json-file
+    options: {max-size: 10m, max-file: "3"}
 
 x-auth-environment: &auth-environment
   AUTH_ENVIRONMENT: development
@@ -32,6 +37,9 @@ services:
       - auth-jwt-keys-private:/var/lib/flashmarket-auth/keys/private
       - auth-jwt-keys-public:/var/lib/flashmarket-auth/keys/public
     restart: "no"
+    mem_limit: ${AUTH_MAINTENANCE_MEMORY_LIMIT:-128m}
+    mem_reservation: ${AUTH_MAINTENANCE_MEMORY_RESERVATION:-40m}
+    pids_limit: ${AUTH_MAINTENANCE_PIDS_LIMIT:-64}
 
   api:
     <<: *auth-runtime
@@ -60,6 +68,9 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
+    mem_limit: ${AUTH_API_MEMORY_LIMIT:-256m}
+    mem_reservation: ${AUTH_API_MEMORY_RESERVATION:-96m}
+    pids_limit: ${AUTH_API_PIDS_LIMIT:-128}
 
   cleanup:
     <<: *auth-runtime
@@ -74,6 +85,9 @@ services:
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
+    mem_limit: ${AUTH_MAINTENANCE_MEMORY_LIMIT:-128m}
+    mem_reservation: ${AUTH_MAINTENANCE_MEMORY_RESERVATION:-40m}
+    pids_limit: ${AUTH_MAINTENANCE_PIDS_LIMIT:-64}
 
   outbox:
     <<: *auth-runtime
@@ -84,6 +98,9 @@ services:
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
+    mem_limit: ${AUTH_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${AUTH_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${AUTH_WORKER_PIDS_LIMIT:-64}
 
 volumes:
   auth-jwt-keys-private:

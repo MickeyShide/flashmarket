@@ -1,8 +1,6 @@
 import uuid
 from dataclasses import dataclass
 
-from anyio import to_thread
-
 from auth_service.application.contracts import (
     AuthenticatedIdentity,
     RequestContext,
@@ -18,6 +16,7 @@ from auth_service.application.errors import (
 )
 from auth_service.domain.events import DomainEvent, EventType
 from auth_service.models import User
+from auth_service.password_work import run_password_work
 from auth_service.security import hash_password, verify_password
 
 
@@ -112,7 +111,7 @@ class ChangePassword:
             command.identity.user_id,
             for_update=True,
         )
-        current_password_valid = await to_thread.run_sync(
+        current_password_valid = await run_password_work(
             verify_password,
             command.current_password,
             user.password_hash,
@@ -128,14 +127,14 @@ class ChangePassword:
             await uow.commit()
             raise CurrentPasswordIncorrect
 
-        if await to_thread.run_sync(
+        if await run_password_work(
             verify_password,
             command.new_password,
             user.password_hash,
         ):
             raise PasswordUnchanged
 
-        user.password_hash = await to_thread.run_sync(
+        user.password_hash = await run_password_work(
             hash_password,
             command.new_password,
         )

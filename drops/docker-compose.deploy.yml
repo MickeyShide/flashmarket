@@ -9,6 +9,14 @@ x-drops-runtime: &drops-runtime
 services:
   api:
     <<: *drops-runtime
+    mem_limit: ${DROPS_API_MEMORY_LIMIT:-192m}
+    mem_reservation: ${DROPS_API_MEMORY_RESERVATION:-72m}
+    pids_limit: ${DROPS_API_PIDS_LIMIT:-96}
+    init: true
+    stop_grace_period: 20s
+    logging: &bounded-logging
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
     networks:
       backend:
         aliases:
@@ -29,6 +37,12 @@ services:
 
   scheduler:
     <<: *drops-runtime
+    mem_limit: ${DROPS_MAINTENANCE_MEMORY_LIMIT:-128m}
+    mem_reservation: ${DROPS_MAINTENANCE_MEMORY_RESERVATION:-40m}
+    pids_limit: ${DROPS_MAINTENANCE_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
     networks:
       - backend
     command:
@@ -38,6 +52,12 @@ services:
 
   outbox:
     <<: *drops-runtime
+    mem_limit: ${DROPS_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${DROPS_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${DROPS_WORKER_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
     networks:
       - backend
     command:

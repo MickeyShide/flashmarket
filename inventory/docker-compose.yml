@@ -3,6 +3,11 @@ name: flashmarket-inventory
 x-inventory-runtime: &inventory-runtime
   image: flashmarket-inventory-api:local
   pull_policy: never
+  init: true
+  stop_grace_period: 20s
+  logging:
+    driver: json-file
+    options: {max-size: 10m, max-file: "3"}
 
 x-inventory-environment: &inventory-environment
   INVENTORY_ENVIRONMENT: development
@@ -45,6 +50,9 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
+    mem_limit: ${INVENTORY_API_MEMORY_LIMIT:-256m}
+    mem_reservation: ${INVENTORY_API_MEMORY_RESERVATION:-96m}
+    pids_limit: ${INVENTORY_API_PIDS_LIMIT:-128}
 
   consumer:
     <<: *inventory-runtime
@@ -57,6 +65,9 @@ services:
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
+    mem_limit: ${INVENTORY_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${INVENTORY_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${INVENTORY_WORKER_PIDS_LIMIT:-64}
 
   outbox:
     <<: *inventory-runtime
@@ -69,6 +80,9 @@ services:
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
+    mem_limit: ${INVENTORY_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${INVENTORY_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${INVENTORY_WORKER_PIDS_LIMIT:-64}
 
   expiry:
     <<: *inventory-runtime
@@ -83,6 +97,9 @@ services:
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
+    mem_limit: ${INVENTORY_MAINTENANCE_MEMORY_LIMIT:-128m}
+    mem_reservation: ${INVENTORY_MAINTENANCE_MEMORY_RESERVATION:-40m}
+    pids_limit: ${INVENTORY_MAINTENANCE_PIDS_LIMIT:-64}
 
 volumes:
   inventory-metrics-data:

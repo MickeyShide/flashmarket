@@ -10,6 +10,7 @@ from media_service.domain.exceptions import (
     InvalidAssetState,
     InvalidBinding,
     InvalidFilename,
+    MediaCapacityExhausted,
     MediaError,
     MediaQuotaExceeded,
     StorageObjectNotFound,
@@ -34,6 +35,7 @@ ERROR_STATUS: dict[type[MediaError], int] = {
     InvalidFilename: status.HTTP_422_UNPROCESSABLE_CONTENT,
     UploadValidationFailed: status.HTTP_422_UNPROCESSABLE_CONTENT,
     StorageUnavailable: status.HTTP_503_SERVICE_UNAVAILABLE,
+    MediaCapacityExhausted: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

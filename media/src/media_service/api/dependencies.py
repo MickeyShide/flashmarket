@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from media_service.application.contracts import ObjectStorage
 from media_service.application.services.assets import MediaAssetService
+from media_service.application.validation_gate import get_validation_gate
 from media_service.config import get_settings
 from media_service.infrastructure.database import get_db
 from media_service.infrastructure.repositories import MediaAssetRepository
@@ -48,7 +49,13 @@ def get_media_service(
     storage: Annotated[ObjectStorage, Depends(get_storage)],
 ) -> MediaAssetService:
     """Build a request-scoped Media application service."""
-    return MediaAssetService(db, MediaAssetRepository(db), storage, get_settings())
+    return MediaAssetService(
+        db,
+        MediaAssetRepository(db),
+        storage,
+        get_settings(),
+        get_validation_gate(),
+    )
 
 
 MediaServiceDep = Annotated[MediaAssetService, Depends(get_media_service)]

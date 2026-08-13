@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import jwt
-from anyio import to_thread
 
 from auth_service.application.contracts import (
     AuthenticatedIdentity,
@@ -30,6 +29,7 @@ from auth_service.config import get_settings
 from auth_service.domain.events import DomainEvent, EventType
 from auth_service.identity import fingerprint_identity, normalize_email
 from auth_service.models import LoginSession, RefreshToken, User, UserRole
+from auth_service.password_work import run_password_work
 from auth_service.privacy import anonymize_ip
 from auth_service.security import (
     AccessTokenClaims,
@@ -128,7 +128,7 @@ class RegisterUser:
         session_store: SessionStore,
     ) -> AuthenticationResult:
         """Register a customer, persist a session, and issue tokens."""
-        password_hash = await to_thread.run_sync(hash_password, command.password)
+        password_hash = await run_password_work(hash_password, command.password)
         user = User(
             id=uuid.uuid7(),
             email=normalize_email(command.email),
@@ -193,7 +193,7 @@ class LoginUser:
         email = normalize_email(command.email)
         user = await uow.users.get_by_email(email)
         if user is None:
-            await to_thread.run_sync(burn_password_check, command.password)
+            await run_password_work(burn_password_check, command.password)
             uow.audit.add(
                 command.context,
                 event_type="login_failed",
@@ -205,7 +205,7 @@ class LoginUser:
             await uow.commit()
             raise InvalidCredentials
 
-        password_valid = await to_thread.run_sync(
+        password_valid = await run_password_work(
             verify_password,
             command.password,
             user.password_hash,
@@ -231,8 +231,8 @@ class LoginUser:
             await uow.commit()
             raise AccountDisabled
 
-        if await to_thread.run_sync(password_needs_rehash, user.password_hash):
-            user.password_hash = await to_thread.run_sync(
+        if await run_password_work(password_needs_rehash, user.password_hash):
+            user.password_hash = await run_password_work(
                 hash_password,
                 command.password,
             )

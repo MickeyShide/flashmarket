@@ -3,6 +3,11 @@ name: flashmarket-media
 x-media-runtime: &media-runtime
   image: flashmarket-media-api:local
   pull_policy: never
+  init: true
+  stop_grace_period: 20s
+  logging:
+    driver: json-file
+    options: {max-size: 10m, max-file: "3"}
 
 x-media-environment: &media-environment
   MEDIA_ENVIRONMENT: development
@@ -47,6 +52,9 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
+    mem_limit: ${MEDIA_API_MEMORY_LIMIT:-384m}
+    mem_reservation: ${MEDIA_API_MEMORY_RESERVATION:-128m}
+    pids_limit: ${MEDIA_API_PIDS_LIMIT:-128}
 
   cleanup:
     <<: *media-runtime
@@ -61,6 +69,9 @@ services:
       - backend-logs-local:/var/log/shide
     command: ["cleanup", "python", "-m", "media_service.cleanup_worker"]
     restart: unless-stopped
+    mem_limit: ${MEDIA_MAINTENANCE_MEMORY_LIMIT:-128m}
+    mem_reservation: ${MEDIA_MAINTENANCE_MEMORY_RESERVATION:-40m}
+    pids_limit: ${MEDIA_MAINTENANCE_PIDS_LIMIT:-64}
 
 volumes:
   auth-jwt-keys-public:

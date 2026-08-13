@@ -27,6 +27,14 @@ x-payments-environment: &payments-environment
 services:
   api:
     <<: *payments-runtime
+    mem_limit: ${PAYMENTS_API_MEMORY_LIMIT:-256m}
+    mem_reservation: ${PAYMENTS_API_MEMORY_RESERVATION:-96m}
+    pids_limit: ${PAYMENTS_API_PIDS_LIMIT:-128}
+    init: true
+    stop_grace_period: 20s
+    logging: &bounded-logging
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
     environment: *payments-environment
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
@@ -45,6 +53,12 @@ services:
 
   consumer:
     <<: *payments-runtime
+    mem_limit: ${PAYMENTS_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${PAYMENTS_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${PAYMENTS_WORKER_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
     environment: *payments-environment
     command:
       - consumer
@@ -54,6 +68,12 @@ services:
 
   outbox:
     <<: *payments-runtime
+    mem_limit: ${PAYMENTS_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${PAYMENTS_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${PAYMENTS_WORKER_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
     environment: *payments-environment
     command:
       - outbox
@@ -84,6 +104,12 @@ services:
       retries: 20
       start_period: 5s
     restart: unless-stopped
+    mem_limit: ${PAYMENTS_NGINX_MEMORY_LIMIT:-32m}
+    mem_reservation: ${PAYMENTS_NGINX_MEMORY_RESERVATION:-8m}
+    pids_limit: ${PAYMENTS_NGINX_PIDS_LIMIT:-32}
+    init: true
+    stop_grace_period: 10s
+    logging: *bounded-logging
 
 networks:
   frontend:

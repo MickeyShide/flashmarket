@@ -12,6 +12,7 @@ ensure_prometheus_dir() {
 
 case "$CMD" in
   api)
+    export FLASHMARKET_PROCESS_ROLE=api
     echo "Ensuring shared infrastructure resources..."
     python /app/docker/init-infra.py
     echo "Running database migrations (alembic upgrade head)..."
@@ -21,6 +22,7 @@ case "$CMD" in
     ;;
 
   consumer)
+    export FLASHMARKET_PROCESS_ROLE=worker
     ensure_prometheus_dir
     echo "Starting event consumer..."
     shift 1
@@ -28,6 +30,7 @@ case "$CMD" in
     ;;
 
   outbox)
+    export FLASHMARKET_PROCESS_ROLE=worker
     ensure_prometheus_dir
     echo "Starting outbox worker..."
     shift 1
@@ -35,6 +38,7 @@ case "$CMD" in
     ;;
 
   cleanup)
+    export FLASHMARKET_PROCESS_ROLE=worker
     ensure_prometheus_dir
     echo "Starting cleanup worker..."
     shift 1
@@ -42,6 +46,7 @@ case "$CMD" in
     ;;
 
   migrate)
+    export FLASHMARKET_PROCESS_ROLE=worker
     echo "Ensuring shared infrastructure resources..."
     python /app/docker/init-infra.py
     echo "Running database migrations (alembic upgrade head)..."

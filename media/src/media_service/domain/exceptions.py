@@ -72,6 +72,11 @@ class StorageUnavailable(MediaError):
     message = "Media storage is temporarily unavailable"
 
 
+class MediaCapacityExhausted(MediaError):
+    code = "media_capacity_exhausted"
+    message = "Media validation capacity is temporarily exhausted"
+
+
 class StorageObjectNotFound(MediaError):
     code = "uploaded_object_not_found"
     message = "Uploaded object was not found"

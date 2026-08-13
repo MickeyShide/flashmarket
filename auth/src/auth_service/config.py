@@ -35,12 +35,20 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
     database_url: str = "postgresql+asyncpg://shide:shide@shide-postgres:5432/auth"
+    database_api_pool_size: int = Field(default=3, ge=1, le=20)
+    database_api_max_overflow: int = Field(default=2, ge=0, le=20)
+    database_worker_pool_size: int = Field(default=1, ge=1, le=10)
+    database_worker_max_overflow: int = Field(default=1, ge=0, le=10)
+    database_pool_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
+    database_pool_recycle_seconds: int = Field(default=1800, ge=60, le=86400)
     redis_url: str = "redis://shide-redis:6379/0"
     rabbitmq_url: str = "amqp://shide:shide@shide-rabbitmq:5672/flashmarket"
     allow_insecure_internal_services: bool = False
     rabbitmq_exchange: str = "flashmarket.events"
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
+    password_work_concurrency: int = Field(default=2, ge=1, le=8)
+    password_work_acquire_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
 
     jwt_keys_directory: Path = Path("keys")
     jwt_key_id: str = Field(

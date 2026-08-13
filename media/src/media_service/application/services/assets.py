@@ -14,6 +14,7 @@ from media_service.application.schemas import (
     BindingRequest,
     CreateUploadRequest,
 )
+from media_service.application.validation_gate import ValidationGate
 from media_service.config import Settings
 from media_service.domain.entities import AssetStatus, PresignedPost, Visibility
 from media_service.domain.exceptions import (
@@ -67,11 +68,13 @@ class MediaAssetService:
         repository: MediaAssetRepository,
         storage: ObjectStorage,
         settings: Settings,
+        validation_gate: ValidationGate,
     ) -> None:
         self._session = session
         self._repository = repository
         self._storage = storage
         self._settings = settings
+        self._validation_gate = validation_gate
 
     def public_url(self, asset: MediaAssetModel) -> str:
         """Build an immutable browser URL without leaking the internal endpoint."""
@@ -187,12 +190,22 @@ class MediaAssetService:
                 raise UploadValidationFailed(
                     "Stored object metadata does not match the upload session"
                 )
-            content = await self._storage.read_object(asset.object_key, asset.expected_size)
-            if len(content) != asset.expected_size:
-                raise UploadValidationFailed("Stored object size does not match the upload session")
-            validated = validate_content(
-                content, asset.declared_content_type, self._settings.max_image_pixels
-            )
+            async def read_and_validate():  # type: ignore[no-untyped-def]
+                content = await self._storage.read_object(
+                    asset.object_key, asset.expected_size
+                )
+                if len(content) != asset.expected_size:
+                    raise UploadValidationFailed(
+                        "Stored object size does not match the upload session"
+                    )
+                validated = validate_content(
+                    content,
+                    asset.declared_content_type,
+                    self._settings.max_image_pixels,
+                )
+                return content, validated
+
+            content, validated = await self._validation_gate.run(read_and_validate)
         except StorageObjectNotFound:
             asset.status = AssetStatus.PENDING
             await self._session.commit()

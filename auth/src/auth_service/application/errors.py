@@ -37,6 +37,11 @@ class SessionStoreUnavailable(ApplicationError):
     message = "Session store is unavailable"
 
 
+class AuthCapacityExhausted(ApplicationError):
+    code = "auth_capacity_exhausted"
+    message = "Authentication capacity is temporarily exhausted"
+
+
 class AccountUnavailable(ApplicationError):
     code = "account_unavailable"
     message = "Account is unavailable"

@@ -16,6 +16,14 @@ services:
       retries: 10
       start_period: 5s
     restart: unless-stopped
+    mem_limit: ${GATEWAY_MEMORY_LIMIT:-64m}
+    mem_reservation: ${GATEWAY_MEMORY_RESERVATION:-16m}
+    pids_limit: ${GATEWAY_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 10s
+    logging: &bounded-logging
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
     networks:
       - shide-observability
 
@@ -29,6 +37,12 @@ services:
         aliases:
           - frontend
     restart: unless-stopped
+    mem_limit: ${FRONTEND_MEMORY_LIMIT:-48m}
+    mem_reservation: ${FRONTEND_MEMORY_RESERVATION:-12m}
+    pids_limit: ${FRONTEND_PIDS_LIMIT:-32}
+    init: true
+    stop_grace_period: 10s
+    logging: *bounded-logging
 
 networks:
   shide-observability:

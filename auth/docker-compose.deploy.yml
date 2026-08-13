@@ -33,6 +33,14 @@ services:
 
   api:
     <<: *auth-runtime
+    mem_limit: ${AUTH_API_MEMORY_LIMIT:-256m}
+    mem_reservation: ${AUTH_API_MEMORY_RESERVATION:-96m}
+    pids_limit: ${AUTH_API_PIDS_LIMIT:-128}
+    init: true
+    stop_grace_period: 20s
+    logging: &bounded-logging
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
     volumes:
       - auth-jwt-keys:/var/lib/flashmarket-auth/keys
       - auth-jwt-keys-public:/var/lib/flashmarket-auth/keys/public:ro
@@ -74,9 +82,21 @@ services:
       retries: 20
       start_period: 5s
     restart: unless-stopped
+    mem_limit: ${AUTH_NGINX_MEMORY_LIMIT:-32m}
+    mem_reservation: ${AUTH_NGINX_MEMORY_RESERVATION:-8m}
+    pids_limit: ${AUTH_NGINX_PIDS_LIMIT:-32}
+    init: true
+    stop_grace_period: 10s
+    logging: *bounded-logging
 
   cleanup:
     <<: *auth-runtime
+    mem_limit: ${AUTH_MAINTENANCE_MEMORY_LIMIT:-128m}
+    mem_reservation: ${AUTH_MAINTENANCE_MEMORY_RESERVATION:-40m}
+    pids_limit: ${AUTH_MAINTENANCE_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
     command:
       - cleanup
       - sh
@@ -89,6 +109,12 @@ services:
 
   outbox:
     <<: *auth-runtime
+    mem_limit: ${AUTH_WORKER_MEMORY_LIMIT:-160m}
+    mem_reservation: ${AUTH_WORKER_MEMORY_RESERVATION:-56m}
+    pids_limit: ${AUTH_WORKER_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
     command:
       - outbox
       - auth_service.outbox_worker

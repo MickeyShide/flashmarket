@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
     database_url: str = "postgresql+asyncpg://shide:shide@shide-postgres:5432/catalog"
+    database_api_pool_size: int = Field(default=3, ge=1, le=20)
+    database_api_max_overflow: int = Field(default=2, ge=0, le=20)
+    database_worker_pool_size: int = Field(default=1, ge=1, le=10)
+    database_worker_max_overflow: int = Field(default=1, ge=0, le=10)
+    database_pool_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
+    database_pool_recycle_seconds: int = Field(default=1800, ge=60, le=86400)
     redis_url: str = "redis://shide-redis:6379/1"
     category_cache_ttl_seconds: int = Field(default=60, gt=0)
     redis_socket_timeout_seconds: float = Field(default=0.2, gt=0)

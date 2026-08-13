@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     debug: bool = False
     docs_enabled: bool = True
     database_url: str = "postgresql+asyncpg://shide:shide@shide-postgres:5432/media"
+    database_api_pool_size: int = Field(default=3, ge=1, le=20)
+    database_api_max_overflow: int = Field(default=2, ge=0, le=20)
+    database_worker_pool_size: int = Field(default=1, ge=1, le=10)
+    database_worker_max_overflow: int = Field(default=1, ge=0, le=10)
+    database_pool_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
+    database_pool_recycle_seconds: int = Field(default=1800, ge=60, le=86400)
     s3_internal_endpoint: str = "http://shide-minio:9000"
     s3_public_endpoint: str = "http://localhost:9000"
     s3_access_key: str = "shide"
@@ -58,6 +64,8 @@ class Settings(BaseSettings):
     max_user_assets: int = Field(default=200, ge=1, le=100_000)
     max_user_bytes: int = Field(default=500 * 1024 * 1024, ge=1)
     max_image_pixels: int = Field(default=40_000_000, ge=1_000_000)
+    validation_concurrency: int = Field(default=1, ge=1, le=4)
+    validation_acquire_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
     jwt_public_key_dir: Path = Path("keys/public")
     jwt_algorithm: str = "EdDSA"
     jwt_issuer: str = "flashmarket-auth"
