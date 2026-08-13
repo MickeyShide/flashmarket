@@ -64,6 +64,7 @@ async def test_wish_001_to_005_crud_and_idempotency(client: AsyncClient) -> None
 async def test_wish_008_ownership_enforcement(jwt_keystore: TestKeyStore) -> None:
     """WISH-008: Verify user cannot view/modify another user's wishlist (401/403)."""
     from httpx import ASGITransport
+
     from wishlist.main import app
 
     user_a = uuid.uuid4()
@@ -73,7 +74,11 @@ async def test_wish_008_ownership_enforcement(jwt_keystore: TestKeyStore) -> Non
     headers_a = {"Authorization": f"Bearer {token_a}"}
     transport = ASGITransport(app=app)
 
-    async with AsyncClient(transport=transport, base_url="http://localhost", headers=headers_a) as client_a:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://localhost",
+        headers=headers_a,
+    ) as client_a:
         # Access user_b's wishlist with user_a's token -> 401/403
         resp = await client_a.get(f"/api/v1/wishlist/users/{user_b}/items")
         assert resp.status_code in (401, 403)

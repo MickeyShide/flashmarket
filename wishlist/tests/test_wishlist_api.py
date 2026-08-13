@@ -1,9 +1,9 @@
 """Integration tests for Wishlist API endpoints."""
 
 import uuid
-from httpx import AsyncClient
 
 import pytest
+from httpx import AsyncClient
 
 
 @pytest.mark.asyncio

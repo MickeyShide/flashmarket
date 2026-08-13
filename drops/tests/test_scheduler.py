@@ -1,10 +1,10 @@
 """Tests for drops background scheduler logic."""
 
 from datetime import UTC, datetime, timedelta
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from drops.domain.entities import DropEventType, DropStatus
 from drops.infrastructure.models import DropModel, OutboxEventModel

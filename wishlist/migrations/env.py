@@ -1,8 +1,8 @@
 """Alembic environment configuration for async migrations."""
 
 import asyncio
-from logging.config import fileConfig
 import socket
+from logging.config import fileConfig
 from urllib.parse import urlsplit, urlunsplit
 
 from alembic import context

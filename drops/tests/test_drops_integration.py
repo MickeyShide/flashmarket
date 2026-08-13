@@ -1,13 +1,12 @@
 """Comprehensive integration tests for Drops microservice (DROP-001 through DROP-014)."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from drops.domain.entities import DropStatus
 from drops.infrastructure.models import DropModel, OutboxEventModel
 from drops.outbox_worker import publish_outbox_batch
 from drops.scheduler import run_scheduler_tick
@@ -16,7 +15,7 @@ from drops.scheduler import run_scheduler_tick
 @pytest.mark.asyncio
 async def test_drop_001_to_005_drop_lifecycle_and_items(client: AsyncClient) -> None:
     """DROP-001..DROP-005: Create flash sale drop, add/remove items, update status."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     start_time = now + timedelta(hours=1)
     end_time = now + timedelta(hours=2)
 
@@ -66,7 +65,7 @@ async def test_drop_008_scheduler_auto_transitions(
     session_factory: async_sessionmaker[AsyncSession], client: AsyncClient
 ) -> None:
     """DROP-008: Scheduler automatically transitions scheduled drops when start_time is due."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     future_start = now + timedelta(minutes=5)
     future_end = now + timedelta(hours=1)
 
@@ -89,7 +88,7 @@ async def test_drop_008_scheduler_auto_transitions(
     async with session_factory() as db, db.begin():
         drop = await db.get(DropModel, drop_id)
         assert drop is not None
-        drop.starts_at = datetime.now(timezone.utc) - timedelta(minutes=5)
+        drop.starts_at = datetime.now(UTC) - timedelta(minutes=5)
 
     # 3. Process due drops via scheduler
     await run_scheduler_tick(session_factory=session_factory)

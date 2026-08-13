@@ -2,9 +2,9 @@
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from httpx import AsyncClient
 
 import pytest
+from httpx import AsyncClient
 
 
 @pytest.mark.asyncio

@@ -1,9 +1,9 @@
 """Unit and integration tests for WishlistService logic."""
 
 import uuid
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from wishlist.application.schemas import AddToWishlistRequest, WishlistListParams
 from wishlist.application.services.wishlist import WishlistService
