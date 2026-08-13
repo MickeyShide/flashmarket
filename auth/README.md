@@ -315,13 +315,17 @@ production deploy по SSH:
 Secrets:
 
 - `DEPLOY_SSH_KEY` — приватный ключ deploy-пользователя;
+- `DEPLOY_KNOWN_HOSTS` — проверенная вне канала deployment строка `known_hosts`
+  для production-сервера (для нестандартного порта используется имя
+  `[host]:port`);
 - `AUTH_POSTGRES_PASSWORD` — пароль PostgreSQL;
 - `AUTH_REDIS_PASSWORD` — пароль Redis;
 - `AUTH_RABBITMQ_PASSWORD` — пароль RabbitMQ.
 
-SSH deploy выполняется без проверки host key (`StrictHostKeyChecking=no`), поэтому
-`DEPLOY_KNOWN_HOSTS` не нужен. Это упрощает подключение к новым серверам, но
-снижает защиту от подмены SSH-сервера.
+SSH deploy использует `StrictHostKeyChecking=yes` и останавливается, если ключ
+сервера отсутствует в `DEPLOY_KNOWN_HOSTS` или не совпадает. Не заполняй secret
+результатом непроверенного `ssh-keyscan`: сначала сверь SHA256 fingerprint через
+консоль хостинга или другой доверенный канал.
 
 Пароли должны содержать 32–128 URL-safe символов. Их можно создать командой
 `openssl rand -hex 32`.

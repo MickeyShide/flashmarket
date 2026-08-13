@@ -193,6 +193,7 @@ jobs:
         shell: bash
         run: |
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
+          DEPLOY_PORT="${DEPLOY_PORT:-22}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           GATEWAY_DOMAIN="${GATEWAY_DOMAIN:-flashmarket.shide.world}"
 

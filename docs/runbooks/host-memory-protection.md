@@ -21,6 +21,18 @@ before changing memory limits so the new baseline is meaningful.
 
 ## 2. Create persistent 2 GiB swap
 
+The reliability operations workflow performs this step idempotently with
+`scripts/install-host-memory-protection.sh`. For a manual rollout, run that
+script as root from a verified repository checkout:
+
+```bash
+sudo sh scripts/install-host-memory-protection.sh
+```
+
+The script refuses to overwrite an existing `/swapfile` unless it is already a
+valid swap area. The equivalent low-level commands are retained below for
+incident recovery and review.
+
 The following target is deliberately explicit. Do not substitute a broad or
 computed path.
 
@@ -141,4 +153,3 @@ enabled while investigating; disabling swap under load can itself exhaust RAM.
 If swap removal is later required, first verify enough available memory, then
 run `sudo swapoff /swapfile`, remove the exact `/swapfile` entry from
 `/etc/fstab`, and delete only `/swapfile`.
-

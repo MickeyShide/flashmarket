@@ -154,6 +154,7 @@ jobs:
         shell: bash
         run: |
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
+          DEPLOY_PORT="${DEPLOY_PORT:-22}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           INFRA_USER="${INFRA_USER:-shide}"
           : "${DEPLOY_POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"

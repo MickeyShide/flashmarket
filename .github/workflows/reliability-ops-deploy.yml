@@ -8,6 +8,7 @@ on:
       - deploy/systemd/**
       - scripts/flashmarket_worker_watchdog.py
       - scripts/install-worker-watchdog.sh
+      - scripts/install-host-memory-protection.sh
       - scripts/configure-deploy-ssh.sh
       - .github/workflows/reliability-ops-deploy.yml
   workflow_dispatch:
@@ -62,6 +63,7 @@ jobs:
           scp -P "$DEPLOY_PORT" \
             scripts/flashmarket_worker_watchdog.py \
             scripts/install-worker-watchdog.sh \
+            scripts/install-host-memory-protection.sh \
             "$target:$DEPLOY_PATH/scripts/"
           scp -P "$DEPLOY_PORT" deploy/systemd/* \
             "$target:$DEPLOY_PATH/deploy/systemd/"
@@ -77,6 +79,15 @@ jobs:
              sudo systemctl is-enabled --quiet flashmarket-worker-watchdog.timer &&
              sudo systemctl is-active --quiet flashmarket-worker-watchdog.timer &&
              sudo systemctl start flashmarket-worker-watchdog.service"
+
+      - name: Install and verify host memory protection
+        shell: bash
+        run: |
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -p "$DEPLOY_PORT" "$target" \
+            "sudo sh '$DEPLOY_PATH/scripts/install-host-memory-protection.sh' &&
+             swapon --show &&
+             test \"\$(sysctl -n vm.swappiness)\" = 10"
 
       - name: Install and reload Prometheus rules
         if: env.PROMETHEUS_RULES_DIR != ''

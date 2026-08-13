@@ -256,6 +256,7 @@ jobs:
         shell: bash
         run: |
           DEPLOY_HOST="${DEPLOY_HOST:-176.108.242.100}"
+          DEPLOY_PORT="${DEPLOY_PORT:-22}"
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           INVENTORY_DOMAIN="inventory.${GATEWAY_DOMAIN}"
           INFRA_USER="${INFRA_USER:-shide}"

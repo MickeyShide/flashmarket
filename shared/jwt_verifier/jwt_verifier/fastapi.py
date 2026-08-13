@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -68,9 +68,9 @@ class JWTAuth:
 def create_auth_dependencies(
     verifier_getter: Callable[[], JWTVerifier]
 ) -> tuple[
-    Callable[..., Principal | None],
-    Callable[..., Principal],
-    Callable[..., Principal],
+    Callable[..., Awaitable[Principal | None]],
+    Callable[..., Awaitable[Principal]],
+    Callable[..., Awaitable[Principal]],
 ]:
     """Factory creating FastAPI dependencies bound to a verifier getter."""
     auth = JWTAuth(verifier_getter)

@@ -9,13 +9,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
 )
-
 from jwt_verifier import (
     ExpiredTokenError,
     InvalidTokenError,
     JWTVerifier,
     KeyStoreError,
-    Principal,
 )
 
 
@@ -28,7 +26,7 @@ def key_pair() -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
 
 @pytest.fixture
 def keys_dir(tmp_path: Path, key_pair: tuple[Ed25519PrivateKey, Ed25519PublicKey]) -> Path:
-    priv, pub = key_pair
+    _, pub = key_pair
     pub_dir = tmp_path / "public"
     pub_dir.mkdir()
     pub_pem = pub.public_bytes(

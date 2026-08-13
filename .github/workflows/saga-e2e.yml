@@ -67,7 +67,7 @@ jobs:
 
           # Wait for postgres to accept connections
           echo "Waiting for PostgreSQL..."
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             if docker exec shide-postgres pg_isready -U shide -q 2>/dev/null; then
               echo "PostgreSQL is ready"
               break
@@ -83,7 +83,7 @@ jobs:
 
           # Wait for RabbitMQ to be ready
           echo "Waiting for RabbitMQ..."
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             if docker exec shide-rabbitmq rabbitmqctl status >/dev/null 2>&1; then
               echo "RabbitMQ is ready"
               break

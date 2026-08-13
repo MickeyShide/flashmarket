@@ -34,8 +34,17 @@ CRITICAL_SERVICES = (
     "orders",
     "payments",
     "notifications",
+    "orders-outbox",
+    "payments-consumer",
+    "payments-outbox",
+    "orders-consumer",
+    "inventory-consumer",
+    "inventory-outbox",
+    "notifications-consumer",
 )
 ADMIN_PASSWORD = "SagaAdminPassword123!"
+S3_ACCESS_KEY = "shide"
+S3_SECRET_KEY = "shide-e2e-secret"
 
 
 def announce(message: str) -> None:
@@ -142,7 +151,9 @@ class E2ERunner:
         self.postgres = f"{self.project}-postgres"
         self.redis = f"{self.project}-redis"
         self.rabbitmq = f"{self.project}-rabbitmq"
+        self.minio = f"{self.project}-minio"
         self.gateway = f"{self.project}-gateway"
+        self.gateway_exporter = f"{self.project}-gateway-exporter"
         self.admin_email = f"saga-admin-{suffix}@example.com"
         self.override_path: Path | None = None
         self.compose_env = os.environ.copy()
@@ -151,6 +162,9 @@ class E2ERunner:
                 "E2E_NETWORK": self.network,
                 "E2E_LOG_VOLUME": self.log_volume,
                 "E2E_GATEWAY_CONTAINER": self.gateway,
+                "E2E_GATEWAY_EXPORTER_CONTAINER": self.gateway_exporter,
+                "S3_ACCESS_KEY": S3_ACCESS_KEY,
+                "S3_SECRET_KEY": S3_SECRET_KEY,
             }
         )
 
@@ -202,11 +216,22 @@ class E2ERunner:
             "frontend",
         )
         service_overrides = "\n".join(
-            f"  {service}:\n    ports: !reset []"
+            (
+                f"  {service}:\n"
+                "    ports: !reset []\n"
+                "    healthcheck:\n"
+                "      timeout: 15s"
+            )
             for service in services_without_host_ports
+        )
+        worker_health_overrides = "\n".join(
+            f"  {service}:\n    healthcheck:\n      timeout: 15s"
+            for service in CRITICAL_SERVICES
+            if service not in services_without_host_ports and service != "gateway"
         )
         content = f"""services:
 {service_overrides}
+{worker_health_overrides}
   gateway:
     container_name: ${{E2E_GATEWAY_CONTAINER}}
     ports: !override
@@ -214,6 +239,8 @@ class E2ERunner:
         published: \"0\"
         host_ip: 127.0.0.1
         protocol: tcp
+  gateway-exporter:
+    container_name: ${{E2E_GATEWAY_EXPORTER_CONTAINER}}
 
 networks:
   default:
@@ -302,6 +329,26 @@ volumes:
                 "rabbitmq:3-management-alpine",
             )
         )
+        run_command(
+            (
+                "docker",
+                "run",
+                "-d",
+                "--name",
+                self.minio,
+                "--network",
+                self.network,
+                "--network-alias",
+                "shide-minio",
+                "-e",
+                f"MINIO_ROOT_USER={S3_ACCESS_KEY}",
+                "-e",
+                f"MINIO_ROOT_PASSWORD={S3_SECRET_KEY}",
+                "minio/minio:RELEASE.2025-04-22T22-12-26Z",
+                "server",
+                "/data",
+            )
+        )
 
         self.wait_for_command(
             ("docker", "exec", self.postgres, "pg_isready", "-U", "shide", "-q"),
@@ -341,6 +388,34 @@ volumes:
             ("docker", "exec", self.rabbitmq, "rabbitmqctl", "status"),
             description="RabbitMQ",
             timeout=90,
+        )
+        self.wait_for_command(
+            (
+                "docker",
+                "exec",
+                self.minio,
+                "curl",
+                "--fail",
+                "--silent",
+                "http://127.0.0.1:9000/minio/health/ready",
+            ),
+            description="MinIO",
+            timeout=90,
+        )
+        run_command(
+            (
+                "docker",
+                "run",
+                "--rm",
+                "--network",
+                self.network,
+                "-e",
+                f"MC_HOST_e2e=http://{S3_ACCESS_KEY}:{S3_SECRET_KEY}@shide-minio:9000",
+                "minio/mc:RELEASE.2025-04-16T18-13-26Z",
+                "mb",
+                "--ignore-existing",
+                "e2e/flashmarket-public",
+            )
         )
         for vhost in ("payments", "notifications"):
             run_command(
@@ -387,7 +462,7 @@ volumes:
         self.compose("build", "--quiet", timeout=900)
         self.compose("up", "-d", "--no-build", capture=True, timeout=300)
 
-        deadline = time.monotonic() + 180
+        deadline = time.monotonic() + 300
         pending = set(CRITICAL_SERVICES)
         while time.monotonic() < deadline:
             pending = {
@@ -400,7 +475,7 @@ volumes:
                 return
             time.sleep(3)
         raise TimeoutError(
-            "Services did not become healthy within 180s: " + ", ".join(sorted(pending))
+            "Services did not become healthy within 300s: " + ", ".join(sorted(pending))
         )
 
     def service_health(self, service: str) -> str:
@@ -503,7 +578,7 @@ volumes:
                 capture=True,
                 timeout=180,
             )
-        for container in (self.postgres, self.redis, self.rabbitmq):
+        for container in (self.postgres, self.redis, self.rabbitmq, self.minio):
             run_command(("docker", "rm", "-f", container), check=False, capture=True)
         run_command(
             ("docker", "volume", "rm", self.log_volume), check=False, capture=True
