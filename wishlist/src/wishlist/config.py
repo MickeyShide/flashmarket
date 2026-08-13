@@ -18,7 +18,7 @@ def resolve_url_ipv4(url_str: str) -> str:
             )
             if infos:
                 ip = infos[0][4][0]
-                netloc = parsed.netloc.replace(parsed.hostname, ip, 1)
+                netloc = parsed.netloc.replace(parsed.hostname, str(ip), 1)
                 return urlunsplit(parsed._replace(netloc=netloc))
     except Exception:
         pass
@@ -60,6 +60,13 @@ class Settings(BaseSettings):
     rabbitmq_publish_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
+    rabbitmq_retry_delays_seconds: tuple[int, int, int] = (5, 30, 120)
+    rabbitmq_reconnect_initial_seconds: float = Field(default=1.0, gt=0, le=60)
+    rabbitmq_reconnect_max_seconds: float = Field(default=30.0, gt=0, le=600)
+    outbox_claim_lease_seconds: int = Field(default=30, ge=5, le=600)
+    outbox_max_backoff_seconds: float = Field(default=300.0, ge=1, le=3600)
+    worker_heartbeat_interval_seconds: float = Field(default=10.0, ge=1, le=60)
+    worker_heartbeat_stale_seconds: int = Field(default=45, ge=10, le=600)
     jwt_public_key_dir: Path = Path("keys/public")
     jwt_algorithm: str = "EdDSA"
     jwt_issuer: str = "flashmarket-auth"

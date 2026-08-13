@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from wishlist.api.dependencies import get_verifier
 from wishlist.api.error_handlers import wishlist_error_handler
 from wishlist.api.routes import health, metrics, wishlist
 from wishlist.config import get_settings
@@ -16,9 +17,6 @@ from wishlist.observability import (
     request_observability_middleware,
     setup_metrics,
 )
-
-
-from wishlist.api.dependencies import get_verifier
 
 
 @asynccontextmanager

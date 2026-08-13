@@ -13,6 +13,9 @@ dependencies = [
     "sqlalchemy>=2.0.47,<3",
 ]
 
+[project.scripts]
+flashmarket-dlq = "rabbitmq_reliability.dlq:main"
+
 [dependency-groups]
 dev = [
     "mypy>=2.1,<3",
@@ -24,10 +27,14 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["rabbitmq_reliability"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"rabbitmq_reliability/py.typed" = "rabbitmq_reliability/py.typed"
+
 [tool.pytest.ini_options]
 addopts = "-q"
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["integration: requires a live RabbitMQ broker"]
 
 [tool.ruff]
 line-length = 100

@@ -63,6 +63,12 @@ services:
     mem_limit: ${WISHLIST_WORKER_MEMORY_LIMIT:-160m}
     mem_reservation: ${WISHLIST_WORKER_MEMORY_RESERVATION:-56m}
     pids_limit: ${WISHLIST_WORKER_PIDS_LIMIT:-64}
+    healthcheck: &worker-health
+      test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${WISHLIST_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 45s
 
   outbox:
     <<: *wishlist-runtime
@@ -78,6 +84,7 @@ services:
     mem_limit: ${WISHLIST_WORKER_MEMORY_LIMIT:-160m}
     mem_reservation: ${WISHLIST_WORKER_MEMORY_RESERVATION:-56m}
     pids_limit: ${WISHLIST_WORKER_PIDS_LIMIT:-64}
+    healthcheck: *worker-health
 
 volumes:
   auth-jwt-keys-public:

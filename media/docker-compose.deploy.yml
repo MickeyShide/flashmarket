@@ -48,6 +48,8 @@ services:
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
     restart: unless-stopped
+    labels:
+      flashmarket.autoheal: "true"
     healthcheck:
       test: ["CMD", "python", "-m", "media_service.worker_health", "90"]
       interval: 30s

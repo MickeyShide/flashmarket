@@ -38,7 +38,6 @@ services:
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
       - backend-logs-local:/var/log/shide
-      - inventory-metrics-data:/tmp/prometheus
     healthcheck:
       test:
         - CMD
@@ -68,6 +67,12 @@ services:
     mem_limit: ${INVENTORY_WORKER_MEMORY_LIMIT:-160m}
     mem_reservation: ${INVENTORY_WORKER_MEMORY_RESERVATION:-56m}
     pids_limit: ${INVENTORY_WORKER_PIDS_LIMIT:-64}
+    healthcheck: &worker-health
+      test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${INVENTORY_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 45s
 
   outbox:
     <<: *inventory-runtime
@@ -83,6 +88,7 @@ services:
     mem_limit: ${INVENTORY_WORKER_MEMORY_LIMIT:-160m}
     mem_reservation: ${INVENTORY_WORKER_MEMORY_RESERVATION:-56m}
     pids_limit: ${INVENTORY_WORKER_PIDS_LIMIT:-64}
+    healthcheck: *worker-health
 
   expiry:
     <<: *inventory-runtime
@@ -100,9 +106,10 @@ services:
     mem_limit: ${INVENTORY_MAINTENANCE_MEMORY_LIMIT:-128m}
     mem_reservation: ${INVENTORY_MAINTENANCE_MEMORY_RESERVATION:-40m}
     pids_limit: ${INVENTORY_MAINTENANCE_PIDS_LIMIT:-64}
+    healthcheck: *worker-health
 
 volumes:
-  inventory-metrics-data:
+  auth-jwt-keys-public:
   backend-logs-local:
     external: true
     name: shide-backend-logs-local

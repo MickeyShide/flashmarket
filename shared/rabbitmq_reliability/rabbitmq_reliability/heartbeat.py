@@ -11,8 +11,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from .metrics import mark_worker_success, start_worker_metrics_server
+
 
 def touch_heartbeat(path: str | Path, phase: str) -> None:
+    ensure_worker_metrics_server()
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
@@ -21,6 +24,11 @@ def touch_heartbeat(path: str | Path, phase: str) -> None:
         encoding="utf-8",
     )
     temporary.replace(target)
+    mark_worker_success(phase)
+
+
+def ensure_worker_metrics_server() -> None:
+    start_worker_metrics_server(int(os.getenv("FLASHMARKET_WORKER_METRICS_PORT", "9100")))
 
 
 def heartbeat_is_fresh(path: str | Path, max_age_seconds: float) -> bool:
@@ -40,6 +48,7 @@ async def periodic_heartbeat(
     phase: str = "connected",
 ) -> AsyncIterator[None]:
     """Keep an idle but connected worker healthy until its scope exits."""
+    ensure_worker_metrics_server()
 
     async def beat() -> None:
         while True:

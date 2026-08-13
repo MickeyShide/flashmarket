@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from payments.api.dependencies import get_verifier
 from payments.api.error_handlers import payment_error_handler
 from payments.api.routes import health, metrics, payments
 from payments.config import get_settings
@@ -16,9 +17,6 @@ from payments.observability import (
     request_observability_middleware,
     setup_metrics,
 )
-
-
-from payments.api.dependencies import get_verifier
 
 
 @asynccontextmanager

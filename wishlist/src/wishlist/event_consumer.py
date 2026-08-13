@@ -13,8 +13,10 @@ from aio_pika.abc import AbstractIncomingMessage
 from rabbitmq_reliability import (
     PermanentMessageError,
     ReliabilityConfig,
+    begin_event_once,
     declare_consumer_topology,
     decode_json_object,
+    delivery_identity,
     periodic_heartbeat,
     process_with_retries,
     run_forever,
@@ -22,12 +24,10 @@ from rabbitmq_reliability import (
 
 from wishlist.config import get_settings
 from wishlist.infrastructure.database import SessionFactory, engine
+from wishlist.infrastructure.models import ProcessedEventModel
 from wishlist.infrastructure.repositories.wishlist import WishlistRepository
 
 logger = logging.getLogger(__name__)
-
-INITIAL_RECONNECT_DELAY_SECONDS = 1.0
-MAX_RECONNECT_DELAY_SECONDS = 30.0
 
 
 async def process_drop_started(
@@ -43,6 +43,15 @@ async def process_drop_started(
         raise PermanentMessageError("invalid DropStarted payload") from exc
 
     async with SessionFactory() as session, session.begin():
+        routing_key = "drops.DropStarted"
+        if not await begin_event_once(
+            session,
+            ProcessedEventModel,
+            event_id=delivery_identity(message, routing_key),
+            routing_key=routing_key,
+        ):
+            logger.info("Skipping duplicate event %s", delivery_identity(message, routing_key))
+            return
         repository = WishlistRepository(session)
         users = await repository.get_users_for_products(product_ids)
         staged = await repository.stage_drop_notifications(
@@ -56,6 +65,7 @@ async def process_drop_started(
 
 async def run_consumer() -> None:
     settings = get_settings()
+    reliability = ReliabilityConfig.from_settings(settings)
     connection = await aio_pika.connect_robust(settings.rabbitmq_url)
     async with connection:
         channel = await connection.channel(publisher_confirms=True, on_return_raises=True)
@@ -68,9 +78,13 @@ async def run_consumer() -> None:
             queue_name="wishlist.drop-events",
             topic_exchange=exchange,
             routing_keys=("drops.DropStarted",),
-            config=ReliabilityConfig(),
+            config=reliability,
         )
-        async with periodic_heartbeat("/tmp/flashmarket-heartbeat.json"):
+        async with periodic_heartbeat(
+            "/tmp/flashmarket-heartbeat.json",
+            interval_seconds=settings.worker_heartbeat_interval_seconds,
+            phase="wishlist_consumer",
+        ):
             async with topology.queue.iterator() as iterator:
                 async for message in iterator:
                     try:
@@ -78,7 +92,7 @@ async def run_consumer() -> None:
                             message,
                             handler=process_drop_started,
                             topology=topology,
-                            config=ReliabilityConfig(),
+                            config=reliability,
                         )
                     except asyncio.CancelledError:
                         raise
@@ -94,8 +108,8 @@ async def run_consumer_forever(
     """Keep retrying initial broker connections without restarting the container."""
     await run_forever(
         consumer,
-        initial_delay=INITIAL_RECONNECT_DELAY_SECONDS,
-        max_delay=MAX_RECONNECT_DELAY_SECONDS,
+        initial_delay=get_settings().rabbitmq_reconnect_initial_seconds,
+        max_delay=get_settings().rabbitmq_reconnect_max_seconds,
         sleep=sleep,
         jitter=lambda: 0.5,
         label="Wishlist consumer",

@@ -74,17 +74,25 @@ def test_all_production_workflows_use_shared_vhost() -> None:
         content = (PROJECT_ROOT / ".github" / "workflows" / workflow_name).read_text(
             encoding="utf-8"
         )
-        rabbitmq_lines = [line for line in content.splitlines() if "RABBITMQ_URL=" in line]
+        rabbitmq_lines = [
+            line for line in content.splitlines() if "RABBITMQ_URL=" in line
+        ]
         assert rabbitmq_lines, f"{workflow_name} does not render a RabbitMQ URL"
-        assert all(SHARED_RABBITMQ_PATH in line for line in rabbitmq_lines), workflow_name
+        assert all(SHARED_RABBITMQ_PATH in line for line in rabbitmq_lines), (
+            workflow_name
+        )
 
 
 def test_all_environment_examples_use_shared_vhost() -> None:
     for relative_path in EXAMPLES:
         content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
-        rabbitmq_lines = [line for line in content.splitlines() if "RABBITMQ_URL=" in line]
+        rabbitmq_lines = [
+            line for line in content.splitlines() if "RABBITMQ_URL=" in line
+        ]
         assert rabbitmq_lines, f"{relative_path} does not define a RabbitMQ URL"
-        assert all(SHARED_RABBITMQ_PATH in line for line in rabbitmq_lines), relative_path
+        assert all(SHARED_RABBITMQ_PATH in line for line in rabbitmq_lines), (
+            relative_path
+        )
 
 
 def test_runtime_defaults_and_local_compose_use_shared_vhost() -> None:
@@ -96,15 +104,17 @@ def test_runtime_defaults_and_local_compose_use_shared_vhost() -> None:
             if "rabbitmq_url: str =" in line.lower() or "RABBITMQ_URL:" in line
         ]
         assert rabbitmq_lines, f"{relative_path} does not define a RabbitMQ URL"
-        assert all(SHARED_RABBITMQ_PATH in line for line in rabbitmq_lines), relative_path
+        assert all(SHARED_RABBITMQ_PATH in line for line in rabbitmq_lines), (
+            relative_path
+        )
 
 
 def test_amqp_uri_maps_to_exactly_one_vhost() -> None:
     module = _load_init_infra()
 
-    assert module._rabbitmq_vhost_from_url("amqp://user:pass@rabbitmq:5672/flashmarket") == (
-        "flashmarket"
-    )
+    assert module._rabbitmq_vhost_from_url(
+        "amqp://user:pass@rabbitmq:5672/flashmarket"
+    ) == ("flashmarket")
     assert module._rabbitmq_vhost_from_url("amqp://user:pass@rabbitmq:5672/%2F") == "/"
     assert module._rabbitmq_vhost_from_url("amqp://user:pass@rabbitmq:5672/") == "/"
 
@@ -160,15 +170,36 @@ def test_bootstrap_declares_reliability_exchanges_and_queue_policies() -> None:
     urls = [request.full_url for request in requests]
     assert any("/exchanges/flashmarket/flashmarket.retry" in url for url in urls)
     assert any("/exchanges/flashmarket/flashmarket.dead-letter" in url for url in urls)
-    dlq_requests = [request for request in requests if "/queues/flashmarket/" in request.full_url]
+    dlq_requests = [
+        request for request in requests if "/queues/flashmarket/" in request.full_url
+    ]
     binding_requests = [
-        request for request in requests if "/bindings/flashmarket/e/" in request.full_url
+        request
+        for request in requests
+        if "/bindings/flashmarket/e/" in request.full_url
     ]
     assert len(dlq_requests) == 5
     assert len(binding_requests) == 5
     assert all(request.get_method() == "POST" for request in binding_requests)
-    policies = [request for request in requests if "/policies/flashmarket/" in request.full_url]
-    assert len(policies) == 5
-    definitions = [json.loads(request.data)["definition"] for request in policies]
-    assert all(definition["overflow"] == "reject-publish-dlx" for definition in definitions)
-    assert all(definition["dead-letter-exchange"] == "flashmarket.dead-letter" for definition in definitions)
+    policies = [
+        request for request in requests if "/policies/flashmarket/" in request.full_url
+    ]
+    assert len(policies) == 15
+    payloads = [json.loads(request.data) for request in policies]
+    main = [
+        payload["definition"]
+        for payload in payloads
+        if payload["definition"]["overflow"] == "reject-publish-dlx"
+    ]
+    bounded = [
+        payload["definition"]
+        for payload in payloads
+        if payload["definition"]["overflow"] == "reject-publish"
+    ]
+    assert len(main) == 5
+    assert len(bounded) == 10
+    assert all(definition["overflow"] == "reject-publish-dlx" for definition in main)
+    assert all(
+        definition["dead-letter-exchange"] == "flashmarket.dead-letter"
+        for definition in main
+    )

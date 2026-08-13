@@ -234,12 +234,7 @@ volumes:
   frontend-node-modules:
   auth-jwt-keys-private:
   auth-jwt-keys-public:
-  auth-metrics-data:
   catalog-metrics-data:
-  inventory-metrics-data:
-  orders-metrics-data:
-  payments-metrics-data:
-  notifications-metrics-data:
   backend-logs-local:
     external: true
     name: shide-backend-logs-local

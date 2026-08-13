@@ -1,0 +1,76 @@
+groups:
+  - name: flashmarket-rabbitmq-reliability
+    rules:
+      - alert: FlashMarketRabbitMQMetricsMissing
+        expr: absent(rabbitmq_detailed_queue_messages_ready)
+        for: 3m
+        labels: {severity: critical}
+        annotations:
+          summary: RabbitMQ per-queue metrics are missing
+          description: Scrape /metrics/detailed with queue_coarse_metrics and queue_consumer_count.
+
+      - alert: FlashMarketRabbitMQDLQNotEmpty
+        expr: rabbitmq_detailed_queue_messages_ready{queue=~".*\\.dlq"} > 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "DLQ {{ $labels.queue }} is not empty"
+          description: "{{ $value }} poison message(s) require diagnosis before replay."
+
+      - alert: FlashMarketRabbitMQMainQueueNearLimit
+        expr: rabbitmq_detailed_queue_messages_ready{queue=~"(inventory|orders|payments|notifications)\\.events|wishlist\\.drop-events"} > 14000
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Queue {{ $labels.queue }} exceeds 70% of its message limit"
+          description: "Ready depth is {{ $value }} of the configured 20000-message limit."
+
+      - alert: FlashMarketRabbitMQConsumerMissing
+        expr: rabbitmq_detailed_queue_consumers{queue=~"(inventory|orders|payments|notifications)\\.events|wishlist\\.drop-events"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "No consumer is attached to {{ $labels.queue }}"
+          description: The worker may be crashed, unhealthy, or unable to connect.
+
+      - alert: FlashMarketRabbitMQResourceAlarm
+        expr: max({__name__=~"rabbitmq_alarms_(memory_used_watermark|free_disk_space_watermark|file_descriptor_limit)"}) > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: RabbitMQ resource alarm is active
+          description: A memory or disk alarm is blocking publishers.
+
+  - name: flashmarket-worker-reliability
+    rules:
+      - alert: FlashMarketWorkerHeartbeatStale
+        expr: time() - flashmarket_worker_last_success_unixtime{worker=~".*_(consumer|outbox|scheduler|expiry)"} > 90
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Worker {{ $labels.worker }} has stopped making progress"
+          description: Its last successful cycle was more than 90 seconds ago.
+
+      - alert: FlashMarketOutboxBacklogOld
+        expr: flashmarket_outbox_oldest_pending_seconds > 300
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.service }} outbox is delayed"
+          description: "The oldest unpublished event is {{ $value | humanizeDuration }} old."
+
+      - alert: FlashMarketAuthCleanupHeartbeatStale
+        expr: time() - flashmarket_worker_last_success_unixtime{worker="auth_cleanup"} > 4000
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Auth cleanup worker has stopped making progress
+          description: The hourly cleanup cycle has not completed within its expected interval.
+
+      - alert: FlashMarketRabbitMQPublishFailures
+        expr: sum(rate(flashmarket_rabbitmq_publish_total{outcome!="confirmed"}[5m])) > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: FlashMarket RabbitMQ publications are failing
+          description: Publisher timeouts, rejections, or errors have persisted for five minutes.

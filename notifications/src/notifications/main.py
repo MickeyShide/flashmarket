@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from notifications.api.dependencies import get_verifier
 from notifications.api.error_handlers import notification_error_handler
 from notifications.api.routes import health, metrics, notifications
 from notifications.config import get_settings
@@ -16,9 +17,6 @@ from notifications.observability import (
     request_observability_middleware,
     setup_metrics,
 )
-
-
-from notifications.api.dependencies import get_verifier
 
 
 @asynccontextmanager

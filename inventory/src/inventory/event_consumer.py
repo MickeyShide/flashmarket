@@ -15,8 +15,10 @@ from aio_pika.abc import AbstractIncomingMessage
 from rabbitmq_reliability import (
     PermanentMessageError,
     ReliabilityConfig,
+    begin_event_once,
     declare_consumer_topology,
     decode_json_object,
+    delivery_identity,
     original_routing_key,
     periodic_heartbeat,
     process_with_retries,
@@ -29,7 +31,7 @@ from inventory.application.schemas import StockResponse
 from inventory.config import get_settings
 from inventory.domain.entities import InventoryEventType, ReservationStatus
 from inventory.infrastructure.database import SessionFactory, engine
-from inventory.infrastructure.models import ReservationModel, StockModel
+from inventory.infrastructure.models import ProcessedEventModel, ReservationModel, StockModel
 from inventory.infrastructure.repositories.stock import (
     OutboxRepository,
     ReservationRepository,
@@ -287,6 +289,16 @@ async def process_message(
     try:
         async with session_factory() as session:
             async with session.begin():
+                if not await begin_event_once(
+                    session,
+                    ProcessedEventModel,
+                    event_id=delivery_identity(message, routing_key),
+                    routing_key=routing_key,
+                ):
+                    logger.info(
+                        "Skipping duplicate event %s", delivery_identity(message, routing_key)
+                    )
+                    return
                 changed_stock = await handler(session, body)
             if changed_stock is not None:
                 snapshot = StockResponse.model_validate(changed_stock)
@@ -298,6 +310,7 @@ async def process_message(
 async def run_consumer() -> None:
     """Connect to RabbitMQ and consume saga events."""
     settings = get_settings()
+    reliability = ReliabilityConfig.from_settings(settings)
     connection = await aio_pika.connect_robust(settings.rabbitmq_url)
     async with connection:
         channel = await connection.channel(publisher_confirms=True, on_return_raises=True)
@@ -312,9 +325,13 @@ async def run_consumer() -> None:
             queue_name="inventory.events",
             topic_exchange=exchange,
             routing_keys=tuple(HANDLERS),
-            config=ReliabilityConfig(),
+            config=reliability,
         )
-        async with periodic_heartbeat("/tmp/flashmarket-heartbeat.json"):
+        async with periodic_heartbeat(
+            "/tmp/flashmarket-heartbeat.json",
+            interval_seconds=settings.worker_heartbeat_interval_seconds,
+            phase="inventory_consumer",
+        ):
             async with topology.queue.iterator() as iterator:
                 async for message in iterator:
                     try:
@@ -322,7 +339,7 @@ async def run_consumer() -> None:
                             message,
                             handler=process_message,
                             topology=topology,
-                            config=ReliabilityConfig(),
+                            config=reliability,
                         )
                     except asyncio.CancelledError:
                         raise
@@ -333,7 +350,13 @@ async def run_consumer() -> None:
 async def run() -> None:
     """Start the consumer coroutine."""
     try:
-        await run_forever(run_consumer, label="Inventory consumer")
+        settings = get_settings()
+        await run_forever(
+            run_consumer,
+            initial_delay=settings.rabbitmq_reconnect_initial_seconds,
+            max_delay=settings.rabbitmq_reconnect_max_seconds,
+            label="Inventory consumer",
+        )
     finally:
         await redis_client.aclose()
         await engine.dispose()

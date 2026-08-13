@@ -1,18 +1,17 @@
 """FastAPI dependencies for dependency injection."""
 
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
+from jwt_verifier import JWTVerifier, Principal, create_auth_dependencies
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drops.application.services.drop import DropService
+from drops.config import get_settings
 from drops.infrastructure.database import get_db
 from drops.infrastructure.repositories.drop import DropRepository
 from drops.infrastructure.repositories.outbox import OutboxRepository
-
-from functools import lru_cache
-from jwt_verifier import JWTVerifier, Principal, create_auth_dependencies
-from drops.config import get_settings
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -28,7 +27,9 @@ def get_verifier() -> JWTVerifier:
     )
 
 
-get_optional_principal, get_current_principal, require_admin = create_auth_dependencies(get_verifier)
+get_optional_principal, get_current_principal, require_admin = create_auth_dependencies(
+    get_verifier
+)
 
 OptionalPrincipal = Annotated[Principal | None, Depends(get_optional_principal)]
 CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]

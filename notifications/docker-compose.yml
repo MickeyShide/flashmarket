@@ -34,7 +34,6 @@ services:
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
       - backend-logs-local:/var/log/shide
-      - notifications-metrics-data:/tmp/prometheus
     healthcheck:
       test:
         - CMD
@@ -64,6 +63,12 @@ services:
     mem_limit: ${NOTIFICATIONS_WORKER_MEMORY_LIMIT:-160m}
     mem_reservation: ${NOTIFICATIONS_WORKER_MEMORY_RESERVATION:-56m}
     pids_limit: ${NOTIFICATIONS_WORKER_PIDS_LIMIT:-64}
+    healthcheck: &worker-health
+      test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${NOTIFICATIONS_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 45s
 
   outbox:
     <<: *notifications-runtime
@@ -79,9 +84,10 @@ services:
     mem_limit: ${NOTIFICATIONS_WORKER_MEMORY_LIMIT:-160m}
     mem_reservation: ${NOTIFICATIONS_WORKER_MEMORY_RESERVATION:-56m}
     pids_limit: ${NOTIFICATIONS_WORKER_PIDS_LIMIT:-64}
+    healthcheck: *worker-health
 
 volumes:
-  notifications-metrics-data:
+  auth-jwt-keys-public:
   backend-logs-local:
     external: true
     name: shide-backend-logs-local

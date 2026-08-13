@@ -1,0 +1,105 @@
+name: Reliability Integration
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: reliability-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  rabbitmq-and-migrations:
+    runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq:4.1-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: flashmarket
+          RABBITMQ_DEFAULT_PASS: flashmarket
+          RABBITMQ_DEFAULT_VHOST: flashmarket
+        ports: ["5672:5672"]
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: flashmarket
+          POSTGRES_PASSWORD: flashmarket
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U flashmarket"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.32"
+          enable-cache: true
+
+      - name: Wait for RabbitMQ
+        run: |
+          for attempt in $(seq 1 60); do
+            if (echo > /dev/tcp/127.0.0.1/5672) >/dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Run live RabbitMQ guarantees
+        env:
+          RABBITMQ_TEST_URL: amqp://flashmarket:flashmarket@127.0.0.1:5672/flashmarket
+        run: >-
+          uv run --project shared/rabbitmq_reliability pytest
+          shared/rabbitmq_reliability/tests/integration -m integration -v
+          --confcutdir=shared/rabbitmq_reliability
+
+      - name: Restart RabbitMQ during confirmed load
+        env:
+          RABBITMQ_TEST_URL: amqp://flashmarket:flashmarket@127.0.0.1:5672/flashmarket
+        run: |
+          uv run --project shared/rabbitmq_reliability python scripts/rabbitmq_chaos_probe.py --total 100 --rate 20 >/tmp/chaos-probe.log 2>&1 &
+          probe_pid=$!
+          for attempt in $(seq 1 30); do
+            grep -q READY /tmp/chaos-probe.log && break
+            sleep 1
+          done
+          grep -q READY /tmp/chaos-probe.log
+          rabbit_id=$(docker ps --filter ancestor=rabbitmq:4.1-management-alpine --format '{{.ID}}' | head -n1)
+          test -n "$rabbit_id"
+          docker restart "$rabbit_id"
+          probe_status=0
+          wait "$probe_pid" || probe_status=$?
+          cat /tmp/chaos-probe.log
+          exit "$probe_status"
+
+      - name: Create service databases
+        env:
+          PGPASSWORD: flashmarket
+        run: |
+          for db in inventory orders payments notifications wishlist; do
+            psql -h 127.0.0.1 -U flashmarket -d postgres -v ON_ERROR_STOP=1 \
+              -c "CREATE DATABASE $db"
+          done
+
+      - name: Upgrade all consumer inbox migrations
+        run: |
+          INVENTORY_DATABASE_URL=postgresql+asyncpg://flashmarket:flashmarket@127.0.0.1:5432/inventory uv run --project inventory alembic -c inventory/alembic.ini upgrade head
+          ORDERS_DATABASE_URL=postgresql+asyncpg://flashmarket:flashmarket@127.0.0.1:5432/orders uv run --project orders alembic -c orders/alembic.ini upgrade head
+          PAYMENTS_DATABASE_URL=postgresql+asyncpg://flashmarket:flashmarket@127.0.0.1:5432/payments uv run --project payments alembic -c payments/alembic.ini upgrade head
+          NOTIFICATIONS_DATABASE_URL=postgresql+asyncpg://flashmarket:flashmarket@127.0.0.1:5432/notifications uv run --project notifications alembic -c notifications/alembic.ini upgrade head
+          WISHLIST_DATABASE_URL=postgresql+asyncpg://flashmarket:flashmarket@127.0.0.1:5432/wishlist uv run --project wishlist alembic -c wishlist/alembic.ini upgrade head
+
+      - name: Verify inbox tables
+        env:
+          PGPASSWORD: flashmarket
+        run: |
+          for db in inventory orders payments notifications wishlist; do
+            test "$(psql -h 127.0.0.1 -U flashmarket -d "$db" -Atc "select to_regclass('public.processed_events')")" = processed_events
+          done

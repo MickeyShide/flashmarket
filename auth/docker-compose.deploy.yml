@@ -97,15 +97,20 @@ services:
     init: true
     stop_grace_period: 20s
     logging: *bounded-logging
+    networks:
+      backend:
+        aliases: [auth-cleanup]
     command:
       - cleanup
-      - sh
-      - -c
-      - while true; do .venv/bin/python -m auth_service.cli cleanup-expired && .venv/bin/python -c "from rabbitmq_reliability import touch_heartbeat; touch_heartbeat('/tmp/flashmarket-heartbeat.json', 'tick_complete')"; sleep 3600; done
+      - python
+      - -m
+      - auth_service.cleanup_worker
     depends_on:
       api:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      flashmarket.autoheal: "true"
     healthcheck:
       test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "3700"]
       interval: 60s
@@ -121,6 +126,9 @@ services:
     init: true
     stop_grace_period: 20s
     logging: *bounded-logging
+    networks:
+      backend:
+        aliases: [auth-outbox]
     command:
       - outbox
       - auth_service.outbox_worker
@@ -128,8 +136,10 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      flashmarket.autoheal: "true"
     healthcheck:
-      test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "45"]
+      test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${AUTH_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
       interval: 15s
       timeout: 3s
       retries: 3

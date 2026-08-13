@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from orders.api.dependencies import get_verifier
 from orders.api.error_handlers import order_error_handler
 from orders.api.routes import health, metrics, orders, promocodes
 from orders.config import get_settings
@@ -16,9 +17,6 @@ from orders.observability import (
     request_observability_middleware,
     setup_metrics,
 )
-
-
-from orders.api.dependencies import get_verifier
 
 
 @asynccontextmanager

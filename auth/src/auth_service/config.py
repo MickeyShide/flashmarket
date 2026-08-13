@@ -13,10 +13,12 @@ def resolve_url_ipv4(url_str: str) -> str:
         parsed = urlsplit(url_str)
         if parsed.hostname and not parsed.hostname.replace(".", "").isdigit():
             port = parsed.port or 5432
-            infos = socket.getaddrinfo(parsed.hostname, port, family=socket.AF_INET, type=socket.SOCK_STREAM)
+            infos = socket.getaddrinfo(
+                parsed.hostname, port, family=socket.AF_INET, type=socket.SOCK_STREAM
+            )
             if infos:
                 ip = infos[0][4][0]
-                netloc = parsed.netloc.replace(parsed.hostname, ip, 1)
+                netloc = parsed.netloc.replace(parsed.hostname, str(ip), 1)
                 return urlunsplit(parsed._replace(netloc=netloc))
     except Exception:
         pass
@@ -47,6 +49,14 @@ class Settings(BaseSettings):
     rabbitmq_exchange: str = "flashmarket.events"
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
+    rabbitmq_publish_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
+    rabbitmq_retry_delays_seconds: tuple[int, int, int] = (5, 30, 120)
+    rabbitmq_reconnect_initial_seconds: float = Field(default=1.0, gt=0, le=60)
+    rabbitmq_reconnect_max_seconds: float = Field(default=30.0, gt=0, le=600)
+    outbox_claim_lease_seconds: int = Field(default=30, ge=5, le=600)
+    outbox_max_backoff_seconds: float = Field(default=300.0, ge=1, le=3600)
+    worker_heartbeat_interval_seconds: float = Field(default=10.0, ge=1, le=60)
+    worker_heartbeat_stale_seconds: int = Field(default=45, ge=10, le=600)
     password_work_concurrency: int = Field(default=2, ge=1, le=8)
     password_work_acquire_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
 
@@ -94,7 +104,7 @@ class Settings(BaseSettings):
     audit_retention_days: int = Field(default=365, ge=30, le=3650)
 
     @model_validator(mode="after")
-    def validate_production_settings(self) -> "Settings":
+    def validate_production_settings(self) -> Settings:
         """Validate production settings."""
         if self.environment != "production":
             return self
@@ -110,7 +120,9 @@ class Settings(BaseSettings):
             errors.append("wildcard CORS origins are forbidden")
         if "*" in self.trusted_hosts:
             errors.append("wildcard trusted hosts are forbidden")
-        if "flashmarket:flashmarket@" in self.database_url or (":shide@" in self.database_url and "shide-postgres" in self.database_url):
+        if "flashmarket:flashmarket@" in self.database_url or (
+            ":shide@" in self.database_url and "shide-postgres" in self.database_url
+        ):
             errors.append("default database credentials are forbidden")
         db_is_internal = self.allow_insecure_internal_services
         if "localhost" in self.database_url or "127.0.0.1" in self.database_url:
@@ -119,21 +131,21 @@ class Settings(BaseSettings):
             errors.append("AUTH_DATABASE_URL must use TLS (sslmode)")
         if "localhost" in self.redis_url or "127.0.0.1" in self.redis_url:
             errors.append("AUTH_REDIS_URL must point to production Redis")
-        redis_is_internal = (
-            self.allow_insecure_internal_services
-            and urlsplit(self.redis_url).hostname in {"redis", "shide-redis", "192.168.64.4"}
-        )
+        redis_is_internal = self.allow_insecure_internal_services and urlsplit(
+            self.redis_url
+        ).hostname in {"redis", "shide-redis", "192.168.64.4"}
         if not self.redis_url.startswith("rediss://") and not redis_is_internal:
             errors.append("AUTH_REDIS_URL must use TLS (rediss://)")
         if "localhost" in self.rabbitmq_url or "127.0.0.1" in self.rabbitmq_url:
             errors.append("AUTH_RABBITMQ_URL must point to production RabbitMQ")
-        rabbitmq_is_internal = (
-            self.allow_insecure_internal_services
-            and urlsplit(self.rabbitmq_url).hostname in {"rabbitmq", "shide-rabbitmq", "192.168.64.4"}
-        )
+        rabbitmq_is_internal = self.allow_insecure_internal_services and urlsplit(
+            self.rabbitmq_url
+        ).hostname in {"rabbitmq", "shide-rabbitmq", "192.168.64.4"}
         if not self.rabbitmq_url.startswith("amqps://") and not rabbitmq_is_internal:
             errors.append("AUTH_RABBITMQ_URL must use TLS (amqps://)")
-        if "flashmarket:flashmarket@" in self.rabbitmq_url or (":shide@" in self.rabbitmq_url and "shide-rabbitmq" in self.rabbitmq_url):
+        if "flashmarket:flashmarket@" in self.rabbitmq_url or (
+            ":shide@" in self.rabbitmq_url and "shide-rabbitmq" in self.rabbitmq_url
+        ):
             errors.append("default RabbitMQ credentials are forbidden")
 
         if self.refresh_token_transport == "cookie" and not self.refresh_cookie_secure:
@@ -148,7 +160,7 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def resolve_dns_ipv4(self) -> "Settings":
+    def resolve_dns_ipv4(self) -> Settings:
         if self.database_url:
             self.database_url = resolve_url_ipv4(self.database_url)
         return self

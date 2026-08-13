@@ -1,19 +1,18 @@
 """FastAPI dependency injection wiring."""
 
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
+from jwt_verifier import JWTVerifier, Principal, create_auth_dependencies
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from orders.application.services.order import OrderService
 from orders.application.services.promocode import PromocodeService
+from orders.config import get_settings
 from orders.infrastructure.database import get_db
 from orders.infrastructure.repositories.order import OrderRepository, OutboxRepository
 from orders.infrastructure.repositories.promocode import PromocodeRepository
-
-from functools import lru_cache
-from jwt_verifier import JWTVerifier, Principal, create_auth_dependencies
-from orders.config import get_settings
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -29,7 +28,9 @@ def get_verifier() -> JWTVerifier:
     )
 
 
-get_optional_principal, get_current_principal, require_admin = create_auth_dependencies(get_verifier)
+get_optional_principal, get_current_principal, require_admin = create_auth_dependencies(
+    get_verifier
+)
 
 OptionalPrincipal = Annotated[Principal | None, Depends(get_optional_principal)]
 CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]

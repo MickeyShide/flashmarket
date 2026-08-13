@@ -18,7 +18,7 @@ def resolve_url_ipv4(url_str: str) -> str:
             )
             if infos:
                 ip = infos[0][4][0]
-                netloc = parsed.netloc.replace(parsed.hostname, ip, 1)
+                netloc = parsed.netloc.replace(parsed.hostname, str(ip), 1)
                 return urlunsplit(parsed._replace(netloc=netloc))
     except Exception:
         pass
@@ -49,11 +49,21 @@ class Settings(BaseSettings):
     rabbitmq_exchange: str = "flashmarket.events"
     outbox_batch_size: int = 50
     outbox_poll_interval_seconds: float = 1.0
+    rabbitmq_publish_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
+    rabbitmq_retry_delays_seconds: tuple[int, int, int] = (5, 30, 120)
+    rabbitmq_reconnect_initial_seconds: float = Field(default=1.0, gt=0, le=60)
+    rabbitmq_reconnect_max_seconds: float = Field(default=30.0, gt=0, le=600)
+    outbox_claim_lease_seconds: int = Field(default=30, ge=5, le=600)
+    outbox_max_backoff_seconds: float = Field(default=300.0, ge=1, le=3600)
+    worker_heartbeat_interval_seconds: float = Field(default=10.0, ge=1, le=60)
+    worker_heartbeat_stale_seconds: int = Field(default=45, ge=10, le=600)
     log_file_path: str | None = None
     log_level: str = "INFO"
     prometheus_multiproc_dir: str | None = None
     docs_enabled: bool = True
-    trusted_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "test", "testserver"])
+    trusted_hosts: list[str] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "test", "testserver"]
+    )
     cors_origins: list[str] = Field(default_factory=list)
     allow_insecure_internal_services: bool = False
     jwt_public_key_dir: Path = Path("keys/public")
@@ -62,7 +72,7 @@ class Settings(BaseSettings):
     jwt_audience: str = "flashmarket-api"
 
     @model_validator(mode="after")
-    def validate_production_settings(self) -> "Settings":
+    def validate_production_settings(self) -> Settings:
         """Enforce strict settings in production."""
         if self.environment != "production":
             return self
@@ -86,7 +96,7 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def resolve_dns_ipv4(self) -> "Settings":
+    def resolve_dns_ipv4(self) -> Settings:
         if self.database_url:
             self.database_url = resolve_url_ipv4(self.database_url)
         return self

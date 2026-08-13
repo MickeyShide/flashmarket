@@ -23,7 +23,7 @@ class CreateDropRequest(BaseModel):
     payment_timeout_seconds: int = Field(default=300, ge=60, le=3600)
 
     @model_validator(mode="after")
-    def validate_time_range(self) -> "CreateDropRequest":
+    def validate_time_range(self) -> CreateDropRequest:
         if self.ends_at <= self.starts_at:
             raise ValueError("ends_at must be after starts_at")
         return self
@@ -44,7 +44,7 @@ class UpdateDropRequest(BaseModel):
     payment_timeout_seconds: int | None = Field(default=None, ge=60, le=3600)
 
     @model_validator(mode="after")
-    def validate_time_range(self) -> "UpdateDropRequest":
+    def validate_time_range(self) -> UpdateDropRequest:
         if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
             raise ValueError("ends_at must be after starts_at")
         return self

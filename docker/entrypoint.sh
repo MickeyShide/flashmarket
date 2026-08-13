@@ -6,13 +6,13 @@ CMD="$1"
 ensure_prometheus_dir() {
     if [ -n "${PROMETHEUS_MULTIPROC_DIR:-}" ]; then
         mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
-        rm -f "$PROMETHEUS_MULTIPROC_DIR"/*.db
     fi
 }
 
 case "$CMD" in
   api)
     export FLASHMARKET_PROCESS_ROLE=api
+    ensure_prometheus_dir
     echo "Ensuring shared infrastructure resources..."
     python /app/docker/init-infra.py
     echo "Running database migrations (alembic upgrade head)..."

@@ -44,13 +44,16 @@ services:
     stop_grace_period: 20s
     logging: *bounded-logging
     networks:
-      - backend
+      backend:
+        aliases: [drops-scheduler]
     command:
       - consumer
       - drops.scheduler
     restart: unless-stopped
+    labels:
+      flashmarket.autoheal: "true"
     healthcheck:
-      test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "45"]
+      test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${DROPS_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
       interval: 15s
       timeout: 3s
       retries: 3
@@ -65,13 +68,16 @@ services:
     stop_grace_period: 20s
     logging: *bounded-logging
     networks:
-      - backend
+      backend:
+        aliases: [drops-outbox]
     command:
       - outbox
       - drops.outbox_worker
     restart: unless-stopped
+    labels:
+      flashmarket.autoheal: "true"
     healthcheck:
-      test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "45"]
+      test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${DROPS_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
       interval: 15s
       timeout: 3s
       retries: 3

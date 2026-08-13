@@ -1,0 +1,13 @@
+[Unit]
+Description=Restart unhealthy opted-in FlashMarket background workers
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/flashmarket/scripts/flashmarket_worker_watchdog.py
+User=root
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flashmarket

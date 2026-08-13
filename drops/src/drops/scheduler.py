@@ -70,7 +70,7 @@ async def main() -> None:
         except Exception:
             logger.exception("Error in scheduler tick")
         else:
-            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "tick_complete")
+            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "drops_scheduler")
         await asyncio.sleep(10)
 
 

@@ -23,10 +23,10 @@ COPY auth/scripts ./scripts
 COPY docker/init-infra.py ./docker/init-infra.py
 COPY docker/entrypoint.sh ./docker/entrypoint.sh
 
-RUN uv sync --frozen --no-dev --no-editable && \
+RUN mkdir -p /tmp/prometheus && uv sync --frozen --no-dev --no-editable && \
     sed -i 's/\r$//' ./docker/entrypoint.sh && \
     chmod +x ./docker/entrypoint.sh && \
-    chown -R app:app /app
+    chown -R app:app /app /tmp/prometheus
 
 RUN mkdir -p \
         /var/lib/flashmarket-auth/keys/private \

@@ -1,0 +1,49 @@
+# Merge these jobs and the rule_files entry into the host Prometheus configuration.
+rule_files:
+  - /etc/prometheus/rules/flashmarket-reliability.rules.yml
+
+scrape_configs:
+  - job_name: rabbitmq-flashmarket-node
+    metrics_path: /metrics
+    static_configs:
+      - targets: [shide-rabbitmq:15692]
+
+  - job_name: rabbitmq-flashmarket-queues
+    metrics_path: /metrics/detailed
+    params:
+      family: [queue_coarse_metrics, queue_consumer_count]
+      vhost: [flashmarket]
+    static_configs:
+      - targets: [shide-rabbitmq:15692]
+
+  - job_name: flashmarket-services
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - auth:8000
+          - inventory:8000
+          - orders:8000
+          - payments:8000
+          - notifications:8000
+          - wishlist:8000
+          - drops:8000
+
+  - job_name: flashmarket-workers
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - inventory-consumer:9100
+          - inventory-outbox:9100
+          - inventory-expiry:9100
+          - orders-consumer:9100
+          - orders-outbox:9100
+          - payments-consumer:9100
+          - payments-outbox:9100
+          - notifications-consumer:9100
+          - notifications-outbox:9100
+          - wishlist-consumer:9100
+          - wishlist-outbox:9100
+          - drops-scheduler:9100
+          - drops-outbox:9100
+          - auth-outbox:9100
+          - auth-cleanup:9100

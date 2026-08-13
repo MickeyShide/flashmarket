@@ -39,7 +39,7 @@ async def run() -> None:
             except Exception:
                 logger.exception("Reservation expiry tick failed")
             else:
-                touch_heartbeat("/tmp/flashmarket-heartbeat.json", "tick_complete")
+                touch_heartbeat("/tmp/flashmarket-heartbeat.json", "inventory_expiry")
             await asyncio.sleep(settings.expiry_poll_interval_seconds)
     finally:
         await redis_client.aclose()

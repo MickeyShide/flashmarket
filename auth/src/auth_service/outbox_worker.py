@@ -4,9 +4,10 @@ import logging
 
 import aio_pika
 from aio_pika import DeliveryMode, ExchangeType, Message
-from aio_pika.abc import AbstractRobustExchange
+from aio_pika.abc import AbstractExchange
 from rabbitmq_reliability import (
     claim_outbox_event,
+    observe_outbox_age,
     publish_confirmed,
     record_outbox_result,
     run_forever,
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 async def publish_outbox_batch(
-    exchange: AbstractRobustExchange,
+    exchange: AbstractExchange,
     *,
     session_factory: async_sessionmaker[AsyncSession] = SessionFactory,
 ) -> int:
@@ -31,7 +32,12 @@ async def publish_outbox_batch(
     settings = get_settings()
     processed = 0
     for _ in range(settings.outbox_batch_size):
-        claimed = await claim_outbox_event(session_factory, OutboxEvent, utc_now())
+        claimed = await claim_outbox_event(
+            session_factory,
+            OutboxEvent,
+            utc_now(),
+            lease_seconds=settings.outbox_claim_lease_seconds,
+        )
         if claimed is None:
             break
         event, token = claimed
@@ -53,7 +59,7 @@ async def publish_outbox_batch(
                     },
                 ),
                 f"identity.{event.event_type}",
-                timeout_seconds=5.0,
+                timeout_seconds=settings.rabbitmq_publish_timeout_seconds,
                 mandatory=False,
             )
         except asyncio.CancelledError:
@@ -61,7 +67,15 @@ async def publish_outbox_batch(
         except Exception as exc:
             error = exc
             logger.warning("Failed to publish outbox event %s: %s", event.id, exc)
-        await record_outbox_result(session_factory, OutboxEvent, event.id, token, utc_now(), error)
+        await record_outbox_result(
+            session_factory,
+            OutboxEvent,
+            event.id,
+            token,
+            utc_now(),
+            error,
+            max_backoff_seconds=settings.outbox_max_backoff_seconds,
+        )
         processed += 1
     return processed
 
@@ -91,7 +105,8 @@ async def run_connected_worker() -> None:
                 continue
             if processed:
                 logger.info("Processed %d outbox event(s)", processed)
-            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "poll_complete")
+            await observe_outbox_age(SessionFactory, OutboxEvent, utc_now(), "auth")
+            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "auth_outbox")
             await asyncio.sleep(settings.outbox_poll_interval_seconds)
 
 
@@ -100,7 +115,8 @@ async def run_worker() -> None:
     settings = get_settings()
     await run_forever(
         run_connected_worker,
-        initial_delay=settings.outbox_poll_interval_seconds,
+        initial_delay=settings.rabbitmq_reconnect_initial_seconds,
+        max_delay=settings.rabbitmq_reconnect_max_seconds,
         label="Auth outbox",
     )
 

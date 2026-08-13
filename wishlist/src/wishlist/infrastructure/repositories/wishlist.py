@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from wishlist.infrastructure.models import OutboxEventModel, WishlistItemModel
@@ -35,6 +37,7 @@ class WishlistRepository:
             WishlistItemModel.product_id == product_id,
         )
         result = await self._session.execute(stmt)
+        assert isinstance(result, CursorResult)
         return bool(result.rowcount > 0)
 
     async def get_by_user(self, user_id: UUID, limit: int, offset: int) -> WishlistPage:
@@ -112,11 +115,6 @@ class WishlistRepository:
         staged = 0
         for user_id in user_ids:
             event_key = f"drop:{drop_id}:user:{user_id}"
-            exists = await self._session.scalar(
-                select(OutboxEventModel.id).where(OutboxEventModel.event_key == event_key)
-            )
-            if exists is not None:
-                continue
             payload = {
                 "event_key": event_key,
                 "user_id": str(user_id),
@@ -124,13 +122,17 @@ class WishlistRepository:
                 "drop_name": drop_name,
                 "drop_slug": drop_slug,
             }
-            self._session.add(
-                OutboxEventModel(
-                    event_key=event_key,
-                    event_type="DropAvailable",
-                    payload=json.dumps(payload, separators=(",", ":")),
-                )
-            )
+            try:
+                async with self._session.begin_nested():
+                    self._session.add(
+                        OutboxEventModel(
+                            event_key=event_key,
+                            event_type="DropAvailable",
+                            payload=json.dumps(payload, separators=(",", ":")),
+                        )
+                    )
+                    await self._session.flush()
+            except IntegrityError:
+                continue
             staged += 1
-        await self._session.flush()
         return staged

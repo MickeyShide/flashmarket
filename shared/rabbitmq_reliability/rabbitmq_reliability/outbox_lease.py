@@ -10,13 +10,39 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .delivery import sanitize_error
+from .metrics import OUTBOX_OLDEST_PENDING
 from .outbox import retry_backoff_seconds
 
 logger = logging.getLogger(__name__)
+
+
+async def observe_outbox_age(
+    session_factory: async_sessionmaker[AsyncSession],
+    model: Any,
+    now: datetime,
+    service: str,
+) -> float:
+    """Update and return the age of the oldest pending outbox row."""
+    status_column = getattr(model, "status", None)
+    pending_filter = (
+        status_column.in_(["pending", "failed"])
+        if status_column is not None
+        else model.published_at.is_(None)
+    )
+    timestamp_column = getattr(model, "created_at", None)
+    if timestamp_column is None:
+        timestamp_column = model.occurred_at
+    async with session_factory() as db:
+        oldest = await db.scalar(select(func.min(timestamp_column)).where(pending_filter))
+    if oldest is not None and oldest.tzinfo is None and now.tzinfo is not None:
+        oldest = oldest.replace(tzinfo=now.tzinfo)
+    age = max(0.0, (now - oldest).total_seconds()) if oldest is not None else 0.0
+    OUTBOX_OLDEST_PENDING.labels(service).set(age)
+    return age
 
 
 async def claim_outbox_event(
@@ -61,6 +87,8 @@ async def record_outbox_result(
     token: uuid.UUID,
     now: datetime,
     error: Exception | None,
+    *,
+    max_backoff_seconds: float = 300.0,
 ) -> bool:
     """Record the result only when the caller still owns the event lease."""
     async with session_factory() as db, db.begin():
@@ -83,6 +111,8 @@ async def record_outbox_result(
             if hasattr(event, "status"):
                 event.status = "failed"
             event.published_at = None
-            event.next_attempt_at = now + timedelta(seconds=retry_backoff_seconds(event.attempts))
+            event.next_attempt_at = now + timedelta(
+                seconds=retry_backoff_seconds(event.attempts, maximum=max_backoff_seconds)
+            )
             event.last_error = sanitize_error(error)
     return True

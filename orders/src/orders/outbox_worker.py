@@ -10,6 +10,7 @@ from aio_pika import DeliveryMode, ExchangeType, Message
 from aio_pika.abc import AbstractExchange
 from rabbitmq_reliability import (
     claim_outbox_event,
+    observe_outbox_age,
     publish_confirmed,
     record_outbox_result,
     run_forever,
@@ -42,7 +43,12 @@ async def publish_outbox_batch(
     settings = get_settings()
     processed = 0
     for _ in range(settings.outbox_batch_size):
-        claimed = await claim_outbox_event(session_factory, OutboxEventModel, utc_now())
+        claimed = await claim_outbox_event(
+            session_factory,
+            OutboxEventModel,
+            utc_now(),
+            lease_seconds=settings.outbox_claim_lease_seconds,
+        )
         if claimed is None:
             break
         event, token = claimed
@@ -64,7 +70,7 @@ async def publish_outbox_batch(
                     headers={"event_id": str(event.id)},
                 ),
                 routing_key,
-                timeout_seconds=5.0,
+                timeout_seconds=settings.rabbitmq_publish_timeout_seconds,
             )
         except asyncio.CancelledError:
             raise
@@ -72,7 +78,13 @@ async def publish_outbox_batch(
             error = exc
             logger.warning("Failed to publish outbox event %s: %s", event.id, exc)
         await record_outbox_result(
-            session_factory, OutboxEventModel, event.id, token, utc_now(), error
+            session_factory,
+            OutboxEventModel,
+            event.id,
+            token,
+            utc_now(),
+            error,
+            max_backoff_seconds=settings.outbox_max_backoff_seconds,
         )
         processed += 1
     return processed
@@ -103,7 +115,8 @@ async def run_connected_worker() -> None:
                 continue
             if processed:
                 logger.info("Processed %d outbox event(s)", processed)
-            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "poll_complete")
+            await observe_outbox_age(SessionFactory, OutboxEventModel, utc_now(), "orders")
+            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "orders_outbox")
             await asyncio.sleep(settings.outbox_poll_interval_seconds)
 
 
@@ -112,7 +125,8 @@ async def run_worker() -> None:
     settings = get_settings()
     await run_forever(
         run_connected_worker,
-        initial_delay=settings.outbox_poll_interval_seconds,
+        initial_delay=settings.rabbitmq_reconnect_initial_seconds,
+        max_delay=settings.rabbitmq_reconnect_max_seconds,
         label="Orders outbox",
     )
 

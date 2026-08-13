@@ -156,3 +156,11 @@ class OutboxEventModel(Base):
     last_error: Mapped[str | None] = mapped_column(Text)
     claim_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProcessedEventModel(Base):
+    __tablename__ = "processed_events"
+
+    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    routing_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

@@ -8,6 +8,11 @@
    claim columns and create the Wishlist transactional outbox.
 3. Start consumers before outbox relays so strict mandatory routes exist immediately.
 4. Verify every consumer, outbox, scheduler and cleanup container is `healthy`.
+5. Install the host watchdog once as root:
+   `sh scripts/install-worker-watchdog.sh /opt/flashmarket`.
+6. Mount `deploy/prometheus/flashmarket-reliability.rules.yml` into Prometheus and merge
+   `deploy/prometheus/scrape-config.example.yml` into its configuration. Route both
+   `warning` and `critical` alerts to the production Alertmanager receiver.
 
 ## Fast checks
 
@@ -21,7 +26,9 @@ docker exec shide-rabbitmq rabbitmqctl list_connections -p flashmarket \
 
 Expected retry queues end in `.retry.1`, `.retry.2`, `.retry.3`; poison messages end in
 `.dlq`. A non-zero DLQ is actionable. A retry queue may be briefly non-zero while its TTL
-is running.
+is running. Main and retry queues are capped at 20,000 messages/128 MiB; DLQs are capped
+at 50,000 messages/256 MiB. A full retry/DLQ rejects new publications instead of consuming
+unbounded broker memory.
 
 ## Outbox diagnosis
 
@@ -44,6 +51,29 @@ first and let scheduled retries deliver them.
 
 Never bulk replay a DLQ into the main queue while the underlying failure remains; the
 bounded retry chain will otherwise amplify load during an outage.
+
+Use the guarded utility from any service image (credentials are read from `RABBITMQ_URL`):
+
+```bash
+flashmarket-dlq orders.events.dlq status
+flashmarket-dlq orders.events.dlq replay --limit 20
+flashmarket-dlq orders.events.dlq replay --limit 20 --yes
+```
+
+The middle command is intentionally a dry run. The final command republishes one message
+at a time with mandatory routing and publisher confirms, then acknowledges the DLQ copy.
+
+## Watchdog checks
+
+```bash
+systemctl status flashmarket-worker-watchdog.timer
+journalctl -u flashmarket-worker-watchdog.service --since -1h
+cat /var/lib/flashmarket/worker-watchdog.json
+```
+
+Only unhealthy containers with `flashmarket.autoheal=true` are eligible. Restarts are
+rate-limited to one per container every five minutes, so a bad deploy cannot create a hot
+restart loop.
 
 ## Suggested alerts
 

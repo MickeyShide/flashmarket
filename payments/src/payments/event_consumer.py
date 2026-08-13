@@ -15,8 +15,10 @@ from aio_pika.abc import AbstractIncomingMessage
 from rabbitmq_reliability import (
     PermanentMessageError,
     ReliabilityConfig,
+    begin_event_once,
     declare_consumer_topology,
     decode_json_object,
+    delivery_identity,
     original_routing_key,
     periodic_heartbeat,
     process_with_retries,
@@ -27,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from payments.config import get_settings
 from payments.domain.entities import PaymentStatus
 from payments.infrastructure.database import SessionFactory, engine
-from payments.infrastructure.models import PaymentModel
+from payments.infrastructure.models import PaymentModel, ProcessedEventModel
 from payments.infrastructure.repositories.payment import PaymentRepository
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,14 @@ async def process_message(
         raise PermanentMessageError(f"unsupported routing key: {routing_key}")
     try:
         async with session_factory() as session, session.begin():
+            if not await begin_event_once(
+                session,
+                ProcessedEventModel,
+                event_id=delivery_identity(message, routing_key),
+                routing_key=routing_key,
+            ):
+                logger.info("Skipping duplicate event %s", delivery_identity(message, routing_key))
+                return
             await handler(session, body)
     except (KeyError, TypeError, ValueError) as exc:
         raise PermanentMessageError("invalid payments event payload") from exc
@@ -96,6 +106,7 @@ async def process_message(
 async def run_consumer() -> None:
     """Connect to RabbitMQ and consume saga events."""
     settings = get_settings()
+    reliability = ReliabilityConfig.from_settings(settings)
     connection = await aio_pika.connect_robust(settings.rabbitmq_url)
     async with connection:
         channel = await connection.channel(publisher_confirms=True, on_return_raises=True)
@@ -110,9 +121,13 @@ async def run_consumer() -> None:
             queue_name="payments.events",
             topic_exchange=exchange,
             routing_keys=("orders.PaymentRequested",),
-            config=ReliabilityConfig(),
+            config=reliability,
         )
-        async with periodic_heartbeat("/tmp/flashmarket-heartbeat.json"):
+        async with periodic_heartbeat(
+            "/tmp/flashmarket-heartbeat.json",
+            interval_seconds=settings.worker_heartbeat_interval_seconds,
+            phase="payments_consumer",
+        ):
             async with topology.queue.iterator() as iterator:
                 async for message in iterator:
                     try:
@@ -120,7 +135,7 @@ async def run_consumer() -> None:
                             message,
                             handler=process_message,
                             topology=topology,
-                            config=ReliabilityConfig(),
+                            config=reliability,
                         )
                     except asyncio.CancelledError:
                         raise
@@ -131,7 +146,13 @@ async def run_consumer() -> None:
 async def run() -> None:
     """Start the consumer coroutine."""
     try:
-        await run_forever(run_consumer, label="Payments consumer")
+        settings = get_settings()
+        await run_forever(
+            run_consumer,
+            initial_delay=settings.rabbitmq_reconnect_initial_seconds,
+            max_delay=settings.rabbitmq_reconnect_max_seconds,
+            label="Payments consumer",
+        )
     finally:
         await engine.dispose()
 

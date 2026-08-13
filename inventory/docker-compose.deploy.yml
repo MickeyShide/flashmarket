@@ -64,14 +64,19 @@ services:
     init: true
     stop_grace_period: 20s
     logging: *bounded-logging
+    networks:
+      backend:
+        aliases: [inventory-consumer]
     environment: *inventory-environment
     command:
       - consumer
       - inventory.event_consumer
     depends_on: {}
     restart: unless-stopped
+    labels:
+      flashmarket.autoheal: "true"
     healthcheck: &worker-health
-      test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "45"]
+      test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${INVENTORY_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
       interval: 15s
       timeout: 3s
       retries: 3
@@ -85,12 +90,17 @@ services:
     init: true
     stop_grace_period: 20s
     logging: *bounded-logging
+    networks:
+      backend:
+        aliases: [inventory-outbox]
     environment: *inventory-environment
     command:
       - outbox
       - inventory.outbox_worker
     depends_on: {}
     restart: unless-stopped
+    labels:
+      flashmarket.autoheal: "true"
     healthcheck: *worker-health
 
   expiry:
@@ -101,6 +111,9 @@ services:
     init: true
     stop_grace_period: 20s
     logging: *bounded-logging
+    networks:
+      backend:
+        aliases: [inventory-expiry]
     environment: *inventory-environment
     command:
       - cleanup
@@ -109,6 +122,8 @@ services:
       - inventory.expiry_worker
     depends_on: {}
     restart: unless-stopped
+    labels:
+      flashmarket.autoheal: "true"
     healthcheck: *worker-health
 
   nginx:

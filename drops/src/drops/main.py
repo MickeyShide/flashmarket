@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from drops.api.dependencies import get_verifier
 from drops.api.error_handlers import drops_error_handler
 from drops.api.routes import admin, drops, health, metrics
 from drops.config import get_settings
@@ -16,9 +17,6 @@ from drops.observability import (
     request_observability_middleware,
     setup_metrics,
 )
-
-
-from drops.api.dependencies import get_verifier
 
 
 @asynccontextmanager

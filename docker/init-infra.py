@@ -279,6 +279,42 @@ def _ensure_vhost_and_permissions(raw_url: str) -> None:
                 )
         print(f"Applied RabbitMQ queue policy '{policy_name}'")
 
+        for suffix, max_length, max_bytes in (
+            (r"\.retry\.[123]", 20_000, 128 * 1024 * 1024),
+            (r"\.dlq", 50_000, 256 * 1024 * 1024),
+        ):
+            kind = "retry" if "retry" in suffix else "dlq"
+            bounded_policy_name = f"flashmarket-{queue_name}-{kind}-limits"
+            bounded_policy_url = (
+                f"{base}/policies/{encoded_vhost}/"
+                f"{urllib.parse.quote(bounded_policy_name, safe='')}"
+            )
+            bounded_body = json.dumps(
+                {
+                    "pattern": f"^{re.escape(queue_name)}{suffix}$",
+                    "apply-to": "queues",
+                    "priority": 50,
+                    "definition": {
+                        "max-length": max_length,
+                        "max-length-bytes": max_bytes,
+                        "overflow": "reject-publish",
+                    },
+                }
+            ).encode("utf-8")
+            bounded_request = urllib.request.Request(
+                bounded_policy_url,
+                headers=headers,
+                method="PUT",
+                data=bounded_body,
+            )
+            with urllib.request.urlopen(bounded_request, timeout=10.0) as resp:
+                if resp.status not in (200, 201, 204):
+                    raise RuntimeError(
+                        f"RabbitMQ rejected queue policy '{bounded_policy_name}' "
+                        f"with HTTP {resp.status}"
+                    )
+            print(f"Applied RabbitMQ queue policy '{bounded_policy_name}'")
+
 
 @retry("Waiting for RabbitMQ management API")
 def ensure_rabbitmq_vhost() -> None:
