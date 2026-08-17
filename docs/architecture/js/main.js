@@ -1,144 +1,117 @@
 import architectureData from "../architecture-data.js";
-import { initFlows, initServices, renderHero } from "./core-explorers.js";
-import { initConcurrency, initInterview, initOutbox, renderDecisions } from "./labs.js";
-import { initSystemMap } from "./system-map.js";
-import { $, $$, createEntityIndex, entityLabel, escapeHtml } from "./utils.js";
+import { initServices } from "./core-explorers.js";
+import { initSystemMap, renderInspector } from "./system-map.js";
+import { $, $$, createEntityIndex } from "./utils.js";
 
 const data = architectureData;
 const index = createEntityIndex(data);
 
-function searchDocuments() {
-  const docs = [];
-  const add = (type, entity, subtitle, keywords = []) => docs.push({
-    type,
-    id: entity.id,
-    title: entityLabel(entity, entity.id),
-    subtitle,
-    haystack: [entityLabel(entity, entity.id), subtitle, ...keywords].join(" ").toLowerCase(),
-  });
+const SCENARIOS = {
+  buy: [
+    { from: "component-browser", to: "component-gateway", label: "[1/5] Client → Gateway: POST /api/v1/orders/checkout", target: "service-orders" },
+    { from: "component-gateway", to: "service-orders", label: "[2/5] Orders Service initializes checkout & requests inventory", target: "service-orders" },
+    { from: "service-orders", to: "service-inventory", label: "[3/5] Orders → Inventory: Atomic stock reservation query", target: "service-inventory" },
+    { from: "service-inventory", to: "component-postgres", label: "[4/5] Inventory DB: COMMIT (Stock -1) + INSERT outbox_events", target: "component-postgres" },
+    { from: "service-inventory", to: "component-rabbitmq", label: "[5/5] Outbox Relay publishes 'stock_reserved' → Payments & Notifications", target: "component-rabbitmq" },
+  ],
+  drop: [
+    { from: "component-browser", to: "service-drops", label: "[1/4] Client visits Drop Page at release time", target: "service-drops" },
+    { from: "service-drops", to: "component-redis", label: "[2/4] Drops reads cached countdown & allocation from Redis", target: "component-redis" },
+    { from: "service-drops", to: "service-inventory", label: "[3/4] Drops calls Inventory for flash reservation claim", target: "service-inventory" },
+    { from: "service-inventory", to: "component-postgres", label: "[4/4] PostgreSQL executes single-query atomic decrement", target: "component-postgres" },
+  ],
+  outbox: [
+    { from: "service-orders", to: "component-postgres", label: "[1/4] Orders executes BEGIN; UPDATE status; INSERT outbox; COMMIT;", target: "component-postgres" },
+    { from: "service-orders", to: "service-orders", label: "[2/4] PROCESS CRASH! Server dies before network publish.", target: "service-orders" },
+    { from: "service-orders", to: "component-postgres", label: "[3/4] Outbox relay restarts & claims pending row via SKIP LOCKED", target: "component-postgres" },
+    { from: "component-postgres", to: "component-rabbitmq", label: "[4/4] Relay sends confirmed event to RabbitMQ. Zero loss.", target: "component-rabbitmq" },
+  ],
+  cleanup: [
+    { from: "component-celery", to: "service-inventory", label: "[1/3] Celery Beat triggers periodic cleanup on /flashmarket-tasks", target: "component-celery" },
+    { from: "service-inventory", to: "component-postgres", label: "[2/3] Worker finds expired reservations (created > 15m ago)", target: "component-postgres" },
+    { from: "component-postgres", to: "service-inventory", label: "[3/3] Stock released back to available pool. State restored.", target: "service-inventory" },
+  ],
+};
 
-  data.services.forEach((item) => add("service", item, item.responsibility, [...item.owns, item.slug]));
-  data.events.forEach((item) => add("event", item, item.routingKey, [item.trigger, ...item.payloadFields]));
-  data.flows.forEach((item) => add("flow", item, item.summary, item.steps.flatMap((step) => [step.title, step.what])));
-  data.mechanisms.forEach((item) => add("mechanism", item, item.summary, [item.problem, ...item.guarantees]));
-  return docs;
-}
+function initScenarioRunner(map) {
+  const tabs = $$("[data-scenario]");
+  const playBtn = $("[data-play-flow]");
+  const prevBtn = $("[data-step-prev]");
+  const nextBtn = $("[data-step-next]");
+  const statusEl = $("[data-flow-status]");
+  if (!tabs.length || !statusEl) return;
 
-function initSearch(apis) {
-  const dialog = $("[data-search-dialog]");
-  const input = $("[data-search-input]");
-  const results = $("[data-search-results]");
-  if (!dialog || !input || !results) return;
+  let currentKey = "buy";
+  let stepIndex = 0;
+  let timer = null;
 
-  const documents = searchDocuments();
-  let dialogOpener = null;
+  function setStep(idx) {
+    const list = SCENARIOS[currentKey];
+    stepIndex = Math.max(0, Math.min(idx, list.length - 1));
+    const step = list[stepIndex];
+    statusEl.innerHTML = `<b>Step ${stepIndex + 1}/${list.length}:</b> ${step.label}`;
+    map.highlightRoute(step.from, step.to);
 
-  const open = () => {
-    dialogOpener = document.activeElement;
-    if (!dialog.open) dialog.showModal();
-    input.value = "";
-    results.innerHTML = "<p class='dim' style='padding:12px'>Search services, events, flows, and patterns…</p>";
-    window.setTimeout(() => input.focus(), 0);
-  };
-  const close = () => dialog.close();
+    if (prevBtn) prevBtn.disabled = stepIndex === 0;
+    if (nextBtn) nextBtn.disabled = stepIndex === list.length - 1;
 
-  function renderResults(query) {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      results.innerHTML = "<p class='dim' style='padding:12px'>Type to search…</p>";
-      return;
-    }
-    const terms = normalized.split(/\s+/).filter(Boolean);
-    const matches = documents
-      .map((doc) => ({
-        doc,
-        score: terms.reduce((score, term) => score + (doc.title.toLowerCase().includes(term) ? 4 : doc.haystack.includes(term) ? 1 : -10), 0)
-      }))
-      .filter(({ score }) => score >= terms.length)
-      .slice(0, 12)
-      .map(({ doc }) => doc);
-
-    results.innerHTML = matches.length
-      ? matches.map((item) => `
-        <button type="button" class="search-result" data-result-type="${item.type}" data-result-id="${item.id}">
-          <small>${item.type}</small>
-          <div>
-            <strong>${escapeHtml(item.title)}</strong>
-            <span>${escapeHtml(item.subtitle)}</span>
-          </div>
-        </button>`).join("")
-      : `<p class='dim' style='padding:12px'>No results found for “${escapeHtml(query)}”.</p>`;
+    const targetEntity = index.get(step.target);
+    if (targetEntity) renderInspector(targetEntity, data, index);
   }
 
-  function navigate(type, id) {
-    if (type === "service") { close(); apis.services.openService(id); return; }
-    if (type === "flow") {
-      close();
-      const select = $("[data-flow-select]");
-      if (select) { select.value = id; select.dispatchEvent(new Event("change")); }
-      $("#flows")?.scrollIntoView();
+  function play() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+      if (playBtn) playBtn.textContent = "▶ Play Animation";
       return;
     }
-    if (type === "mechanism") {
-      close();
-      $("#highlights")?.scrollIntoView();
-      return;
-    }
+    if (playBtn) playBtn.textContent = "⏸ Pause";
+    const list = SCENARIOS[currentKey];
+    if (stepIndex >= list.length - 1) stepIndex = -1;
+
+    timer = setInterval(() => {
+      if (stepIndex < list.length - 1) {
+        setStep(stepIndex + 1);
+      } else {
+        clearInterval(timer);
+        timer = null;
+        if (playBtn) playBtn.textContent = "▶ Play Animation";
+      }
+    }, 1600);
   }
 
-  $("[data-search-open]")?.addEventListener("click", open);
-  $("[data-search-close]")?.addEventListener("click", close);
-  input.addEventListener("input", () => renderResults(input.value));
-  results.addEventListener("click", (e) => {
-    const res = e.target.closest("[data-result-id]");
-    if (res) navigate(res.dataset.resultType, res.dataset.resultId);
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      if (timer) { clearInterval(timer); timer = null; }
+      tabs.forEach((t) => t.classList.toggle("is-active", t === tab));
+      currentKey = tab.dataset.scenario;
+      setStep(0);
+      if (playBtn) playBtn.textContent = "▶ Play Animation";
+    });
   });
-  dialog.addEventListener("click", (e) => { if (e.target === dialog) close(); });
-  dialog.addEventListener("close", () => {
-    if (dialogOpener instanceof HTMLElement && dialogOpener.isConnected) dialogOpener.focus();
-  });
-  document.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-      e.preventDefault();
-      open();
-    }
-  });
-}
 
-function initSectionNavigation() {
-  const links = $$(".section-nav a");
-  const byId = new Map(links.map((l) => [l.hash.slice(1), l]));
-  const observer = new IntersectionObserver((entries) => {
-    const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-    if (!visible) return;
-    links.forEach((l) => l.classList.toggle("is-active", l === byId.get(visible.target.id)));
-  }, { rootMargin: "-20% 0px -60%", threshold: [0, .1, .4] });
-  byId.forEach((_, id) => { const sec = document.getElementById(id); if (sec) observer.observe(sec); });
-}
+  playBtn?.addEventListener("click", play);
+  prevBtn?.addEventListener("click", () => { if (timer) clearInterval(timer); setStep(stepIndex - 1); });
+  nextBtn?.addEventListener("click", () => { if (timer) clearInterval(timer); setStep(stepIndex + 1); });
 
-function validateRuntimeData() {
-  const required = ["services", "events", "connections", "flows", "databases", "queues", "evidence"];
-  const missing = required.filter((k) => !Array.isArray(data[k]));
-  if (missing.length) throw new Error(`Missing collections: ${missing.join(", ")}`);
+  setStep(0);
 }
 
 function start() {
-  validateRuntimeData();
-  renderHero(data);
   const services = initServices(data, index);
   const map = initSystemMap(data, index, { onOpenService: services.openService });
-  initFlows(data, index, { onStepChange: (nodeId) => map.focusNode(nodeId, { flow: true }) });
-  initOutbox(data, index);
-  initConcurrency();
-  renderDecisions(data, index);
-  initInterview(data, index);
-  initSearch({ services });
-  initSectionNavigation();
+  initScenarioRunner(map);
+
+  // Set default inspector to Inventory Service
+  const initial = index.get("service-inventory");
+  if (initial) renderInspector(initial, data, index);
+
   document.documentElement.classList.add("is-ready");
 }
 
 try {
   start();
 } catch (error) {
-  console.error("Architecture page failed to start", error);
+  console.error("Architecture Cockpit failed to start", error);
 }

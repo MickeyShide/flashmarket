@@ -3,171 +3,129 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Interactive architecture presentation for FlashMarket distributed marketplace.">
+    <meta name="description" content="FlashMarket Interactive Architecture Cockpit.">
     <meta name="theme-color" content="#ffffff">
     <link rel="icon" href="data:,">
-    <title>FlashMarket — Architecture</title>
+    <title>FlashMarket — Interactive Architecture</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,600;0,700;0,800;0,900;1,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to architecture</a>
+    <a class="skip-link" href="#cockpit">Skip to architecture cockpit</a>
 
-    <header class="site-header">
-      <a class="wordmark" href="#main">
-        <span class="wordmark__signal" aria-hidden="true"></span>
-        <span>FLASHMARKET</span>
-        <span class="wordmark__context">/ ARCHITECTURE</span>
-      </a>
+    <!-- TOP BAR -->
+    <header class="cockpit-header">
+      <div class="header-left">
+        <a class="wordmark" href="#cockpit">
+          <span class="wordmark__signal" aria-hidden="true"></span>
+          <span>FLASHMARKET</span>
+          <span class="wordmark__context">/ ARCHITECTURE COCKPIT</span>
+        </a>
+        <div class="system-pills">
+          <span class="sys-pill">9 Microservices</span>
+          <span class="sys-pill">PostgreSQL per service</span>
+          <span class="sys-pill">RabbitMQ Outbox</span>
+          <span class="sys-pill">Celery Workers</span>
+        </div>
+      </div>
 
-      <nav class="section-nav">
-        <a href="#system">Map</a>
-        <a href="#services">Services</a>
-        <a href="#flows">Flows</a>
-        <a href="#highlights">Highlights</a>
-        <a href="#labs">Labs</a>
-        <a href="#interview">Q&A</a>
-      </nav>
-
-      <div class="header-actions">
-        <a class="header-link" href="/dev">DEV HUB ↗</a>
-        <a class="header-link" href="/">STORE ↗</a>
-        <button class="search-trigger" type="button" data-search-open aria-haspopup="dialog">
-          <span>Search</span>
-          <kbd>⌘ K</kbd>
-        </button>
+      <div class="header-right">
+        <a class="nav-btn" href="/dev">DEV HUB ↗</a>
+        <a class="nav-btn" href="/">STORE ↗</a>
       </div>
     </header>
 
-    <main id="main">
-      <!-- 1. COMPACT HERO + SYSTEM TOPOLOGY -->
-      <section class="section hero-map-section" id="system">
-        <div class="hero-bar">
-          <div>
-            <p class="eyebrow">Distributed Marketplace Architecture</p>
-            <h1>FastAPI · PostgreSQL · RabbitMQ · Redis · Celery</h1>
-          </div>
-          <div class="quick-stats" data-hero-stats></div>
+    <!-- MAIN UNIFIED COCKPIT -->
+    <main id="cockpit" class="cockpit-layout">
+      <!-- 1. LIVE SCENARIO BAR -->
+      <section class="scenario-bar" aria-label="Interactive flow scenarios">
+        <div class="scenario-tabs">
+          <span class="scenario-label">⚡ RUN SCENARIO:</span>
+          <button type="button" class="scenario-btn is-active" data-scenario="buy">1. Buy & Checkout (Outbox + AMQP)</button>
+          <button type="button" class="scenario-btn" data-scenario="drop">2. Flash Sale Drop (Atomic Lock)</button>
+          <button type="button" class="scenario-btn" data-scenario="outbox">3. Outbox Crash & Recovery</button>
+          <button type="button" class="scenario-btn" data-scenario="cleanup">4. Celery Stock Cleanup</button>
         </div>
 
-        <div class="system-workbench">
-          <div class="map-shell">
-            <div class="map-toolbar">
-              <div class="map-legend">
-                <span><i class="legend-line legend-line--http"></i>HTTP</span>
-                <span><i class="legend-line legend-line--event"></i>Events (RabbitMQ)</span>
-                <span><i class="legend-line legend-line--data"></i>PostgreSQL</span>
-                <span><i class="legend-line legend-line--key"></i>Storage / Cache</span>
-              </div>
-              <div class="map-controls" data-map-filters></div>
+        <div class="scenario-player">
+          <button type="button" class="play-btn" data-play-flow>▶ Play Animation</button>
+          <button type="button" class="step-btn" data-step-prev disabled>←</button>
+          <button type="button" class="step-btn" data-step-next>→</button>
+          <div class="flow-status-text" data-flow-status>Ready. Click a scenario or step to trace data flow.</div>
+        </div>
+      </section>
+
+      <!-- 2. INTERACTIVE TOPOLOGY & INSPECTOR -->
+      <section class="workbench-grid">
+        <!-- Visual Map -->
+        <div class="map-viewport">
+          <div class="viewport-toolbar">
+            <div class="legend-items">
+              <span class="leg-item"><i class="leg-line leg-http"></i> HTTP (Sync)</span>
+              <span class="leg-item"><i class="leg-line leg-event"></i> RabbitMQ Events (Async)</span>
+              <span class="leg-item"><i class="leg-line leg-data"></i> PostgreSQL</span>
+              <span class="leg-item"><i class="leg-line leg-cache"></i> Redis / S3</span>
             </div>
-            <div class="architecture-map" data-system-map aria-label="FlashMarket topology map"></div>
-            <div class="map-help">Click any service to view its API, database tables, and published events.</div>
+            <div class="filter-buttons" data-map-filters></div>
           </div>
-          <aside class="connection-inspector" data-connection-inspector>
-            <p class="eyebrow">Connection Details</p>
-            <h3>Select a connection</h3>
-            <p>Hover or click any line on the map to inspect protocol, contract, and consistency.</p>
-          </aside>
+
+          <div class="architecture-canvas" data-system-map aria-label="Interactive Architecture Map"></div>
         </div>
+
+        <!-- Live Instant Inspector -->
+        <aside class="live-inspector" data-connection-inspector aria-live="polite">
+          <p class="eyebrow">Instant Inspector</p>
+          <h3 id="inspector-title">System Overview</h3>
+          <p class="inspector-desc">Hover or click any service or connection line to inspect its inbound/outbound contracts and DB queries.</p>
+          <div class="inspector-content" data-inspector-content></div>
+        </aside>
       </section>
 
-      <!-- 2. SERVICES OVERVIEW (COMPACT GRID) -->
-      <section class="section" id="services">
-        <div class="section-heading">
-          <p class="eyebrow">Services</p>
-          <h2>9 Microservices</h2>
-          <p>Each service owns a private PostgreSQL database and communicates via HTTP and RabbitMQ Outbox events.</p>
-        </div>
-        <div class="service-grid" data-service-grid></div>
-      </section>
-
-      <!-- 3. BUSINESS FLOWS -->
-      <section class="section" id="flows">
-        <div class="section-heading section-heading--split">
-          <div>
-            <p class="eyebrow">Workflows</p>
-            <h2>Core Business Flows</h2>
-            <p>End-to-end request pipelines showing transaction boundaries and event choreography.</p>
+      <!-- 3. CORE PATTERNS STRIP -->
+      <section class="patterns-strip" aria-label="Core Engineering Mechanisms">
+        <article class="pattern-card">
+          <div class="pat-header">
+            <strong>1. Atomic Stock Update</strong>
+            <code>PostgreSQL</code>
           </div>
-          <label class="field-label">Select flow
-            <select data-flow-select></select>
-          </label>
-        </div>
-        <div class="flow-player" data-flow-player></div>
-      </section>
+          <code>UPDATE stock SET available = available - 1 WHERE available >= 1</code>
+          <p>Prevents overselling under race conditions in a single query without distributed locks.</p>
+        </article>
 
-      <!-- 4. ENGINEERING HIGHLIGHTS -->
-      <section class="section" id="highlights">
-        <div class="section-heading">
-          <p class="eyebrow">Key Decisions</p>
-          <h2>Engineering Highlights</h2>
-          <p>Concrete backend solutions for concurrency, data consistency, and failure recovery without distributed locks.</p>
-        </div>
-        <div class="decision-grid" data-decision-grid></div>
-      </section>
+        <article class="pattern-card">
+          <div class="pat-header">
+            <strong>2. Transactional Outbox</strong>
+            <code>aio-pika relay</code>
+          </div>
+          <code>INSERT INTO outbox_events (...) in same DB transaction</code>
+          <p>Guarantees at-least-once message delivery even if the application server crashes after commit.</p>
+        </article>
 
-      <!-- 5. RELIABILITY LABS -->
-      <section class="section" id="labs">
-        <div class="section-heading">
-          <p class="eyebrow">Interactive Labs</p>
-          <h2>Outbox & Concurrency</h2>
-          <p>Live simulation of crash recovery and race conditions.</p>
-        </div>
-        <div class="labs-container">
-          <div class="lab-block">
-            <h3>Transactional Outbox Simulator</h3>
-            <p class="lab-desc">DB change and outbox event commit in the same transaction. The relay recovers pending events on restart.</p>
-            <div class="outbox-lab" data-outbox-lab></div>
+        <article class="pattern-card">
+          <div class="pat-header">
+            <strong>3. Idempotent Consumers</strong>
+            <code>RabbitMQ</code>
           </div>
-          <div class="lab-block">
-            <h3>Concurrency Race (Last Unit)</h3>
-            <p class="lab-desc">Two users race to purchase the last item. PostgreSQL atomic check ensures only one succeeds.</p>
-            <div class="concurrency-lab" data-concurrency-lab></div>
-          </div>
-        </div>
-      </section>
+          <code>UNIQUE (event_id, consumer_name)</code>
+          <p>Duplicate messages cause zero side effects via database deduplication keys.</p>
+        </article>
 
-      <!-- 6. INTERVIEW Q&A -->
-      <section class="section" id="interview">
-        <div class="section-heading section-heading--split">
-          <div>
-            <p class="eyebrow">Technical Q&A</p>
-            <h2>Interview Questions</h2>
-            <p>Whiteboard answers for architectural discussions.</p>
+        <article class="pattern-card">
+          <div class="pat-header">
+            <strong>4. Two-Tier Redis Strategy</strong>
+            <code>Redis + PG</code>
           </div>
-          <button class="button" type="button" data-expand-interview>Expand all</button>
-        </div>
-        <div class="interview-list" data-interview-list></div>
+          <code>Catalog: Fail-open to DB | Auth sessions: Fail-closed</code>
+          <p>High catalog throughput with strict security guarantees for user authorization.</p>
+        </article>
       </section>
     </main>
 
-    <footer class="site-footer">
-      <div><span class="wordmark__signal" aria-hidden="true"></span> FLASHMARKET ARCHITECTURE</div>
-      <p>9 Services · PostgreSQL · RabbitMQ · Redis · Celery</p>
-      <div class="footer-links">
-        <a href="/dev">DEV HUB ↗</a>
-        <a href="/">STORE ↗</a>
-        <a href="#main">TOP ↑</a>
-      </div>
-    </footer>
-
-    <!-- SERVICE DRAWER -->
-    <dialog class="side-dialog" data-service-dialog aria-label="Service details">
+    <!-- FULL SERVICE DRAWER (ON DEMAND) -->
+    <dialog class="side-dialog" data-service-dialog aria-label="Service Details Drawer">
       <div data-service-dialog-content></div>
-    </dialog>
-
-    <!-- SEARCH MODAL -->
-    <dialog class="search-dialog" data-search-dialog aria-labelledby="search-title">
-      <h2 class="sr-only" id="search-title">Search FlashMarket architecture</h2>
-      <div class="search-dialog__bar">
-        <span aria-hidden="true">⌕</span>
-        <input id="architecture-search" name="architecture-search" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" aria-label="Search architecture" placeholder="Search service, event, lock, SQL…" data-search-input>
-        <button type="button" data-search-close aria-label="Close search">Esc</button>
-      </div>
-      <div class="search-results" data-search-results></div>
     </dialog>
 
     <div class="connection-tooltip" role="tooltip" data-connection-tooltip hidden></div>
