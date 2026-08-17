@@ -62,11 +62,11 @@ services:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
     mem_limit: ${AUTH_API_MEMORY_LIMIT:-256m}
     mem_reservation: ${AUTH_API_MEMORY_RESERVATION:-96m}
@@ -74,7 +74,7 @@ services:
 
   maintenance:
     <<: *auth-runtime
-    command: ["celery-worker", "-A", "auth_service.celery_app:app", "worker", "--loglevel=INFO", "--queues=auth.maintenance", "--concurrency=1", "--hostname=auth-maintenance@%h"]
+    command: ["celery-worker", "-A", "auth_service.celery_app:app", "worker", "--pool=solo", "--loglevel=INFO", "--queues=auth.maintenance", "--concurrency=1", "--hostname=auth-maintenance@%h"]
     environment:
       <<: *auth-environment
       AUTH_LOG_FILE_PATH: /var/log/shide/auth-maintenance.log
@@ -97,9 +97,9 @@ services:
       <<: *auth-environment
       AUTH_LOG_FILE_PATH: /var/log/shide/celery-beat.log
       CELERY_AUTH_CLEANUP_INTERVAL_SECONDS: ${CELERY_AUTH_CLEANUP_INTERVAL_SECONDS:-3600}
-      CELERY_INVENTORY_EXPIRY_INTERVAL_SECONDS: ${CELERY_INVENTORY_EXPIRY_INTERVAL_SECONDS:-5}
-      CELERY_DROPS_SCHEDULER_INTERVAL_SECONDS: ${CELERY_DROPS_SCHEDULER_INTERVAL_SECONDS:-10}
-      CELERY_MEDIA_CLEANUP_INTERVAL_SECONDS: ${CELERY_MEDIA_CLEANUP_INTERVAL_SECONDS:-30}
+      CELERY_INVENTORY_EXPIRY_INTERVAL_SECONDS: ${CELERY_INVENTORY_EXPIRY_INTERVAL_SECONDS:-30}
+      CELERY_DROPS_SCHEDULER_INTERVAL_SECONDS: ${CELERY_DROPS_SCHEDULER_INTERVAL_SECONDS:-30}
+      CELERY_MEDIA_CLEANUP_INTERVAL_SECONDS: ${CELERY_MEDIA_CLEANUP_INTERVAL_SECONDS:-120}
     command: ["celery-beat", "-A", "flashmarket_celery.beat:app", "beat", "--loglevel=INFO", "--schedule=/var/lib/celery/celerybeat-schedule", "--pidfile=/tmp/celerybeat.pid"]
     volumes:
       - celery-beat-data:/var/lib/celery
@@ -123,8 +123,8 @@ services:
     pids_limit: ${AUTH_WORKER_PIDS_LIMIT:-64}
     healthcheck:
       test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${AUTH_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
-      interval: 15s
-      timeout: 3s
+      interval: 20s
+      timeout: 10s
       retries: 3
       start_period: 45s
 

@@ -43,10 +43,10 @@ services:
         - python
         - -c
         - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
     mem_limit: ${CATALOG_API_MEMORY_LIMIT:-192m}
     mem_reservation: ${CATALOG_API_MEMORY_RESERVATION:-72m}

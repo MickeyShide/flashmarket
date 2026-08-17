@@ -48,10 +48,10 @@ services:
         - python
         - -c
         - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
     mem_limit: ${MEDIA_API_MEMORY_LIMIT:-384m}
     mem_reservation: ${MEDIA_API_MEMORY_RESERVATION:-128m}
@@ -68,14 +68,14 @@ services:
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
       - backend-logs-local:/var/log/shide
-    command: ["celery-worker", "-A", "media_service.celery_app:app", "worker", "--loglevel=INFO", "--queues=media.maintenance", "--concurrency=1", "--hostname=media-maintenance@%h"]
+    command: ["celery-worker", "-A", "media_service.celery_app:app", "worker", "--pool=solo", "--loglevel=INFO", "--queues=media.maintenance", "--concurrency=1", "--hostname=media-maintenance@%h"]
     restart: unless-stopped
     mem_limit: ${MEDIA_MAINTENANCE_MEMORY_LIMIT:-128m}
     mem_reservation: ${MEDIA_MAINTENANCE_MEMORY_RESERVATION:-40m}
     pids_limit: ${MEDIA_MAINTENANCE_PIDS_LIMIT:-64}
     healthcheck:
       test: ["CMD-SHELL", "celery -A media_service.celery_app:app inspect ping --destination media-maintenance@$${HOSTNAME} --timeout 5"]
-      interval: 15s
+      interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s

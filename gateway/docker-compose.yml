@@ -13,10 +13,10 @@ services:
       GATEWAY_DOMAIN: ${GATEWAY_DOMAIN:-localhost}
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/health || exit 1"]
-      interval: 5s
-      timeout: 3s
+      interval: 15s
+      timeout: 5s
       retries: 5
-      start_period: 2s
+      start_period: 5s
     restart: unless-stopped
     mem_limit: ${GATEWAY_MEMORY_LIMIT:-64m}
     mem_reservation: ${GATEWAY_MEMORY_RESERVATION:-16m}
