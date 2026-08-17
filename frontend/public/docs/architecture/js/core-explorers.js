@@ -3,13 +3,20 @@ import {
 } from "./utils.js";
 
 export function renderHero(data) {
-  $("[data-system-summary]").textContent = data.system.summary;
-  const primaryStats = data.projections.heroStats.filter((stat) => [
-    "stat-services", "stat-events", "stat-queues", "stat-workers",
-  ].includes(stat.id));
+  const primaryStats = [
+    { label: "Microservices", value: String(data.services.length) },
+    { label: "Integration Events", value: String(data.events.length) },
+    { label: "Databases (PostgreSQL)", value: String(data.databases.length) },
+    { label: "Background Workers", value: String(data.workerProcesses.length) },
+  ];
   $("[data-hero-stats]").innerHTML = primaryStats.map((stat) => `
-    <div class="stat"><strong>${escapeHtml(stat.value)}</strong><span>${escapeHtml(stat.label)}</span></div>`).join("");
-  $("[data-technologies]").innerHTML = data.technologies.map((technology) => `<span>${escapeHtml(technology.label)}</span>`).join("");
+    <div class="stat">
+      <strong>${escapeHtml(stat.value)}</strong>
+      <span>${escapeHtml(stat.label)}</span>
+    </div>`).join("");
+
+  $("[data-technologies]").innerHTML = data.technologies.map((tech) => `
+    <span class="tech-tag">${escapeHtml(tech.label)}</span>`).join("");
 }
 
 function serviceDialogMarkup(service, data, index) {
@@ -21,25 +28,68 @@ function serviceDialogMarkup(service, data, index) {
   const workers = service.workerIds.map((id) => index.get(id)).filter(Boolean);
   const redis = service.redisUseCaseIds.map((id) => index.get(id)).filter(Boolean);
   const decisions = service.decisionIds.map((id) => index.get(id)).filter(Boolean);
+
   return `
     <div class="dialog-shell">
       <header class="dialog-header">
-        <div><p class="eyebrow">Service explorer / ${escapeHtml(service.slug)}</p><h2 id="service-dialog-title">${escapeHtml(service.name)}</h2>${statusBadge(service.status)}</div>
-        <button class="icon-button" type="button" data-dialog-close aria-label="Close service details">×</button>
+        <div>
+          <p class="eyebrow">Service / ${escapeHtml(service.slug)}</p>
+          <h2 id="service-dialog-title">${escapeHtml(service.name)}</h2>
+          ${statusBadge(service.status)}
+        </div>
+        <button class="icon-button" type="button" data-dialog-close aria-label="Close service details">✕</button>
       </header>
-      <section class="dialog-section"><h3>Responsibility</h3><p>${escapeHtml(service.responsibility)}</p></section>
-      <section class="dialog-section"><h3>Owns / source of truth</h3>${list(service.owns)}</section>
-      <section class="dialog-section deep-only">
-        <h3>API / architecture-significant groups</h3>
-        <div class="endpoint-list">${endpoints.map((endpoint) => `<div class="endpoint"><strong>${escapeHtml(endpoint.method)}</strong><div><code>${escapeHtml(endpoint.path)}</code><p>${escapeHtml(endpoint.summary)}</p></div></div>`).join("") || "<p>No public API group.</p>"}</div>
+
+      <section class="dialog-section">
+        <h3>Responsibility</h3>
+        <p>${escapeHtml(service.responsibility)}</p>
       </section>
-      <section class="dialog-section"><h3>Internal structure</h3><div class="internal-chain">${service.layerIds.map((layer, position) => `${position ? "<i>→</i>" : ""}<span>${escapeHtml(layer)}</span>`).join("")}</div></section>
-      <section class="dialog-section deep-only"><h3>Storage</h3><p><strong>PostgreSQL:</strong> ${escapeHtml(database?.name || "none")}</p>${tagList(tables.map((table) => table.name))}${redis.length ? `<p><strong>Redis:</strong></p>${tagList(redis.map((item) => item.kind))}` : ""}</section>
-      <section class="dialog-section"><h3>Publishes</h3>${tagList(published.map((event) => event.name)) || "<p>No published integration events.</p>"}</section>
-      <section class="dialog-section"><h3>Consumes</h3>${tagList(consumed.map((event) => event.name)) || "<p>No inbound integration events.</p>"}</section>
-      <section class="dialog-section"><h3>Background processes</h3>${workers.length ? workers.map((worker) => `<article class="worker-card"><strong>${escapeHtml(worker.role)} · ${escapeHtml(worker.id)}</strong><p>${escapeHtml(worker.sideEffect)}</p></article>`).join("") : "<p>No long-running process role.</p>"}</section>
-      <section class="dialog-section"><h3>Engineering highlights</h3>${list(decisions.map((decision) => `${decision.title} — ${decision.whyItMatters}`))}</section>
-      ${service.limitations?.length ? `<section class="dialog-section"><h3>Remaining limitations</h3>${list(service.limitations)}</section>` : ""}
+
+      <section class="dialog-section">
+        <h3>State & Ownership</h3>
+        <p><strong>Owns:</strong> ${escapeHtml(service.owns.join(", "))}</p>
+        <p><strong>Database:</strong> <code>${escapeHtml(database?.name || "none")}</code> (PostgreSQL)</p>
+        ${tables.length ? tagList(tables.map((t) => t.name)) : ""}
+        ${redis.length ? `<div style="margin-top:8px"><strong>Redis:</strong> ${tagList(redis.map((r) => r.kind))}</div>` : ""}
+      </section>
+
+      <section class="dialog-section">
+        <h3>Integration Events</h3>
+        <div class="event-tags-group">
+          <div><strong>Publishes:</strong> ${published.length ? tagList(published.map((e) => e.name)) : "<span class='dim'>None</span>"}</div>
+          <div style="margin-top:6px"><strong>Consumes:</strong> ${consumed.length ? tagList(consumed.map((e) => e.name)) : "<span class='dim'>None</span>"}</div>
+        </div>
+      </section>
+
+      <section class="dialog-section">
+        <h3>API Endpoints (${endpoints.length})</h3>
+        <div class="endpoint-list">
+          ${endpoints.map((ep) => `
+            <div class="endpoint">
+              <strong class="method-badge method-${ep.method.toLowerCase()}">${escapeHtml(ep.method)}</strong>
+              <div>
+                <code>${escapeHtml(ep.path)}</code>
+                <p>${escapeHtml(ep.summary)}</p>
+              </div>
+            </div>`).join("") || "<p class='dim'>No public endpoints.</p>"}
+        </div>
+      </section>
+
+      <section class="dialog-section">
+        <h3>Background Workers (${workers.length})</h3>
+        ${workers.length ? workers.map((w) => `
+          <article class="worker-card">
+            <strong>${escapeHtml(w.role)}</strong>
+            <p>${escapeHtml(w.sideEffect)}</p>
+          </article>`).join("") : "<p class='dim'>No background worker.</p>"}
+      </section>
+
+      ${decisions.length ? `
+        <section class="dialog-section">
+          <h3>Key Engineering Decisions</h3>
+          ${list(decisions.map((d) => `<b>${d.title}</b> — ${d.whyItMatters}`))}
+        </section>` : ""}
+
       ${renderEvidence(service.evidenceIds, index)}
     </div>`;
 }
@@ -49,12 +99,26 @@ export function initServices(data, index) {
   const dialog = $("[data-service-dialog]");
   const content = $("[data-service-dialog-content]");
   let dialogOpener = null;
-  grid.innerHTML = data.services.map((service, position) => `
-    <button class="service-card" type="button" data-service-id="${service.id}" aria-label="Explore ${escapeHtml(service.name)} service">
-      <div class="card-topline"><span class="service-card__index">SVC-${String(position + 1).padStart(2, "0")}</span>${statusBadge(service.status)}</div>
-      <div><h3>${escapeHtml(service.name)}</h3><p>${escapeHtml(service.responsibility)}</p></div>
-      <div class="service-card__meta">${tagList([`${service.endpointIds.length} API groups`, `${service.publishesEventIds.length} publish`, `${service.consumesEventIds.length} consume`, `${service.workerIds.length} workers`])}</div>
-    </button>`).join("");
+
+  grid.innerHTML = data.services.map((service, position) => {
+    const database = index.get(service.databaseId);
+    return `
+      <button class="service-card" type="button" data-service-id="${service.id}" aria-label="Open ${escapeHtml(service.name)} service details">
+        <div class="card-topline">
+          <span class="service-card__index">SVC-${String(position + 1).padStart(2, "0")}</span>
+          ${statusBadge(service.status)}
+        </div>
+        <div class="service-card__body">
+          <h3>${escapeHtml(service.name)}</h3>
+          <p>${escapeHtml(service.responsibility)}</p>
+        </div>
+        <div class="service-card__meta">
+          <span class="meta-pill">DB: ${escapeHtml(database?.name || service.slug)}</span>
+          <span class="meta-pill">${service.publishesEventIds.length} Pub / ${service.consumesEventIds.length} Sub</span>
+          <span class="meta-pill-action">Details →</span>
+        </div>
+      </button>`;
+  }).join("");
 
   function openService(id) {
     const service = index.get(id);
@@ -79,36 +143,71 @@ export function initServices(data, index) {
     updateUrlState({ service: null });
     if (dialogOpener instanceof HTMLElement && dialogOpener.isConnected) dialogOpener.focus();
   });
+
   return { openService };
 }
 
 function flowMarkup(flow, stepIndex, index) {
   const step = flow.steps[stepIndex];
   const node = index.get(step.nodeId);
+
   return `
-    <div class="flow-player__top">
-      <aside class="flow-rail">
-        <div class="card-topline"><span class="status-badge status-badge--${flow.status}">${escapeHtml(flow.status)}</span><span class="step-counter">${flow.steps.length} STEPS</span></div>
-        <h3>${escapeHtml(flow.name)}</h3>
-        <p class="flow-rail__summary">${escapeHtml(flow.summary)}</p>
-        <div class="flow-steps">${flow.steps.map((item, position) => `
-          <button class="flow-step-button ${position === stepIndex ? "is-active" : ""}" type="button" data-flow-step="${position}" aria-current="${position === stepIndex ? "step" : "false"}">
-            <span>${String(position + 1).padStart(2, "0")}</span><span>${escapeHtml(item.title)}</span>
-          </button>`).join("")}</div>
-      </aside>
-      <article class="flow-detail">
-        <header class="flow-detail__header"><div><span class="fact-label">Step / ${escapeHtml(entityLabel(node, step.nodeId))}</span><h3>${escapeHtml(step.title)}</h3></div><span class="step-counter">STEP ${stepIndex + 1} / ${flow.steps.length}</span></header>
-        <div class="flow-facts">
-          <div class="flow-fact"><strong>What happens</strong><p>${escapeHtml(step.what)}</p></div>
-          <div class="flow-fact"><strong>Why this step exists</strong><p>${escapeHtml(step.why)}</p></div>
-          <div class="flow-fact"><strong>Transaction / consistency</strong><p>${escapeHtml(step.consistency)}</p></div>
-          <div class="flow-fact"><strong>Failure</strong><p>${escapeHtml(step.failure)}</p></div>
-          <div class="flow-fact"><strong>Protection</strong><p>${escapeHtml(step.protection)}</p></div>
-          <div class="flow-fact deep-only"><strong>Active data owner</strong><p>${escapeHtml(entityLabel(node, step.nodeId))}</p></div>
+    <div class="flow-player__container">
+      <div class="flow-player__header">
+        <div>
+          <div class="card-topline">
+            <span class="status-badge status-badge--${flow.status}">${escapeHtml(flow.status)}</span>
+            <span class="step-counter">${flow.steps.length} STEPS</span>
+          </div>
+          <h3>${escapeHtml(flow.name)}</h3>
+          <p class="flow-summary">${escapeHtml(flow.summary)}</p>
         </div>
+      </div>
+
+      <!-- Pipeline Track -->
+      <div class="flow-steps-track" role="tablist" aria-label="Flow steps">
+        ${flow.steps.map((item, position) => `
+          <button class="flow-step-pill ${position === stepIndex ? "is-active" : ""}" type="button" data-flow-step="${position}" aria-selected="${position === stepIndex}">
+            <span class="step-num">${String(position + 1).padStart(2, "0")}</span>
+            <span class="step-name">${escapeHtml(item.title)}</span>
+          </button>`).join("")}
+      </div>
+
+      <!-- Step Details Grid -->
+      <article class="flow-detail-card">
+        <header class="flow-detail__head">
+          <div>
+            <span class="fact-label">Active Node: <b>${escapeHtml(entityLabel(node, step.nodeId))}</b></span>
+            <h4>Step ${stepIndex + 1}: ${escapeHtml(step.title)}</h4>
+          </div>
+          <span class="step-counter">STEP ${stepIndex + 1} / ${flow.steps.length}</span>
+        </header>
+
+        <div class="flow-facts-grid">
+          <div class="flow-fact-box">
+            <strong>1. What happens</strong>
+            <p>${escapeHtml(step.what)}</p>
+          </div>
+          <div class="flow-fact-box">
+            <strong>2. Transaction boundary</strong>
+            <p>${escapeHtml(step.consistency)}</p>
+          </div>
+          <div class="flow-fact-box">
+            <strong>3. Failure scenario</strong>
+            <p>${escapeHtml(step.failure)}</p>
+          </div>
+          <div class="flow-fact-box">
+            <strong>4. Protection mechanism</strong>
+            <p>${escapeHtml(step.protection)}</p>
+          </div>
+        </div>
+
         <footer class="flow-controls">
           <button class="button autoplay-button" type="button" data-flow-autoplay aria-pressed="false">Autoplay</button>
-          <div class="flow-controls__main"><button class="button" type="button" data-flow-previous ${stepIndex === 0 ? "disabled" : ""}>← Previous</button><button class="button button--primary" type="button" data-flow-next ${stepIndex === flow.steps.length - 1 ? "disabled" : ""}>Next →</button></div>
+          <div class="flow-nav-buttons">
+            <button class="button" type="button" data-flow-previous ${stepIndex === 0 ? "disabled" : ""}>← Previous</button>
+            <button class="button button--primary" type="button" data-flow-next ${stepIndex === flow.steps.length - 1 ? "disabled" : ""}>Next →</button>
+          </div>
         </footer>
       </article>
     </div>`;
@@ -121,7 +220,9 @@ export function initFlows(data, index, { onStepChange }) {
   let flowId = readUrlState("flow", allowed, data.flows[0].id);
   let stepIndex = Number(new URL(window.location.href).searchParams.get("step")) || 0;
   let autoplayTimer = null;
-  select.innerHTML = data.flows.map((flow) => `<option value="${flow.id}" ${flow.id === flowId ? "selected" : ""}>${escapeHtml(flow.name)} · ${flow.status}</option>`).join("");
+
+  select.innerHTML = data.flows.map((flow) => `
+    <option value="${flow.id}" ${flow.id === flowId ? "selected" : ""}>${escapeHtml(flow.name)}</option>`).join("");
 
   function stopAutoplay() {
     if (autoplayTimer) window.clearInterval(autoplayTimer);
@@ -134,8 +235,11 @@ export function initFlows(data, index, { onStepChange }) {
     player.innerHTML = flowMarkup(flow, stepIndex, index);
     updateUrlState({ flow: flowId, step: stepIndex || null });
     onStepChange?.(flow.steps[stepIndex].nodeId);
-    player.querySelector("[data-flow-autoplay]").setAttribute("aria-pressed", String(Boolean(autoplayTimer)));
-    player.querySelector("[data-flow-autoplay]").textContent = autoplayTimer ? "Pause autoplay" : "Autoplay";
+    const btn = player.querySelector("[data-flow-autoplay]");
+    if (btn) {
+      btn.setAttribute("aria-pressed", String(Boolean(autoplayTimer)));
+      btn.textContent = autoplayTimer ? "Pause" : "Autoplay";
+    }
   }
 
   function move(nextIndex, focusSelector = null) {
@@ -158,22 +262,40 @@ export function initFlows(data, index, { onStepChange }) {
     stepIndex = 0;
     render();
   });
+
   player.addEventListener("click", (event) => {
     const step = event.target.closest("[data-flow-step]");
-    if (step) { stopAutoplay(); move(Number(step.dataset.flowStep), `[data-flow-step="${step.dataset.flowStep}"]`); return; }
-    if (event.target.closest("[data-flow-previous]")) { stopAutoplay(); move(stepIndex - 1, "[data-flow-previous]"); return; }
-    if (event.target.closest("[data-flow-next]")) { stopAutoplay(); move(stepIndex + 1, "[data-flow-next]"); return; }
+    if (step) {
+      stopAutoplay();
+      move(Number(step.dataset.flowStep), `[data-flow-step="${step.dataset.flowStep}"]`);
+      return;
+    }
+    if (event.target.closest("[data-flow-previous]")) {
+      stopAutoplay();
+      move(stepIndex - 1, "[data-flow-previous]");
+      return;
+    }
+    if (event.target.closest("[data-flow-next]")) {
+      stopAutoplay();
+      move(stepIndex + 1, "[data-flow-next]");
+      return;
+    }
     if (event.target.closest("[data-flow-autoplay]")) {
       if (autoplayTimer) stopAutoplay();
-      else autoplayTimer = window.setInterval(() => move(stepIndex + 1), 2600);
+      else autoplayTimer = window.setInterval(() => move(stepIndex + 1), 2400);
       render();
     }
   });
+
   render();
 }
 
 function journeyNode(label, value, empty = false) {
-  return `<div class="journey-node ${empty ? "is-empty" : ""}"><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></div>`;
+  return `
+    <div class="journey-node ${empty ? "is-empty" : ""}">
+      <small>${escapeHtml(label)}</small>
+      <strong>${escapeHtml(value)}</strong>
+    </div>`;
 }
 
 function eventMarkup(event, index) {
@@ -183,27 +305,42 @@ function eventMarkup(event, index) {
   const consumers = event.consumerIds.map((id) => index.get(id)).filter(Boolean);
   const queueLabel = queues.length ? (queues.length === 1 ? queues[0].name : `${queues.length} queues`) : "No bound queue";
   const consumerLabel = consumers.length ? (consumers.length === 1 ? consumers[0].name : `${consumers.length} consumers`) : "No subscriber";
-  const databaseLabel = consumers.length ? consumers.map((service) => entityLabel(index.get(service.databaseId), service.databaseId)).join(" + ") : "No side effect";
+  const databaseLabel = consumers.length ? consumers.map((s) => entityLabel(index.get(s.databaseId), s.databaseId)).join(" + ") : "No side effect";
+
   const stages = [
-    ["Producer", producer?.name || event.producerId], ["Durability", "Outbox row"], ["Publisher", "Outbox relay"],
-    ["Exchange", exchange?.name || event.exchangeId], ["Routing key", event.routingKey], ["Queue", queueLabel],
-    ["Consumer", consumerLabel], ["Local state", databaseLabel],
+    ["Producer", producer?.name || event.producerId],
+    ["Durability", "Outbox row"],
+    ["Relay", "aio-pika publisher"],
+    ["Exchange", exchange?.name || event.exchangeId],
+    ["Routing", event.routingKey],
+    ["Queue", queueLabel],
+    ["Consumer", consumerLabel],
+    ["State change", databaseLabel],
   ];
+
   return `
     <div class="journey-canvas">
-      <div class="journey-track">${stages.map(([label, value], position) => `${position ? '<i class="journey-arrow" aria-hidden="true"></i>' : ""}${journeyNode(label, value, !queues.length && position >= 5)}`).join("")}</div>
-      <div class="journey-fanout"><strong>Fan-out:</strong> ${escapeHtml(queues.length ? queues.map((queue) => queue.name).join(" · ") : "Publisher confirms transport, but mandatory=false because no repository subscriber is declared.")}</div>
+      <div class="journey-track">
+        ${stages.map(([label, value], pos) => `
+          ${pos ? '<i class="journey-arrow" aria-hidden="true"></i>' : ""}
+          ${journeyNode(label, value, !queues.length && pos >= 5)}`).join("")}
+      </div>
+      <div class="journey-fanout">
+        <strong>Queue Fan-out:</strong> ${escapeHtml(queues.length ? queues.map((q) => q.name).join(" · ") : "Publisher confirms enabled; no bound consumer queue.")}
+      </div>
     </div>
     <article class="event-card">
-      <div class="card-topline">${statusBadge(event.status)}<span class="tag">${escapeHtml(event.delivery)}</span></div>
+      <div class="card-topline">
+        ${statusBadge(event.status)}
+        <span class="tag">${escapeHtml(event.delivery)}</span>
+      </div>
       <h3>${escapeHtml(event.name)}</h3>
-      <dl>
+      <dl class="event-details-list">
         <div><dt>Trigger</dt><dd>${escapeHtml(event.trigger)}</dd></div>
-        <div><dt>Payload</dt><dd>${escapeHtml(event.payloadFields.join(" · "))}</dd></div>
-        <div><dt>Routing</dt><dd>${escapeHtml(event.routingKey)}</dd></div>
-        <div><dt>Side effects</dt><dd>${escapeHtml(event.sideEffects.join(" "))}</dd></div>
-        <div><dt>Retry</dt><dd>${escapeHtml(event.retry)}</dd></div>
+        <div><dt>Routing key</dt><dd><code>${escapeHtml(event.routingKey)}</code></dd></div>
+        <div><dt>Payload fields</dt><dd>${escapeHtml(event.payloadFields.join(", "))}</dd></div>
         <div><dt>Idempotency</dt><dd>${escapeHtml(event.idempotency)}</dd></div>
+        <div><dt>Retry policy</dt><dd>${escapeHtml(event.retry)}</dd></div>
       </dl>
       ${renderEvidence(event.evidenceIds, index)}
     </article>`;
@@ -213,13 +350,30 @@ export function initEvents(data, index) {
   const select = $("[data-event-select]");
   const explorer = $("[data-event-explorer]");
   const allowed = new Set(data.events.map((event) => event.id));
-  let eventId = readUrlState("event", allowed, data.events.find((event) => event.queueIds.length)?.id || data.events[0].id);
-  select.innerHTML = data.events.map((event) => `<option value="${event.id}" ${event.id === eventId ? "selected" : ""}>${escapeHtml(event.name)} · ${escapeHtml(index.get(event.producerId)?.name)}</option>`).join("");
+  let eventId = readUrlState("event", allowed, data.events.find((e) => e.queueIds.length)?.id || data.events[0].id);
+
+  select.innerHTML = data.events.map((e) => `
+    <option value="${e.id}" ${e.id === eventId ? "selected" : ""}>${escapeHtml(e.name)} (${escapeHtml(index.get(e.producerId)?.name)})</option>`).join("");
+
   const render = () => {
     explorer.innerHTML = eventMarkup(index.get(eventId), index);
     updateUrlState({ event: eventId });
   };
-  select.addEventListener("change", () => { eventId = select.value; render(); announce(`${index.get(eventId).name} journey selected`); });
+
+  select.addEventListener("change", () => {
+    eventId = select.value;
+    render();
+    announce(`${index.get(eventId).name} event selected`);
+  });
+
   render();
-  return { selectEvent(id) { if (allowed.has(id)) { eventId = id; select.value = id; render(); } } };
+  return {
+    selectEvent(id) {
+      if (allowed.has(id)) {
+        eventId = id;
+        select.value = id;
+        render();
+      }
+    }
+  };
 }

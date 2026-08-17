@@ -2,7 +2,7 @@ import architectureData from "../architecture-data.js";
 import { initEvents, initFlows, initServices, renderHero } from "./core-explorers.js";
 import {
   initConcurrency, initDatabases, initFailures, initInterview, initOutbox,
-  renderConsistency, renderDecisions, renderRedis, renderStatusBoard, renderWorkers,
+  renderDecisions, renderStatusBoard, renderWorkers,
 } from "./labs.js";
 import { initSystemMap } from "./system-map.js";
 import { $, $$, announce, createEntityIndex, entityLabel, escapeHtml, updateUrlState } from "./utils.js";
@@ -14,6 +14,7 @@ function initMode() {
   const allowed = new Set(["presentation", "deep"]);
   const requested = new URL(window.location.href).searchParams.get("mode");
   let mode = allowed.has(requested) ? requested : "deep";
+
   const apply = (nextMode) => {
     mode = nextMode;
     document.documentElement.dataset.mode = mode;
@@ -23,9 +24,10 @@ function initMode() {
       button.setAttribute("aria-pressed", String(active));
     });
     updateUrlState({ mode: mode === "deep" ? null : mode });
-    announce(`${mode === "deep" ? "Deep dive" : "Presentation"} mode enabled`);
+    announce(`${mode === "deep" ? "Deep dive" : "Overview"} mode enabled`);
   };
-  $(".mode-switch").addEventListener("click", (event) => {
+
+  $(".mode-switch")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-mode]");
     if (button) apply(button.dataset.mode);
   });
@@ -35,16 +37,20 @@ function initMode() {
 function searchDocuments() {
   const docs = [];
   const add = (type, entity, subtitle, keywords = []) => docs.push({
-    type, id: entity.id, title: entityLabel(entity, entity.id), subtitle,
+    type,
+    id: entity.id,
+    title: entityLabel(entity, entity.id),
+    subtitle,
     haystack: [entityLabel(entity, entity.id), subtitle, ...keywords].join(" ").toLowerCase(),
   });
+
   data.services.forEach((item) => add("service", item, item.responsibility, [...item.owns, item.slug]));
-  data.events.forEach((item) => add("event", item, item.routingKey, [item.trigger, ...item.payloadFields, ...item.sideEffects]));
-  data.flows.forEach((item) => add("flow", item, item.summary, item.steps.flatMap((step) => [step.title, step.what, step.consistency])));
-  data.mechanisms.forEach((item) => add("mechanism", item, item.summary, [item.problem, ...item.guarantees, ...item.limitations]));
-  data.tables.forEach((item) => add("table", item, `${index.get(item.databaseId)?.name} database`, [item.purpose]));
-  data.indexes.forEach((item) => add("index", item, item.query, [item.columns.join(" "), item.whyOrder, item.without]));
-  data.failureScenarios.forEach((item) => add("failure", item, item.problem, [item.mechanism, item.result, item.remainingLimitation]));
+  data.events.forEach((item) => add("event", item, item.routingKey, [item.trigger, ...item.payloadFields]));
+  data.flows.forEach((item) => add("flow", item, item.summary, item.steps.flatMap((step) => [step.title, step.what])));
+  data.mechanisms.forEach((item) => add("mechanism", item, item.summary, [item.problem, ...item.guarantees]));
+  data.tables.forEach((item) => add("table", item, `${index.get(item.databaseId)?.name} DB`, [item.purpose]));
+  data.indexes.forEach((item) => add("index", item, item.query, [item.columns.join(" "), item.whyOrder]));
+  data.failureScenarios.forEach((item) => add("failure", item, item.problem, [item.mechanism, item.result]));
   data.evidence.forEach((item) => add("source", item, item.path, [item.symbol, item.description]));
   return docs;
 }
@@ -53,6 +59,8 @@ function initSearch(apis) {
   const dialog = $("[data-search-dialog]");
   const input = $("[data-search-input]");
   const results = $("[data-search-results]");
+  if (!dialog || !input || !results) return;
+
   const documents = searchDocuments();
   let dialogOpener = null;
 
@@ -60,7 +68,7 @@ function initSearch(apis) {
     dialogOpener = document.activeElement;
     if (!dialog.open) dialog.showModal();
     input.value = "";
-    results.innerHTML = "<p>Search services, events, mechanisms, flows, tables, indexes and source evidence.</p>";
+    results.innerHTML = "<p>Search services, events, flows, tables, indexes, and source evidence.</p>";
     window.setTimeout(() => input.focus(), 0);
   };
   const close = () => dialog.close();
@@ -68,44 +76,81 @@ function initSearch(apis) {
   function renderResults(query) {
     const normalized = query.trim().toLowerCase();
     if (!normalized) {
-      results.innerHTML = "<p>Start typing to search architecture entities and implementation evidence.</p>";
+      results.innerHTML = "<p>Type to search architecture entities and implementation evidence.</p>";
       return;
     }
     const terms = normalized.split(/\s+/).filter(Boolean);
     const matches = documents
-      .map((document) => ({ document, score: terms.reduce((score, term) => score + (document.title.toLowerCase().includes(term) ? 4 : document.haystack.includes(term) ? 1 : -10), 0) }))
+      .map((doc) => ({
+        doc,
+        score: terms.reduce((score, term) => score + (doc.title.toLowerCase().includes(term) ? 4 : doc.haystack.includes(term) ? 1 : -10), 0)
+      }))
       .filter(({ score }) => score >= terms.length)
-      .sort((a, b) => b.score - a.score || a.document.title.localeCompare(b.document.title))
-      .slice(0, 18)
-      .map(({ document }) => document);
-    results.innerHTML = matches.length ? matches.map((item) => `<button type="button" class="search-result" data-result-type="${item.type}" data-result-id="${item.id}"><small>${item.type}</small><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.subtitle)}</span></div><span aria-hidden="true">↗</span></button>`).join("") : `<p>No architecture entity matches “${escapeHtml(query)}”. Try a service, event, queue, lock or source path.</p>`;
+      .sort((a, b) => b.score - a.score || a.doc.title.localeCompare(b.doc.title))
+      .slice(0, 16)
+      .map(({ doc }) => doc);
+
+    results.innerHTML = matches.length
+      ? matches.map((item) => `
+        <button type="button" class="search-result" data-result-type="${item.type}" data-result-id="${item.id}">
+          <small>${item.type}</small>
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.subtitle)}</span>
+          </div>
+          <span aria-hidden="true">↗</span>
+        </button>`).join("")
+      : `<p>No entity matches “${escapeHtml(query)}”. Try a service name, event, index, or table.</p>`;
   }
 
   function navigate(type, id) {
     if (type === "service") { close(); apis.services.openService(id); return; }
-    if (type === "event") { close(); apis.events.selectEvent(id); $("#events").scrollIntoView(); return; }
+    if (type === "event") { close(); apis.events.selectEvent(id); $("#events")?.scrollIntoView(); return; }
     if (type === "flow") {
-      close(); const select = $("[data-flow-select]"); select.value = id; select.dispatchEvent(new Event("change")); $("#flows").scrollIntoView(); return;
+      close();
+      const select = $("[data-flow-select]");
+      if (select) { select.value = id; select.dispatchEvent(new Event("change")); }
+      $("#flows")?.scrollIntoView();
+      return;
     }
     if (type === "failure") {
-      close(); $("#failures").scrollIntoView(); window.setTimeout(() => $(`[data-failure-id="${id}"]`)?.click(), 100); return;
+      close();
+      $("#failures")?.scrollIntoView();
+      window.setTimeout(() => $(`[data-failure-id="${id}"]`)?.click(), 100);
+      return;
     }
     if (type === "table" || type === "index") {
       const entity = index.get(id);
       const databaseId = type === "table" ? entity.databaseId : index.get(entity.tableId)?.databaseId;
-      close(); const select = $("[data-database-select]"); select.value = databaseId; select.dispatchEvent(new Event("change")); $("#database").scrollIntoView(); return;
+      close();
+      const select = $("[data-database-select]");
+      if (select) { select.value = databaseId; select.dispatchEvent(new Event("change")); }
+      $("#database")?.scrollIntoView();
+      return;
     }
     if (type === "mechanism") {
-      close(); $("#decisions").scrollIntoView(); window.setTimeout(() => $(`[data-mechanism-id="${id}"]`)?.click(), 100); return;
+      close();
+      $("#highlights")?.scrollIntoView();
+      window.setTimeout(() => $(`[data-mechanism-id="${id}"]`)?.click(), 100);
+      return;
     }
     if (type === "source") {
       const evidence = index.get(id);
-      results.innerHTML = `<div class="evidence-item"><code>${escapeHtml(evidence.path)}</code><strong>${escapeHtml(evidence.symbol)}</strong><p>${escapeHtml(evidence.description)}</p></div><button class="search-result" type="button" data-search-back><small>Search</small><strong>← Back to results</strong></button>`;
+      results.innerHTML = `
+        <div class="evidence-item">
+          <code>${escapeHtml(evidence.path)}</code>
+          <strong>${escapeHtml(evidence.symbol)}</strong>
+          <p>${escapeHtml(evidence.description)}</p>
+        </div>
+        <button class="search-result" type="button" data-search-back>
+          <small>Search</small>
+          <strong>← Back to results</strong>
+        </button>`;
     }
   }
 
-  $("[data-search-open]").addEventListener("click", open);
-  $("[data-search-close]").addEventListener("click", close);
+  $("[data-search-open]")?.addEventListener("click", open);
+  $("[data-search-close]")?.addEventListener("click", close);
   input.addEventListener("input", () => renderResults(input.value));
   results.addEventListener("click", (event) => {
     const result = event.target.closest("[data-result-id]");
@@ -117,7 +162,10 @@ function initSearch(apis) {
     if (dialogOpener instanceof HTMLElement && dialogOpener.isConnected) dialogOpener.focus();
   });
   document.addEventListener("keydown", (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); open(); }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      open();
+    }
   });
 }
 
@@ -128,13 +176,13 @@ function initSectionNavigation() {
     const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
     if (!visible) return;
     links.forEach((link) => link.classList.toggle("is-active", link === byId.get(visible.target.id)));
-  }, { rootMargin: "-25% 0px -60%", threshold: [0, .1, .4] });
-  byId.forEach((_, id) => { const section = document.getElementById(id); if (section) observer.observe(section); });
+  }, { rootMargin: "-20% 0px -60%", threshold: [0, .1, .4] });
+  byId.forEach((_, id) => { const sec = document.getElementById(id); if (sec) observer.observe(sec); });
 }
 
 function validateRuntimeData() {
   const required = ["services", "events", "connections", "flows", "databases", "queues", "evidence"];
-  const missing = required.filter((key) => !Array.isArray(data[key]));
+  const missing = required.filter((k) => !Array.isArray(data[k]));
   if (missing.length) throw new Error(`Architecture data missing collections: ${missing.join(", ")}`);
   const ids = new Set();
   for (const entity of index.values()) {
@@ -155,8 +203,6 @@ function start() {
   initDatabases(data, index);
   initConcurrency();
   renderWorkers(data, index);
-  renderConsistency(data);
-  renderRedis(data, index);
   initFailures(data, index);
   renderDecisions(data, index);
   initInterview(data, index);
@@ -170,5 +216,5 @@ try {
   start();
 } catch (error) {
   console.error("Architecture Explorer failed to start", error);
-  document.body.insertAdjacentHTML("afterbegin", `<div role="alert" style="padding:16px;background:#2e191d;color:#fff">Architecture Explorer could not start: ${escapeHtml(error.message)}. Serve this directory through a local static server so ES modules can load.</div>`);
+  document.body.insertAdjacentHTML("afterbegin", `<div role="alert" style="padding:16px;background:#ffeded;color:#e53935;font-weight:bold">Architecture Explorer could not start: ${escapeHtml(error.message)}.</div>`);
 }
