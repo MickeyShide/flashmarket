@@ -28,6 +28,13 @@ class OrderRepository:
         """Fetch an order by primary key."""
         return await self._session.get(OrderModel, order_id)
 
+    async def get_by_id_for_update(self, order_id: UUID) -> OrderModel | None:
+        """Fetch an order by primary key with an exclusive row lock."""
+        result = await self._session.scalars(
+            select(OrderModel).where(OrderModel.id == order_id).with_for_update()
+        )
+        return result.first()
+
     async def get_by_reservation_id(self, reservation_id: UUID) -> OrderModel | None:
         """Fetch an order by reservation id."""
         result = await self._session.scalars(

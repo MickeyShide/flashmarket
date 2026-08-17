@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from orders.api.dependencies import CurrentPrincipal, get_order_service
+from orders.api.dependencies import AdminPrincipal, CurrentPrincipal, get_order_service
 from orders.application.schemas import (
     CreateOrderBatchRequest,
     CreateOrderRequest,
@@ -130,16 +130,10 @@ async def list_orders(
 async def confirm_order(
     order_id: UUID,
     payment_id: UUID,
-    principal: CurrentPrincipal,
+    admin: AdminPrincipal,
     service: OrderService = Depends(get_order_service),
 ) -> OrderResponse:
-    """Confirm an order after a successful payment."""
-    order_obj = await service.get_by_id(order_id)
-    if principal.role != "ADMIN" and order_obj.user_id != principal.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot confirm another user's order",
-        )
+    """Confirm an order after a successful payment (admin/internal only)."""
     order = await service.confirm_payment(order_id, payment_id)
     return _order_response(order)
 
@@ -152,15 +146,9 @@ async def confirm_order(
 async def fail_order(
     order_id: UUID,
     payment_id: UUID,
-    principal: CurrentPrincipal,
+    admin: AdminPrincipal,
     service: OrderService = Depends(get_order_service),
 ) -> OrderResponse:
-    """Mark an order as cancelled after a failed payment."""
-    order_obj = await service.get_by_id(order_id)
-    if principal.role != "ADMIN" and order_obj.user_id != principal.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot fail another user's order",
-        )
+    """Mark an order as cancelled after a failed payment (admin/internal only)."""
     order = await service.fail_payment(order_id, payment_id)
     return _order_response(order)

@@ -28,6 +28,13 @@ class PaymentRepository:
         """Fetch a payment by primary key."""
         return await self._session.get(PaymentModel, payment_id)
 
+    async def get_by_id_for_update(self, payment_id: UUID) -> PaymentModel | None:
+        """Fetch a payment by primary key with an exclusive row lock."""
+        result = await self._session.scalars(
+            select(PaymentModel).where(PaymentModel.id == payment_id).with_for_update()
+        )
+        return result.first()
+
     async def get_by_order_id(self, order_id: UUID) -> PaymentModel | None:
         """Fetch the most recent payment for an order."""
         result = await self._session.scalars(

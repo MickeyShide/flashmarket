@@ -31,6 +31,7 @@ class OrderModel(Base):
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_orders_quantity_positive"),
         CheckConstraint("price > 0", name="ck_orders_price_positive"),
+        UniqueConstraint("reservation_id", name="uq_orders_reservation_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
@@ -46,7 +47,9 @@ class OrderModel(Base):
         default=OrderStatus.PENDING,
         server_default="PENDING",
     )
-    reservation_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    reservation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, nullable=False, unique=True, index=True
+    )
     payment_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     checkout_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     variant_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)

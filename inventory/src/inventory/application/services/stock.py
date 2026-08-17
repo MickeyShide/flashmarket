@@ -203,7 +203,7 @@ class InventoryService:
 
     async def commit(self, product_id: UUID, data: CommitRequest) -> ReservationModel:
         """Convert a reservation into a sale."""
-        reservation = await self._reservation_repo.get_by_order_id(data.order_id)
+        reservation = await self._reservation_repo.get_by_order_id_for_update(data.order_id)
         if reservation is None:
             raise ReservationNotFound
 
@@ -242,9 +242,9 @@ class InventoryService:
     async def release(self, product_id: UUID, data: ReleaseRequest) -> ReservationModel:
         """Release a reservation and return stock to available."""
         reservation = (
-            await self._reservation_repo.get_by_id(data.reservation_id)
+            await self._reservation_repo.get_by_id_for_update(data.reservation_id)
             if data.reservation_id is not None
-            else await self._reservation_repo.get_by_order_id(data.order_id)  # type: ignore[arg-type]
+            else await self._reservation_repo.get_by_order_id_for_update(data.order_id)  # type: ignore[arg-type]
         )
         if reservation is None:
             raise ReservationNotFound

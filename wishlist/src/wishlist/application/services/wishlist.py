@@ -30,6 +30,8 @@ class WishlistService:
 
     async def add_item(self, user_id: UUID, data: AddToWishlistRequest) -> WishlistItemModel:
         """Add a product to user's wishlist."""
+        await self._repo.lock_user_wishlist(user_id)
+
         if await self._repo.exists(user_id, data.product_id):
             raise ItemAlreadyInWishlist()
 

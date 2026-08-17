@@ -214,7 +214,13 @@ class ProductVariantModel(Base):
 
     __tablename__ = "product_variants"
     __table_args__ = (
-        UniqueConstraint("product_id", "size", "color", name="uq_variant_product_size_color"),
+        UniqueConstraint(
+            "product_id",
+            "size",
+            "color",
+            name="uq_variant_product_size_color",
+            postgresql_nulls_not_distinct=True,
+        ),
         Index("ix_variants_product_active", "product_id", "is_active"),
     )
 

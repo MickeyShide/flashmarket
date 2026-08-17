@@ -26,11 +26,13 @@ from rabbitmq_reliability import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from orders.application.services.promocode import PromocodeService
 from orders.config import get_settings
 from orders.domain.entities import OrderEventType, OrderStatus
 from orders.infrastructure.database import SessionFactory, engine
 from orders.infrastructure.models import ProcessedEventModel
 from orders.infrastructure.repositories.order import OrderRepository, OutboxRepository
+from orders.infrastructure.repositories.promocode import PromocodeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +61,19 @@ async def handle_payment_succeeded(
     payment_id = uuid.UUID(str(payload["payment_id"]))
 
     order_repo = OrderRepository(session)
-    order = await order_repo.get_by_id(order_id)
+    order = await order_repo.get_by_id_for_update(order_id)
     if order is None:
         logger.warning("Order %s not found for payment success", order_id)
         return
     if order.status == OrderStatus.CONFIRMED:
         logger.info("Order %s already confirmed", order_id)
+        return
+    if order.status == OrderStatus.CANCELLED:
+        logger.error(
+            "CRITICAL: Order %s was already CANCELLED, but received PaymentSucceeded %s; manual intervention/refund required",
+            order_id,
+            payment_id,
+        )
         return
     if order.status != OrderStatus.AWAITING_PAYMENT:
         logger.warning(
@@ -100,7 +109,7 @@ async def handle_payment_failed(
     payment_id = uuid.UUID(str(payload["payment_id"]))
 
     order_repo = OrderRepository(session)
-    order = await order_repo.get_by_id(order_id)
+    order = await order_repo.get_by_id_for_update(order_id)
     if order is None:
         logger.warning("Order %s not found for payment failure", order_id)
         return
@@ -118,6 +127,10 @@ async def handle_payment_failed(
     order.payment_id = payment_id
     order.status = OrderStatus.CANCELLED
     await order_repo.update(order)
+
+    if order.promocode_id:
+        promo_service = PromocodeService(session, PromocodeRepository(session))
+        await promo_service.rollback_usage(order.promocode_id, order.id)
 
     await _emit_order_event(
         session,
@@ -144,7 +157,7 @@ async def handle_reservation_released(
     order_id = uuid.UUID(str(order_id))
 
     order_repo = OrderRepository(session)
-    order = await order_repo.get_by_id(order_id)
+    order = await order_repo.get_by_id_for_update(order_id)
     if order is None:
         return
     if order.status not in (OrderStatus.AWAITING_PAYMENT, OrderStatus.PENDING):
@@ -152,6 +165,10 @@ async def handle_reservation_released(
 
     order.status = OrderStatus.CANCELLED
     await order_repo.update(order)
+
+    if order.promocode_id:
+        promo_service = PromocodeService(session, PromocodeRepository(session))
+        await promo_service.rollback_usage(order.promocode_id, order.id)
 
     await _emit_order_event(
         session,

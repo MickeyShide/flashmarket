@@ -144,12 +144,22 @@ class PromocodeService:
         )
         await self._repo.add_usage(usage)
 
-        promo = await self._repo.get_by_id(promo_id)
+        promo = await self._repo.get_by_id_for_update(promo_id)
         if promo:
             promo.current_uses += 1
             await self._repo.update(promo)
 
         return usage
+
+    async def rollback_usage(self, promo_id: UUID, order_id: UUID) -> bool:
+        """Rollback usage of a promocode when an order is cancelled or failed."""
+        deleted = await self._repo.delete_usage_for_order(promo_id, order_id)
+        if deleted:
+            promo = await self._repo.get_by_id_for_update(promo_id)
+            if promo and promo.current_uses > 0:
+                promo.current_uses -= 1
+                await self._repo.update(promo)
+        return deleted
 
     async def get_by_id(self, promo_id: UUID) -> PromocodeModel:
         """Fetch promocode by ID."""

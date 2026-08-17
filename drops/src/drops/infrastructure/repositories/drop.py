@@ -40,6 +40,17 @@ class DropRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_id_for_update(self, drop_id: UUID) -> DropModel | None:
+        """Retrieve a drop by ID with eagerly loaded items and row lock."""
+        stmt = (
+            select(DropModel)
+            .options(selectinload(DropModel.items))
+            .where(DropModel.id == drop_id)
+            .with_for_update()
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_by_slug(self, slug: str) -> DropModel | None:
         """Retrieve a drop by slug with eagerly loaded items."""
         stmt = (

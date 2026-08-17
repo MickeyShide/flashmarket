@@ -51,7 +51,7 @@ class PaymentService:
 
     async def confirm_payment(self, payment_id: uuid.UUID) -> PaymentModel:
         """Mark a pending payment as successful and emit an event."""
-        payment = await self._payment_repo.get_by_id(payment_id)
+        payment = await self._payment_repo.get_by_id_for_update(payment_id)
         if payment is None:
             raise PaymentNotFound
         if payment.status != PaymentStatus.PENDING:
@@ -86,7 +86,7 @@ class PaymentService:
 
     async def fail_payment(self, payment_id: uuid.UUID) -> PaymentModel:
         """Mark a pending payment as failed and emit an event."""
-        payment = await self._payment_repo.get_by_id(payment_id)
+        payment = await self._payment_repo.get_by_id_for_update(payment_id)
         if payment is None:
             raise PaymentNotFound
         if payment.status != PaymentStatus.PENDING:
@@ -114,7 +114,7 @@ class PaymentService:
 
     async def cancel_payment(self, payment_id: uuid.UUID) -> PaymentModel:
         """Cancel a pending payment and emit an event."""
-        payment = await self._payment_repo.get_by_id(payment_id)
+        payment = await self._payment_repo.get_by_id_for_update(payment_id)
         if payment is None:
             raise PaymentNotFound
         if payment.status != PaymentStatus.PENDING:

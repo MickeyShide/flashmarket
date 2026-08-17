@@ -21,6 +21,7 @@ from rabbitmq_reliability import (
     process_with_retries,
     run_forever,
 )
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from wishlist.config import get_settings
 from wishlist.infrastructure.database import SessionFactory, engine
@@ -32,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 async def process_drop_started(
     message: AbstractIncomingMessage,
+    *,
+    session_factory: async_sessionmaker[AsyncSession] = SessionFactory,
 ) -> None:
     payload = decode_json_object(message)
     try:
@@ -42,7 +45,7 @@ async def process_drop_started(
     except (KeyError, TypeError, ValueError) as exc:
         raise PermanentMessageError("invalid DropStarted payload") from exc
 
-    async with SessionFactory() as session, session.begin():
+    async with session_factory() as session, session.begin():
         routing_key = "drops.DropStarted"
         if not await begin_event_once(
             session,

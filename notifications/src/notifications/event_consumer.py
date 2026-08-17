@@ -72,19 +72,18 @@ async def handle_order_created(
     order_id = str(payload.get("order_id", ""))
     subject = "Order created"
     body = f"Your order {order_id} has been created and is awaiting payment."
+    event_key = f"order:{order_id}:created"
 
     existing = await session.scalar(
         select(NotificationModel).where(
-            NotificationModel.user_id == user_id,
-            NotificationModel.subject == subject,
-            NotificationModel.body.contains(order_id),
+            NotificationModel.event_key == event_key,
         )
     )
     if existing is not None:
         logger.info("Notification for %s (order %s) already exists, skipping", subject, order_id)
         return
 
-    await _create_notification(session, user_id, subject=subject, body=body)
+    await _create_notification(session, user_id, subject=subject, body=body, event_key=event_key)
 
 
 async def handle_order_confirmed(
@@ -96,19 +95,18 @@ async def handle_order_confirmed(
     order_id = str(payload.get("order_id", ""))
     subject = "Order confirmed"
     body = f"Your order {order_id} has been confirmed."
+    event_key = f"order:{order_id}:confirmed"
 
     existing = await session.scalar(
         select(NotificationModel).where(
-            NotificationModel.user_id == user_id,
-            NotificationModel.subject == subject,
-            NotificationModel.body.contains(order_id),
+            NotificationModel.event_key == event_key,
         )
     )
     if existing is not None:
         logger.info("Notification for %s (order %s) already exists, skipping", subject, order_id)
         return
 
-    await _create_notification(session, user_id, subject=subject, body=body)
+    await _create_notification(session, user_id, subject=subject, body=body, event_key=event_key)
 
 
 async def handle_order_cancelled(
@@ -121,19 +119,18 @@ async def handle_order_cancelled(
     reason = str(payload.get("reason", ""))
     subject = "Order cancelled"
     body = f"Your order {order_id} was cancelled. Reason: {reason or 'unknown'}."
+    event_key = f"order:{order_id}:cancelled"
 
     existing = await session.scalar(
         select(NotificationModel).where(
-            NotificationModel.user_id == user_id,
-            NotificationModel.subject == subject,
-            NotificationModel.body.contains(order_id),
+            NotificationModel.event_key == event_key,
         )
     )
     if existing is not None:
         logger.info("Notification for %s (order %s) already exists, skipping", subject, order_id)
         return
 
-    await _create_notification(session, user_id, subject=subject, body=body)
+    await _create_notification(session, user_id, subject=subject, body=body, event_key=event_key)
 
 
 async def handle_wishlist_drop_available(

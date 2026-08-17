@@ -138,7 +138,7 @@ class DropService:
 
     async def start_drop(self, drop_id: UUID) -> DropModel:
         """Transition drop from SCHEDULED to ACTIVE."""
-        drop = await self._repo.get_by_id(drop_id)
+        drop = await self._repo.get_by_id_for_update(drop_id)
         if not drop:
             raise DropNotFound()
 
@@ -161,7 +161,7 @@ class DropService:
 
     async def end_drop(self, drop_id: UUID) -> DropModel:
         """Transition drop from ACTIVE to ENDED."""
-        drop = await self._repo.get_by_id(drop_id)
+        drop = await self._repo.get_by_id_for_update(drop_id)
         if not drop:
             raise DropNotFound()
 
@@ -181,7 +181,7 @@ class DropService:
 
     async def cancel_drop(self, drop_id: UUID) -> DropModel:
         """Cancel a drop from DRAFT, SCHEDULED, or ACTIVE status."""
-        drop = await self._repo.get_by_id(drop_id)
+        drop = await self._repo.get_by_id_for_update(drop_id)
         if not drop:
             raise DropNotFound()
 

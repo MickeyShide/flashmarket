@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID
@@ -89,6 +90,15 @@ class ReservationRepository:
         """Fetch a reservation by primary key."""
         return await self._session.get(ReservationModel, reservation_id)
 
+    async def get_by_id_for_update(self, reservation_id: UUID) -> ReservationModel | None:
+        """Fetch a reservation by primary key with an exclusive row lock."""
+        result = await self._session.scalars(
+            select(ReservationModel)
+            .where(ReservationModel.id == reservation_id)
+            .with_for_update()
+        )
+        return result.first()
+
     async def get_by_order_id(self, order_id: UUID) -> ReservationModel | None:
         """Fetch the active reservation bound to an order."""
         result = await self._session.scalars(
@@ -96,6 +106,27 @@ class ReservationRepository:
                 ReservationModel.order_id == order_id,
                 ReservationModel.status == ReservationStatus.RESERVED,
             )
+        )
+        return result.first()
+
+    async def get_by_order_id_for_update(self, order_id: UUID) -> ReservationModel | None:
+        """Fetch the active reservation bound to an order with an exclusive row lock."""
+        result = await self._session.scalars(
+            select(ReservationModel).where(
+                ReservationModel.order_id == order_id,
+                ReservationModel.status == ReservationStatus.RESERVED,
+            )
+            .with_for_update()
+        )
+        return result.first()
+
+    async def get_any_by_order_id_for_update(self, order_id: UUID) -> ReservationModel | None:
+        """Fetch any reservation bound to an order with an exclusive row lock."""
+        result = await self._session.scalars(
+            select(ReservationModel).where(
+                ReservationModel.order_id == order_id,
+            )
+            .with_for_update()
         )
         return result.first()
 
@@ -116,8 +147,10 @@ class ReservationRepository:
         """Serialize a user's concurrent reservations for one Drop on PostgreSQL."""
         if self._session.get_bind().dialect.name != "postgresql":
             return
-        user_key = int.from_bytes(user_id.bytes[:4], "big", signed=True)
-        drop_key = int.from_bytes(drop_id.bytes[:4], "big", signed=True)
+        combined = user_id.bytes + drop_id.bytes
+        digest = hashlib.sha256(combined).digest()
+        user_key = int.from_bytes(digest[:4], "big", signed=True)
+        drop_key = int.from_bytes(digest[4:8], "big", signed=True)
         await self._session.execute(select(func.pg_advisory_xact_lock(user_key, drop_key)))
 
     async def active_drop_quantity(self, user_id: UUID, drop_id: UUID, now: datetime) -> int:

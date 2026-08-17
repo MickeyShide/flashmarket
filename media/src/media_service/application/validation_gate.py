@@ -19,15 +19,18 @@ class ValidationGate:
         self._acquire_timeout_seconds = acquire_timeout_seconds
 
     async def run(self, operation: Callable[[], Awaitable[T]]) -> T:
+        acquired = False
         try:
-            async with asyncio.timeout(self._acquire_timeout_seconds):
-                await self._semaphore.acquire()
-        except TimeoutError as exc:
-            raise MediaCapacityExhausted from exc
-        try:
+            try:
+                async with asyncio.timeout(self._acquire_timeout_seconds):
+                    await self._semaphore.acquire()
+                    acquired = True
+            except TimeoutError as exc:
+                raise MediaCapacityExhausted from exc
             return await operation()
         finally:
-            self._semaphore.release()
+            if acquired:
+                self._semaphore.release()
 
 
 @lru_cache

@@ -44,6 +44,12 @@ class PromocodeRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_id_for_update(self, promo_id: UUID) -> PromocodeModel | None:
+        """Retrieve a promocode by ID with row lock."""
+        stmt = select(PromocodeModel).where(PromocodeModel.id == promo_id).with_for_update()
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def list_all(self, limit: int, offset: int) -> PromocodePage:
         """List all promocodes with pagination ordered by created_at DESC."""
         count_stmt = select(func.count()).select_from(PromocodeModel)
@@ -84,3 +90,18 @@ class PromocodeRepository:
         self._session.add(usage)
         await self._session.flush()
         return usage
+
+    async def delete_usage_for_order(self, promo_id: UUID, order_id: UUID) -> bool:
+        """Delete a promocode usage record by order_id."""
+        result = await self._session.execute(
+            select(PromocodeUsageModel).where(
+                PromocodeUsageModel.promocode_id == promo_id,
+                PromocodeUsageModel.order_id == order_id,
+            )
+        )
+        usage = result.scalar_one_or_none()
+        if usage is not None:
+            await self._session.delete(usage)
+            await self._session.flush()
+            return True
+        return False

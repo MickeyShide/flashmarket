@@ -61,21 +61,21 @@ async def _find_active_reservation(
     session: AsyncSession,
     payload: dict[str, Any],
 ) -> tuple[ReservationModel, StockModel] | None:
-    """Return (reservation, stock) for an active reservation bound to order_id or reservation_id."""
+    """Return (reservation, stock) for a reservation bound to order_id or reservation_id."""
     reservation_repo = ReservationRepository(session)
     reservation = None
     if "order_id" in payload and payload["order_id"]:
         try:
             order_id = uuid.UUID(str(payload["order_id"]))
-            reservation = await reservation_repo.get_by_order_id(order_id)
-        except ValueError, TypeError:
+            reservation = await reservation_repo.get_any_by_order_id_for_update(order_id)
+        except (ValueError, TypeError):
             pass
 
     if reservation is None and "reservation_id" in payload and payload["reservation_id"]:
         try:
             res_id = uuid.UUID(str(payload["reservation_id"]))
-            reservation = await reservation_repo.get_by_id(res_id)
-        except ValueError, TypeError:
+            reservation = await reservation_repo.get_by_id_for_update(res_id)
+        except (ValueError, TypeError):
             pass
 
     if reservation is None:
@@ -98,8 +98,11 @@ async def handle_payment_succeeded(
 
     result = await _find_active_reservation(session, payload)
     if result is None:
-        logger.warning("No active reservation for order/payload %s to commit", payload)
-        return None
+        logger.warning(
+            "No active reservation for order/payload %s to commit; raising for retry",
+            payload,
+        )
+        raise RuntimeError(f"No active reservation found yet for order {order_id}; retrying")
     reservation, stock = result
 
     if reservation.status != ReservationStatus.RESERVED:
@@ -252,11 +255,11 @@ async def handle_order_created(
     try:
         res_id = uuid.UUID(str(reservation_id_str))
         order_id = uuid.UUID(str(order_id_str))
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return None
 
     reservation_repo = ReservationRepository(session)
-    reservation = await reservation_repo.get_by_id(res_id)
+    reservation = await reservation_repo.get_by_id_for_update(res_id)
     if reservation is not None and reservation.order_id is None:
         reservation.order_id = order_id
         await reservation_repo.update(reservation)
