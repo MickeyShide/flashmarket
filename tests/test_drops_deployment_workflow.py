@@ -48,7 +48,7 @@ def test_drops_deploy_migrates_starts_all_runtime_and_verifies_gateway() -> None
     workflow = _workflow()
 
     assert "run --rm --no-deps api migrate" in workflow
-    assert "api scheduler outbox" in workflow
+    assert "api maintenance outbox" in workflow
     assert "for attempt in $(seq 1 60)" in workflow
     assert ".State.Health.Log" in workflow
     assert "/dev/status/drops" in workflow
@@ -59,7 +59,7 @@ def test_drops_deploy_compose_owns_runtime_and_gateway_alias() -> None:
     compose = DEPLOY_COMPOSE_PATH.read_text(encoding="utf-8")
 
     assert "  api:" in compose
-    assert "  scheduler:" in compose
+    assert "  maintenance:" in compose
     assert "  outbox:" in compose
     assert "        aliases:\n          - drops" in compose
     assert "name: shide-observability" in compose

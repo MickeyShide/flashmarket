@@ -1,17 +1,17 @@
 """Tests for drops background scheduler logic."""
 
-import asyncio
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from drops.domain.entities import DropEventType, DropStatus
 from drops.infrastructure.models import DropModel, OutboxEventModel
-from drops.scheduler import main, run_scheduler_tick
+from drops.infrastructure.repositories.drop import DropRepository
+from drops.scheduler import run_scheduler_tick
 
 
 @pytest.mark.asyncio
@@ -67,25 +67,16 @@ async def test_scheduler_starts_and_ends_drops(
 
 
 @pytest.mark.asyncio
-async def test_scheduler_heartbeat_is_independent_of_tick_failures(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    heartbeat_calls: list[tuple[str, int, str]] = []
+@pytest.mark.parametrize("method_name", ["get_due_to_start", "get_due_to_end"])
+async def test_scheduler_due_queries_skip_rows_locked_by_another_tick(method_name: str) -> None:
+    session = AsyncMock()
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = []
+    session.execute.return_value = result
+    repo = DropRepository(session)
 
-    @asynccontextmanager
-    async def fake_periodic_heartbeat(path: str, *, interval_seconds: int, phase: str):
-        heartbeat_calls.append((path, interval_seconds, phase))
-        yield
+    await getattr(repo, method_name)(datetime.now(UTC))
 
-    failing_tick = AsyncMock(side_effect=RuntimeError("database unavailable"))
-    stop_loop = AsyncMock(side_effect=asyncio.CancelledError)
-    monkeypatch.setattr("drops.scheduler.periodic_heartbeat", fake_periodic_heartbeat)
-    monkeypatch.setattr("drops.scheduler.run_scheduler_tick", failing_tick)
-    monkeypatch.setattr("drops.scheduler.asyncio.sleep", stop_loop)
-    monkeypatch.setattr("drops.scheduler.setup_metrics", lambda: None)
-
-    with pytest.raises(asyncio.CancelledError):
-        await main()
-
-    assert heartbeat_calls == [("/tmp/flashmarket-heartbeat.json", 10, "drops_scheduler")]
-    failing_tick.assert_awaited_once()
+    statement = session.execute.await_args.args[0]
+    sql = str(statement.compile(dialect=postgresql.dialect()))
+    assert "FOR UPDATE SKIP LOCKED" in sql

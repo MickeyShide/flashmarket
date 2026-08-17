@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "aio-pika>=10,<11",
+    "flashmarket-celery-runtime",
     "rabbitmq_reliability",
     "alembic>=1.18,<2",
     "argon2-cffi>=25.1,<26",
@@ -22,6 +23,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+flashmarket-celery-runtime = { path = "../shared/celery_runtime" }
 rabbitmq_reliability = { path = "../shared/rabbitmq_reliability" }
 
 [dependency-groups]

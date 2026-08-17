@@ -16,6 +16,14 @@ scrape_configs:
     static_configs:
       - targets: [shide-rabbitmq:15692]
 
+  - job_name: rabbitmq-flashmarket-celery-queues
+    metrics_path: /metrics/detailed
+    params:
+      family: [queue_coarse_metrics, queue_consumer_count]
+      vhost: [flashmarket-tasks]
+    static_configs:
+      - targets: [shide-rabbitmq:15692]
+
   - job_name: flashmarket-services
     metrics_path: /metrics
     static_configs:
@@ -34,7 +42,7 @@ scrape_configs:
       - targets:
           - inventory-consumer:9100
           - inventory-outbox:9100
-          - inventory-expiry:9100
+          - inventory-maintenance:9100
           - orders-consumer:9100
           - orders-outbox:9100
           - payments-consumer:9100
@@ -43,7 +51,8 @@ scrape_configs:
           - notifications-outbox:9100
           - wishlist-consumer:9100
           - wishlist-outbox:9100
-          - drops-scheduler:9100
+          - drops-maintenance:9100
           - drops-outbox:9100
           - auth-outbox:9100
-          - auth-cleanup:9100
+          - auth-maintenance:9100
+          - media-maintenance:9100

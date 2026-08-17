@@ -45,7 +45,7 @@ def test_wishlist_deploy_renders_strict_production_configuration() -> None:
     assert "RABBITMQ_PASSWORD is required" in workflow
     assert "Wishlist image digest is missing" in workflow
     assert "bash scripts/configure-deploy-ssh.sh" in workflow
-    assert "timeout --signal=TERM --kill-after=30s 900" in workflow
+    assert "timeout --signal=TERM --kill-after=30s 2400" in workflow
 
 
 def test_wishlist_deploy_migrates_starts_runtime_and_verifies_gateway() -> None:

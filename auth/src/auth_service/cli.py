@@ -1,29 +1,22 @@
 import argparse
 import asyncio
 import uuid
-from datetime import timedelta
 
 from email_validator import EmailNotValidError, validate_email
-from sqlalchemy import delete, or_
 
 from auth_service.application.contracts import RequestContext
 from auth_service.cache import redis_client
-from auth_service.config import get_settings
 from auth_service.database import SessionFactory, engine
 from auth_service.domain.events import DomainEvent, EventType
 from auth_service.identity import normalize_email
 from auth_service.infrastructure.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from auth_service.infrastructure.redis_session_store import RedisSessionStore
+from auth_service.maintenance import cleanup_expired_data
 from auth_service.models import (
-    AuditEvent,
-    LoginSession,
-    OutboxEvent,
-    RefreshToken,
     User,
     UserRole,
 )
 from auth_service.security import hash_password, verify_password
-from auth_service.time import utc_now
 
 
 async def create_admin(
@@ -113,39 +106,16 @@ async def create_admin(
     await engine.dispose()
 
 
-async def cleanup_expired_data() -> None:
-    """Remove expired refresh tokens and audit records."""
-    settings = get_settings()
-    now = utc_now()
-    expired_cutoff = now - timedelta(days=settings.expired_data_retention_days)
-    audit_cutoff = now - timedelta(days=settings.audit_retention_days)
-
-    async with SessionFactory() as db:
-        session_result = await db.execute(
-            delete(LoginSession).where(
-                or_(
-                    LoginSession.expires_at < expired_cutoff,
-                    LoginSession.revoked_at < expired_cutoff,
-                )
-            )
-        )
-        refresh_result = await db.execute(
-            delete(RefreshToken).where(RefreshToken.expires_at < expired_cutoff)
-        )
-        audit_result = await db.execute(
-            delete(AuditEvent).where(AuditEvent.created_at < audit_cutoff)
-        )
-        outbox_result = await db.execute(
-            delete(OutboxEvent).where(OutboxEvent.published_at < expired_cutoff)
-        )
-        await db.commit()
-        print(
-            "Cleanup complete: "
-            f"sessions={session_result.rowcount}, "
-            f"refresh_tokens={refresh_result.rowcount}, "
-            f"audit_events={audit_result.rowcount}, "
-            f"outbox_events={outbox_result.rowcount}."
-        )
+async def cleanup_expired_data_cli() -> None:
+    """Run Auth cleanup as an administrative one-shot command."""
+    counts = await cleanup_expired_data()
+    print(
+        "Cleanup complete: "
+        f"sessions={counts.sessions}, "
+        f"refresh_tokens={counts.refresh_tokens}, "
+        f"audit_events={counts.audit_events}, "
+        f"outbox_events={counts.outbox_events}."
+    )
     await engine.dispose()
 
 
@@ -171,7 +141,7 @@ def main() -> None:
             )
         )
     elif args.command == "cleanup-expired":
-        asyncio.run(cleanup_expired_data())
+        asyncio.run(cleanup_expired_data_cli())
 
 
 if __name__ == "__main__":

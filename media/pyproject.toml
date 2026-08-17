@@ -8,6 +8,7 @@ dependencies = [
     "alembic>=1.18,<2",
     "asyncpg>=0.31,<1",
     "boto3>=1.43,<2",
+    "flashmarket-celery-runtime",
     "fastapi>=0.140,<1",
     "pillow>=12.3,<13",
     "prometheus-client>=0.26,<1",
@@ -15,10 +16,13 @@ dependencies = [
     "sqlalchemy>=2.0,<3",
     "uvicorn[standard]>=0.51,<1",
     "jwt_verifier",
+    "rabbitmq_reliability",
 ]
 
 [tool.uv.sources]
+flashmarket-celery-runtime = { path = "../shared/celery_runtime" }
 jwt_verifier = { path = "../shared/jwt_verifier" }
+rabbitmq_reliability = { path = "../shared/rabbitmq_reliability" }
 
 [dependency-groups]
 dev = [

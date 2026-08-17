@@ -19,14 +19,9 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
-from urllib.parse import urljoin
 
-import aio_pika
 import httpx
 import pytest
-
-from tests.conftest import RABBITMQ_URL
-
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 

@@ -10,15 +10,15 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 COMPOSE_SERVICES: dict[str, set[str]] = {
-    "auth/docker-compose.deploy.yml": {"api", "nginx", "cleanup", "outbox"},
+    "auth/docker-compose.deploy.yml": {"api", "nginx", "maintenance", "beat", "outbox"},
     "catalog/docker-compose.deploy.yml": {"api", "nginx"},
-    "inventory/docker-compose.deploy.yml": {"api", "consumer", "outbox", "expiry", "nginx"},
+    "inventory/docker-compose.deploy.yml": {"api", "consumer", "outbox", "maintenance", "nginx"},
     "orders/docker-compose.deploy.yml": {"api", "consumer", "outbox", "nginx"},
     "payments/docker-compose.deploy.yml": {"api", "consumer", "outbox", "nginx"},
     "notifications/docker-compose.deploy.yml": {"api", "consumer", "outbox", "nginx"},
     "wishlist/docker-compose.deploy.yml": {"api", "consumer"},
-    "drops/docker-compose.deploy.yml": {"api", "scheduler", "outbox"},
-    "media/docker-compose.deploy.yml": {"api", "cleanup"},
+    "drops/docker-compose.deploy.yml": {"api", "maintenance", "outbox"},
+    "media/docker-compose.deploy.yml": {"api", "maintenance"},
     "docker-compose.prod.yml": {"gateway", "frontend"},
 }
 

@@ -103,6 +103,7 @@ class DropRepository:
                 DropModel.status == DropStatus.SCHEDULED,
                 DropModel.starts_at <= now,
             )
+            .with_for_update(skip_locked=True)
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -116,6 +117,7 @@ class DropRepository:
                 DropModel.status == DropStatus.ACTIVE,
                 DropModel.ends_at <= now,
             )
+            .with_for_update(skip_locked=True)
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())

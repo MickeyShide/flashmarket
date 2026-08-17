@@ -13,7 +13,6 @@ import aio_pika
 import httpx
 import pytest
 import pytest_asyncio
-from aio_pika import ExchangeType
 
 BASE_URL = os.getenv("FLASHMARKET_GATEWAY", "http://127.0.0.1:8080")
 RABBITMQ_URL = os.getenv("FLASHMARKET_RABBITMQ", "amqp://guest:guest@127.0.0.1:5672/")

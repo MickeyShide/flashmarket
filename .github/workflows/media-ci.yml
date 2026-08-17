@@ -146,6 +146,7 @@ jobs:
       MEDIA_CORS_ORIGINS: ${{ vars.MEDIA_CORS_ORIGINS }}
       GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
       DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -158,6 +159,7 @@ jobs:
           DEPLOY_USER="${DEPLOY_USER:-user1}"
           INFRA_USER="${INFRA_USER:-shide}"
           : "${DEPLOY_POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+          : "${DEPLOY_RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
 
           if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
             echo "::error::DEPLOY_HOST must be a hostname or IPv4 address"
@@ -223,6 +225,7 @@ jobs:
             printf 'MEDIA_PUBLIC_BASE_URL=https://%s/media-storage/%s\n' "$GATEWAY_DOMAIN" "$MEDIA_S3_BUCKET"
             printf 'MEDIA_UPLOAD_TTL_SECONDS=600\n'
             printf 'MEDIA_CLEANUP_INTERVAL_SECONDS=30\n'
+            printf 'CELERY_BROKER_URL=amqp://%s:%s@shide-rabbitmq:5672/flashmarket-tasks\n' "$INFRA_USER" "$DEPLOY_RABBITMQ_PASSWORD"
             printf 'MEDIA_CORS_ORIGINS=%s\n' "$cors_origins"
             printf 'MEDIA_TRUSTED_HOSTS=["%s","media.%s","localhost","127.0.0.1","media","gateway"]\n' "$GATEWAY_DOMAIN" "$GATEWAY_DOMAIN"
             printf 'MEDIA_ALLOW_INSECURE_INTERNAL_SERVICES=true\n'
@@ -332,13 +335,13 @@ jobs:
           timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps api migrate </dev/null
           echo 'Database migrations complete.'
 
-          echo 'Starting Media API and cleanup worker...'
+          echo 'Starting Media API and maintenance worker...'
           docker compose -f docker-compose.yml --env-file .env up \
             -d \
             --no-build \
             --force-recreate \
             --remove-orphans \
-            api cleanup
+            api maintenance
 
           container="$(docker compose -f docker-compose.yml --env-file .env ps -q api)"
           for attempt in $(seq 1 60); do
@@ -357,18 +360,18 @@ jobs:
             docker compose -f docker-compose.yml --env-file .env logs --tail 100 api
             exit 1
           }
-          cleanup_container="$(docker compose -f docker-compose.yml --env-file .env ps -q cleanup)"
-          if [[ -z "$cleanup_container" ]]; then
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 cleanup
+          maintenance_container="$(docker compose -f docker-compose.yml --env-file .env ps -q maintenance)"
+          if [[ -z "$maintenance_container" ]]; then
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 maintenance
             exit 1
           fi
           for attempt in $(seq 1 60); do
-            cleanup_health="$(docker inspect --format '{{.State.Health.Status}}' "$cleanup_container")"
-            [[ "$cleanup_health" == "healthy" ]] && break
+            maintenance_health="$(docker inspect --format '{{.State.Health.Status}}' "$maintenance_container")"
+            [[ "$maintenance_health" == "healthy" ]] && break
             sleep 2
           done
-          [[ -n "$cleanup_container" ]] && [[ "$(docker inspect --format '{{.State.Health.Status}}' "$cleanup_container")" == "healthy" ]] || {
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 cleanup
+          [[ -n "$maintenance_container" ]] && [[ "$(docker inspect --format '{{.State.Health.Status}}' "$maintenance_container")" == "healthy" ]] || {
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 maintenance
             exit 1
           }
           docker compose -f docker-compose.yml --env-file .env ps -a

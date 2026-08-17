@@ -23,11 +23,21 @@ services:
       service: outbox
     depends_on: !reset {}
 
-  auth-cleanup:
+  auth-maintenance:
     extends:
       file: auth/docker-compose.yml
-      service: cleanup
-    depends_on: !reset {}
+      service: maintenance
+    depends_on:
+      celery-beat:
+        condition: service_started
+
+  celery-beat:
+    extends:
+      file: auth/docker-compose.yml
+      service: beat
+    depends_on:
+      auth:
+        condition: service_healthy
 
   # -----------------------------------------------------------
   # CATALOG MICROSERVICE
@@ -63,11 +73,13 @@ services:
       service: outbox
     depends_on: !reset {}
 
-  inventory-expiry:
+  inventory-maintenance:
     extends:
       file: inventory/docker-compose.yml
-      service: expiry
-    depends_on: !reset {}
+      service: maintenance
+    depends_on:
+      celery-beat:
+        condition: service_started
 
   # -----------------------------------------------------------
   # ORDERS MICROSERVICE
@@ -172,11 +184,13 @@ services:
       auth-keygen:
         condition: service_completed_successfully
 
-  drops-scheduler:
+  drops-maintenance:
     extends:
       file: drops/docker-compose.yml
-      service: scheduler
-    depends_on: !reset {}
+      service: maintenance
+    depends_on:
+      celery-beat:
+        condition: service_started
 
   drops-outbox:
     extends:
@@ -196,11 +210,13 @@ services:
       auth-keygen:
         condition: service_completed_successfully
 
-  media-cleanup:
+  media-maintenance:
     extends:
       file: media/docker-compose.yml
-      service: cleanup
-    depends_on: !reset {}
+      service: maintenance
+    depends_on:
+      celery-beat:
+        condition: service_started
 
   # -----------------------------------------------------------
   # GATEWAY & FRONTEND
@@ -231,6 +247,7 @@ networks:
     external: true
 
 volumes:
+  celery-beat-data:
   frontend-node-modules:
   auth-jwt-keys-private:
   auth-jwt-keys-public:

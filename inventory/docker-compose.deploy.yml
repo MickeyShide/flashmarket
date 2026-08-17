@@ -16,6 +16,7 @@ x-inventory-environment: &inventory-environment
   INVENTORY_REDIS_URL: ${INVENTORY_REDIS_URL}
   INVENTORY_STOCK_CACHE_TTL_SECONDS: ${INVENTORY_STOCK_CACHE_TTL_SECONDS:-30}
   INVENTORY_RABBITMQ_URL: ${INVENTORY_RABBITMQ_URL}
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL}
   INVENTORY_RESERVATION_TTL_SECONDS: ${INVENTORY_RESERVATION_TTL_SECONDS:-300}
   INVENTORY_DROPS_BASE_URL: ${INVENTORY_DROPS_BASE_URL:-http://drops:8000}
   INVENTORY_EXPIRY_POLL_INTERVAL_SECONDS: ${INVENTORY_EXPIRY_POLL_INTERVAL_SECONDS:-5}
@@ -103,7 +104,7 @@ services:
       flashmarket.autoheal: "true"
     healthcheck: *worker-health
 
-  expiry:
+  maintenance:
     <<: *inventory-runtime
     mem_limit: ${INVENTORY_MAINTENANCE_MEMORY_LIMIT:-128m}
     mem_reservation: ${INVENTORY_MAINTENANCE_MEMORY_RESERVATION:-40m}
@@ -113,18 +114,19 @@ services:
     logging: *bounded-logging
     networks:
       backend:
-        aliases: [inventory-expiry]
+        aliases: [inventory-maintenance]
     environment: *inventory-environment
-    command:
-      - cleanup
-      - python
-      - -m
-      - inventory.expiry_worker
+    command: ["celery-worker", "-A", "inventory.celery_app:app", "worker", "--loglevel=INFO", "--queues=inventory.maintenance", "--concurrency=1", "--hostname=inventory-maintenance@%h"]
     depends_on: {}
     restart: unless-stopped
     labels:
       flashmarket.autoheal: "true"
-    healthcheck: *worker-health
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A inventory.celery_app:app inspect ping --destination inventory-maintenance@$${HOSTNAME} --timeout 5"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   nginx:
     image: nginx:1.30-alpine

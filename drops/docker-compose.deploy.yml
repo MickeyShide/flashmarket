@@ -35,7 +35,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  scheduler:
+  maintenance:
     <<: *drops-runtime
     mem_limit: ${DROPS_MAINTENANCE_MEMORY_LIMIT:-128m}
     mem_reservation: ${DROPS_MAINTENANCE_MEMORY_RESERVATION:-40m}
@@ -45,19 +45,17 @@ services:
     logging: *bounded-logging
     networks:
       backend:
-        aliases: [drops-scheduler]
-    command:
-      - consumer
-      - drops.scheduler
+        aliases: [drops-maintenance]
+    command: ["celery-worker", "-A", "drops.celery_app:app", "worker", "--loglevel=INFO", "--queues=drops.maintenance", "--concurrency=1", "--hostname=drops-maintenance@%h"]
     restart: unless-stopped
     labels:
       flashmarket.autoheal: "true"
     healthcheck:
-      test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${DROPS_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
+      test: ["CMD-SHELL", "celery -A drops.celery_app:app inspect ping --destination drops-maintenance@$${HOSTNAME} --timeout 5"]
       interval: 15s
-      timeout: 3s
+      timeout: 10s
       retries: 3
-      start_period: 45s
+      start_period: 30s
 
   outbox:
     <<: *drops-runtime

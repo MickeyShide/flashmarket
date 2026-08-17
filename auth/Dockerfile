@@ -13,6 +13,7 @@ WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
 COPY shared/rabbitmq_reliability /shared/rabbitmq_reliability
+COPY shared/celery_runtime /shared/celery_runtime
 COPY auth/pyproject.toml auth/uv.lock auth/README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 
@@ -31,7 +32,8 @@ RUN mkdir -p /tmp/prometheus && uv sync --frozen --no-dev --no-editable && \
 RUN mkdir -p \
         /var/lib/flashmarket-auth/keys/private \
         /var/lib/flashmarket-auth/keys/public \
-    && chown -R app:app /var/lib/flashmarket-auth/keys
+        /var/lib/celery \
+    && chown -R app:app /var/lib/flashmarket-auth/keys /var/lib/celery
 
 ENV UV_NO_CACHE=1
 

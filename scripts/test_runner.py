@@ -25,7 +25,7 @@ SERVICE_NAMES = (
     "drops",
     "media",
 )
-SPECIAL_SUITES = ("jwt", "gateway")
+SPECIAL_SUITES = ("jwt", "gateway", "celery")
 CRITICAL_SERVICES = (
     "gateway",
     "catalog",
@@ -124,6 +124,21 @@ def run_service_suite(service: str) -> None:
                 "pytest,pytest-asyncio,httpx,aio-pika",
                 "pytest",
                 "tests/test_gateway_routing.py",
+                "-q",
+            )
+        )
+        return
+
+    if service == "celery":
+        announce("shared Celery runtime test suite")
+        run_command(
+            (
+                "uv",
+                "run",
+                "--project",
+                "shared/celery_runtime",
+                "pytest",
+                "shared/celery_runtime/tests",
                 "-q",
             )
         )

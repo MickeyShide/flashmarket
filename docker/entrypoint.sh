@@ -45,6 +45,22 @@ case "$CMD" in
     exec "$@"
     ;;
 
+  celery-worker)
+    export FLASHMARKET_PROCESS_ROLE=worker
+    ensure_prometheus_dir
+    echo "Starting Celery maintenance worker..."
+    shift 1
+    exec celery "$@"
+    ;;
+
+  celery-beat)
+    export FLASHMARKET_PROCESS_ROLE=worker
+    ensure_prometheus_dir
+    echo "Starting singleton Celery Beat scheduler..."
+    shift 1
+    exec celery "$@"
+    ;;
+
   migrate)
     export FLASHMARKET_PROCESS_ROLE=worker
     echo "Ensuring shared infrastructure resources..."

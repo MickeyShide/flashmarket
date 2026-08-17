@@ -14,6 +14,7 @@ RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
 COPY shared/jwt_verifier /shared/jwt_verifier
 COPY shared/rabbitmq_reliability /shared/rabbitmq_reliability
+COPY shared/celery_runtime /shared/celery_runtime
 COPY drops/pyproject.toml drops/uv.lock drops/README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 

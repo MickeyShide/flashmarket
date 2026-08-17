@@ -127,6 +127,47 @@ def test_wishlist_rabbitmq_url_is_discovered() -> None:
         assert module._get_rabbitmq_urls() == [url]
 
 
+def test_celery_broker_url_is_discovered() -> None:
+    module = _load_init_infra()
+    url = "amqp://user:pass@rabbitmq:5672/flashmarket-tasks"
+
+    with patch.dict(os.environ, {"CELERY_BROKER_URL": url}, clear=True):
+        assert module._get_celery_broker_urls() == [url]
+
+
+def test_celery_task_vhost_bootstrap_skips_event_topology() -> None:
+    module = _load_init_infra()
+    requests: list[object] = []
+
+    class Response:
+        status = 201
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    def capture(request, *, timeout: float):
+        assert timeout == 10.0
+        requests.append(request)
+        return Response()
+
+    with (
+        patch.object(module, "resolve_host_ipv4", return_value="127.0.0.1"),
+        patch.object(module.urllib.request, "urlopen", side_effect=capture),
+    ):
+        module._ensure_vhost_and_permissions(
+            "amqp://user:pass@rabbitmq:5672/flashmarket-tasks",
+            install_event_topology=False,
+        )
+
+    urls = [request.full_url for request in requests]
+    assert len(urls) == 2
+    assert urls[0].endswith("/vhosts/flashmarket-tasks")
+    assert urls[1].endswith("/permissions/flashmarket-tasks/user")
+
+
 def test_vhost_bootstrap_failure_is_fatal() -> None:
     module = _load_init_infra()
     error = urllib.error.URLError("management API unavailable")

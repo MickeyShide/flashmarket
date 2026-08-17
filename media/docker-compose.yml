@@ -12,6 +12,7 @@ x-media-runtime: &media-runtime
 x-media-environment: &media-environment
   MEDIA_ENVIRONMENT: development
   MEDIA_DATABASE_URL: postgresql+asyncpg://${INFRA_USER:-shide}:${POSTGRES_PASSWORD:-shide}@shide-postgres:5432/media
+  CELERY_BROKER_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket-tasks
   MEDIA_S3_INTERNAL_ENDPOINT: ${MEDIA_S3_INTERNAL_ENDPOINT:-http://shide-minio:9000}
   MEDIA_S3_PUBLIC_ENDPOINT: ${MEDIA_S3_PUBLIC_ENDPOINT:-http://localhost:9000}
   MEDIA_S3_ACCESS_KEY: ${S3_ACCESS_KEY:-shide}
@@ -56,22 +57,28 @@ services:
     mem_reservation: ${MEDIA_API_MEMORY_RESERVATION:-128m}
     pids_limit: ${MEDIA_API_PIDS_LIMIT:-128}
 
-  cleanup:
+  maintenance:
     <<: *media-runtime
     build:
       context: ..
       dockerfile: media/Dockerfile
     environment:
       <<: *media-environment
-      MEDIA_LOG_FILE_PATH: /var/log/shide/media-cleanup.log
+      MEDIA_LOG_FILE_PATH: /var/log/shide/media-maintenance.log
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
       - backend-logs-local:/var/log/shide
-    command: ["cleanup", "python", "-m", "media_service.cleanup_worker"]
+    command: ["celery-worker", "-A", "media_service.celery_app:app", "worker", "--loglevel=INFO", "--queues=media.maintenance", "--concurrency=1", "--hostname=media-maintenance@%h"]
     restart: unless-stopped
     mem_limit: ${MEDIA_MAINTENANCE_MEMORY_LIMIT:-128m}
     mem_reservation: ${MEDIA_MAINTENANCE_MEMORY_RESERVATION:-40m}
     pids_limit: ${MEDIA_MAINTENANCE_PIDS_LIMIT:-64}
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A media_service.celery_app:app inspect ping --destination media-maintenance@$${HOSTNAME} --timeout 5"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   auth-jwt-keys-public:

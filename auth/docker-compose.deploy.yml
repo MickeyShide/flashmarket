@@ -89,7 +89,7 @@ services:
     stop_grace_period: 10s
     logging: *bounded-logging
 
-  cleanup:
+  maintenance:
     <<: *auth-runtime
     mem_limit: ${AUTH_MAINTENANCE_MEMORY_LIMIT:-128m}
     mem_reservation: ${AUTH_MAINTENANCE_MEMORY_RESERVATION:-40m}
@@ -99,12 +99,8 @@ services:
     logging: *bounded-logging
     networks:
       backend:
-        aliases: [auth-cleanup]
-    command:
-      - cleanup
-      - python
-      - -m
-      - auth_service.cleanup_worker
+        aliases: [auth-maintenance]
+    command: ["celery-worker", "-A", "auth_service.celery_app:app", "worker", "--loglevel=INFO", "--queues=auth.maintenance", "--concurrency=1", "--hostname=auth-maintenance@%h"]
     depends_on:
       api:
         condition: service_healthy
@@ -112,11 +108,30 @@ services:
     labels:
       flashmarket.autoheal: "true"
     healthcheck:
-      test: ["CMD", "python", "-m", "rabbitmq_reliability.heartbeat", "/tmp/flashmarket-heartbeat.json", "3700"]
-      interval: 60s
-      timeout: 3s
+      test: ["CMD-SHELL", "celery -A auth_service.celery_app:app inspect ping --destination auth-maintenance@$${HOSTNAME} --timeout 5"]
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 120s
+      start_period: 30s
+
+  beat:
+    <<: *auth-runtime
+    mem_limit: ${CELERY_BEAT_MEMORY_LIMIT:-128m}
+    mem_reservation: ${CELERY_BEAT_MEMORY_RESERVATION:-40m}
+    pids_limit: ${CELERY_BEAT_PIDS_LIMIT:-64}
+    init: true
+    stop_grace_period: 20s
+    logging: *bounded-logging
+    networks:
+      backend:
+        aliases: [celery-beat]
+    command: ["celery-beat", "-A", "flashmarket_celery.beat:app", "beat", "--loglevel=INFO", "--schedule=/var/lib/celery/celerybeat-schedule", "--pidfile=/tmp/celerybeat.pid"]
+    volumes:
+      - celery-beat-data:/var/lib/celery
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
   outbox:
     <<: *auth-runtime
@@ -154,6 +169,7 @@ networks:
     name: shide-observability
 
 volumes:
+  celery-beat-data:
   auth-jwt-keys:
   auth-jwt-keys-public:
     name: flashmarket-auth-jwt-keys-public

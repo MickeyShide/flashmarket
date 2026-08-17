@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en" data-mode="deep">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Interactive architecture explorer for the FlashMarket distributed marketplace backend.">
+    <meta name="theme-color" content="#0b0e12">
+    <link rel="icon" href="data:,">
+    <title>FlashMarket — Architecture Explorer</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to architecture</a>
+
+    <header class="site-header" data-header>
+      <a class="wordmark" href="#system" aria-label="FlashMarket architecture home">
+        <span class="wordmark__signal" aria-hidden="true"></span>
+        <span>FLASHMARKET</span>
+        <span class="wordmark__context">/ ARCHITECTURE</span>
+      </a>
+
+      <nav class="section-nav" aria-label="Architecture sections">
+        <a href="#system">System</a>
+        <a href="#services">Services</a>
+        <a href="#flows">Flows</a>
+        <a href="#events">Events</a>
+        <a href="#outbox">Outbox</a>
+        <a href="#database">Database</a>
+        <a href="#concurrency">Concurrency</a>
+        <a href="#failures">Failures</a>
+        <a href="#interview">Interview</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="search-trigger" type="button" data-search-open aria-haspopup="dialog">
+          <span>Search system</span>
+          <kbd>⌘ K</kbd>
+        </button>
+        <div class="mode-switch" role="group" aria-label="Content depth">
+          <button type="button" data-mode="presentation">Presentation</button>
+          <button class="is-active" type="button" data-mode="deep">Deep dive</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero__copy">
+          <p class="eyebrow">Distributed marketplace backend</p>
+          <h1 id="hero-title">Architecture you can<br><span>follow under failure.</span></h1>
+          <p class="hero__lede" data-system-summary></p>
+          <div class="hero__actions">
+            <a class="button button--primary" href="#system">Explore architecture <span aria-hidden="true">↘</span></a>
+            <a class="button" href="#flows">Run a business flow</a>
+            <a class="button button--quiet" href="#interview">Interview mode</a>
+          </div>
+        </div>
+
+        <div class="hero__instrument" aria-label="Live system overview">
+          <div class="instrument__header">
+            <span>System pulse</span>
+            <span class="live-label"><i aria-hidden="true"></i> audited snapshot</span>
+          </div>
+          <div class="instrument__route" aria-hidden="true">
+            <span>CLIENT</span><i></i><span>API</span><i></i><span>TX</span><i class="is-event"></i><span>EVENT</span><i></i><span>CONSUMER</span>
+          </div>
+          <div class="hero-stats" data-hero-stats></div>
+          <div class="tech-strip" data-technologies aria-label="Technology stack"></div>
+        </div>
+      </section>
+
+      <section class="section system-section" id="system" aria-labelledby="system-title">
+        <div class="section-heading section-heading--split">
+          <div>
+            <p class="eyebrow">System map / live topology</p>
+            <h2 id="system-title">One system. Explicit boundaries.</h2>
+            <p>Select a service or isolate a connection type. The map is a projection of repository configuration and runtime roles.</p>
+          </div>
+          <div class="map-controls" role="group" aria-label="System map layers" data-map-filters></div>
+        </div>
+
+        <div class="system-workbench">
+          <div class="map-shell">
+            <div class="map-toolbar">
+              <div class="map-legend" aria-label="Map legend">
+                <span><i class="legend-line legend-line--http"></i>HTTP</span>
+                <span><i class="legend-line legend-line--event"></i>Event</span>
+                <span><i class="legend-line legend-line--data"></i>Data</span>
+                <span><i class="legend-line legend-line--key"></i>Key volume</span>
+              </div>
+              <button class="text-button" type="button" data-consistency-toggle aria-pressed="false">Show consistency boundaries</button>
+            </div>
+            <div class="architecture-map" data-system-map aria-label="Interactive FlashMarket system map"></div>
+            <p class="map-help">Hover or focus a node to isolate its runtime relationships. Select it for implementation detail.</p>
+          </div>
+          <aside class="connection-inspector" data-connection-inspector aria-live="polite">
+            <p class="eyebrow">Connection inspector</p>
+            <h3>Choose a path</h3>
+            <p>Focus any visible line to inspect its protocol, contract, consistency and failure behaviour.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section" id="services" aria-labelledby="services-title">
+        <div class="section-heading">
+          <p class="eyebrow">Nine bounded contexts</p>
+          <h2 id="services-title">Service ownership, not boxes and arrows.</h2>
+          <p>Each service owns a logical database and a focused state machine. Open one to inspect its API, storage, events, workers, limits and source.</p>
+        </div>
+        <div class="service-grid" data-service-grid></div>
+      </section>
+
+      <section class="section section--wide" id="flows" aria-labelledby="flows-title">
+        <div class="section-heading section-heading--split">
+          <div>
+            <p class="eyebrow">Request flow player</p>
+            <h2 id="flows-title">Follow the transaction boundary.</h2>
+            <p>Move through real business paths one durable state transition at a time.</p>
+          </div>
+          <label class="field-label">Business flow
+            <select data-flow-select></select>
+          </label>
+        </div>
+        <div class="flow-player" data-flow-player></div>
+      </section>
+
+      <section class="section" id="events" aria-labelledby="events-title">
+        <div class="section-heading section-heading--split">
+          <div>
+            <p class="eyebrow">Event journey</p>
+            <h2 id="events-title">A fact, from commit to consumer.</h2>
+            <p>Every journey shows the actual producer, routing key, queue fan-out, delivery contract and deduplication boundary.</p>
+          </div>
+          <label class="field-label">Integration event
+            <select data-event-select></select>
+          </label>
+        </div>
+        <div class="event-explorer" data-event-explorer></div>
+      </section>
+
+      <section class="section section--lab" id="outbox" aria-labelledby="outbox-title">
+        <div class="section-heading">
+          <p class="eyebrow">Reliability mechanism / interactive lab</p>
+          <h2 id="outbox-title">The dangerous millisecond after COMMIT.</h2>
+          <p>Crash the process in both designs. Only one preserves enough state to recover delivery.</p>
+        </div>
+        <div class="outbox-lab" data-outbox-lab></div>
+      </section>
+
+      <section class="section" id="database" aria-labelledby="database-title">
+        <div class="section-heading section-heading--split">
+          <div>
+            <p class="eyebrow">Database lab</p>
+            <h2 id="database-title">Indexes follow worker queries.</h2>
+            <p>Inspect owned tables, persisted invariants and the access patterns that shaped each important index.</p>
+          </div>
+          <label class="field-label">Service database
+            <select data-database-select></select>
+          </label>
+        </div>
+        <div class="database-explorer" data-database-explorer></div>
+      </section>
+
+      <section class="section section--lab" id="concurrency" aria-labelledby="concurrency-title">
+        <div class="section-heading">
+          <p class="eyebrow">Concurrency lab</p>
+          <h2 id="concurrency-title">Two buyers. One last unit.</h2>
+          <p>Compare the race with FlashMarket’s PostgreSQL locking and invariant checks.</p>
+        </div>
+        <div class="concurrency-lab" data-concurrency-lab></div>
+      </section>
+
+      <section class="section" id="workers" aria-labelledby="workers-title">
+        <div class="section-heading">
+          <p class="eyebrow">RabbitMQ / process roles</p>
+          <h2 id="workers-title">The broker carries messages. Python processes do the work.</h2>
+          <p>FlashMarket keeps integration events on direct <code>aio-pika</code> consumers and runs four periodic maintenance commands through Celery Beat and isolated service queues.</p>
+        </div>
+        <div class="worker-explorer" data-worker-explorer></div>
+      </section>
+
+      <section class="section" id="consistency" aria-labelledby="consistency-title">
+        <div class="section-heading">
+          <p class="eyebrow">Consistency map</p>
+          <h2 id="consistency-title">Strong locally. Eventual between owners.</h2>
+          <p>The important question is not whether the system is consistent, but where each guarantee ends.</p>
+        </div>
+        <div class="consistency-grid" data-consistency-grid></div>
+      </section>
+
+      <section class="section" id="redis" aria-labelledby="redis-title">
+        <div class="section-heading">
+          <p class="eyebrow">Redis explorer</p>
+          <h2 id="redis-title">One technology, two failure policies.</h2>
+          <p>Derived caches fail open to PostgreSQL. Security-bearing Auth state fails closed.</p>
+        </div>
+        <div class="redis-grid" data-redis-grid></div>
+      </section>
+
+      <section class="section" id="failures" aria-labelledby="failures-title">
+        <div class="section-heading">
+          <p class="eyebrow">Failure mode explorer</p>
+          <h2 id="failures-title">Ask the uncomfortable question.</h2>
+          <p>Each answer separates current protection from the limitation that still remains.</p>
+        </div>
+        <div class="failure-layout" data-failure-explorer></div>
+      </section>
+
+      <section class="section" id="decisions" aria-labelledby="decisions-title">
+        <div class="section-heading">
+          <p class="eyebrow">Engineering decisions</p>
+          <h2 id="decisions-title">Correctness mechanisms with a price tag.</h2>
+          <p>These are the decisions worth discussing—not another inventory of technologies.</p>
+        </div>
+        <div class="decision-grid" data-decision-grid></div>
+      </section>
+
+      <section class="section interview-section" id="interview" aria-labelledby="interview-title">
+        <div class="section-heading section-heading--split">
+          <div>
+            <p class="eyebrow">Interview mode</p>
+            <h2 id="interview-title">Why is it built this way?</h2>
+            <p>Short answers for the whiteboard. Deep answers for the follow-up.</p>
+          </div>
+          <button class="button" type="button" data-expand-interview>Expand all answers</button>
+        </div>
+        <div class="interview-list" data-interview-list></div>
+      </section>
+
+      <section class="section status-section" aria-labelledby="status-title">
+        <div class="section-heading">
+          <p class="eyebrow">Truthful scope</p>
+          <h2 id="status-title">Implemented is not the same as intended.</h2>
+          <p>Mock payment authority, physical notification delivery and tracing are shown as boundaries—not quietly presented as finished work.</p>
+        </div>
+        <div class="status-board" data-status-board></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div><span class="wordmark__signal" aria-hidden="true"></span> FlashMarket Architecture Explorer</div>
+      <p>Repository-audited snapshot · 2026-08-14 · No runtime data is changed by this page.</p>
+      <a href="#main">Back to top ↑</a>
+    </footer>
+
+    <dialog class="side-dialog" data-service-dialog aria-label="Service details">
+      <div data-service-dialog-content></div>
+    </dialog>
+
+    <dialog class="search-dialog" data-search-dialog aria-labelledby="search-title">
+      <h2 class="sr-only" id="search-title">Search FlashMarket architecture</h2>
+      <div class="search-dialog__bar">
+        <span aria-hidden="true">⌕</span>
+        <label class="sr-only" for="architecture-search">Search architecture</label>
+        <input id="architecture-search" name="architecture-search" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" aria-label="Search architecture" placeholder="Search outbox, order, lock, queue…" data-search-input>
+        <button type="button" data-search-close aria-label="Close search">Esc</button>
+      </div>
+      <div class="search-results" data-search-results>
+        <p>Start typing to search services, events, mechanisms, flows, tables and source evidence.</p>
+      </div>
+    </dialog>
+
+    <div class="connection-tooltip" role="tooltip" data-connection-tooltip hidden></div>
+    <div class="sr-only" aria-live="polite" data-live-region></div>
+
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>

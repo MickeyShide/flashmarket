@@ -15,6 +15,7 @@ x-inventory-environment: &inventory-environment
   INVENTORY_REDIS_URL: redis://shide-redis:6379/2
   INVENTORY_STOCK_CACHE_TTL_SECONDS: 30
   INVENTORY_RABBITMQ_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket
+  CELERY_BROKER_URL: amqp://${INFRA_USER:-shide}:${RABBITMQ_PASSWORD:-shide}@shide-rabbitmq:5672/flashmarket-tasks
   INVENTORY_DROPS_BASE_URL: http://drops:8000
   INVENTORY_EXPIRY_POLL_INTERVAL_SECONDS: 5
   INVENTORY_CORS_ORIGINS: '["http://localhost:3000"]'
@@ -90,23 +91,24 @@ services:
     pids_limit: ${INVENTORY_WORKER_PIDS_LIMIT:-64}
     healthcheck: *worker-health
 
-  expiry:
+  maintenance:
     <<: *inventory-runtime
     environment:
       <<: *inventory-environment
-      INVENTORY_LOG_FILE_PATH: /var/log/shide/inventory-expiry.log
-    command:
-      - cleanup
-      - python
-      - -m
-      - inventory.expiry_worker
+      INVENTORY_LOG_FILE_PATH: /var/log/shide/inventory-maintenance.log
+    command: ["celery-worker", "-A", "inventory.celery_app:app", "worker", "--loglevel=INFO", "--queues=inventory.maintenance", "--concurrency=1", "--hostname=inventory-maintenance@%h"]
     volumes:
       - backend-logs-local:/var/log/shide
     restart: unless-stopped
     mem_limit: ${INVENTORY_MAINTENANCE_MEMORY_LIMIT:-128m}
     mem_reservation: ${INVENTORY_MAINTENANCE_MEMORY_RESERVATION:-40m}
     pids_limit: ${INVENTORY_MAINTENANCE_PIDS_LIMIT:-64}
-    healthcheck: *worker-health
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A inventory.celery_app:app inspect ping --destination inventory-maintenance@$${HOSTNAME} --timeout 5"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   auth-jwt-keys-public:

@@ -7,6 +7,7 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.18,<2",
     "asyncpg>=0.31,<1",
+    "flashmarket-celery-runtime",
     "fastapi>=0.140,<1",
     "httpx>=0.28,<1",
     "prometheus-client>=0.26,<1",
@@ -20,6 +21,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+flashmarket-celery-runtime = { path = "../shared/celery_runtime" }
 jwt_verifier = { path = "../shared/jwt_verifier" }
 rabbitmq_reliability = { path = "../shared/rabbitmq_reliability" }
 

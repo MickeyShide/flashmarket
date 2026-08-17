@@ -36,7 +36,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  cleanup:
+  maintenance:
     <<: *media-runtime
     mem_limit: ${MEDIA_MAINTENANCE_MEMORY_LIMIT:-128m}
     mem_reservation: ${MEDIA_MAINTENANCE_MEMORY_RESERVATION:-40m}
@@ -44,18 +44,21 @@ services:
     init: true
     stop_grace_period: 20s
     logging: *bounded-logging
-    command: ["cleanup", "python", "-m", "media_service.cleanup_worker"]
+    command: ["celery-worker", "-A", "media_service.celery_app:app", "worker", "--loglevel=INFO", "--queues=media.maintenance", "--concurrency=1", "--hostname=media-maintenance@%h"]
+    networks:
+      backend:
+        aliases: [media-maintenance]
     volumes:
       - auth-jwt-keys-public:/var/lib/flashmarket/keys/public:ro
     restart: unless-stopped
     labels:
       flashmarket.autoheal: "true"
     healthcheck:
-      test: ["CMD", "python", "-m", "media_service.worker_health", "90"]
-      interval: 30s
-      timeout: 3s
+      test: ["CMD-SHELL", "celery -A media_service.celery_app:app inspect ping --destination media-maintenance@$${HOSTNAME} --timeout 5"]
+      interval: 15s
+      timeout: 10s
       retries: 3
-      start_period: 90s
+      start_period: 30s
 
 networks:
   backend:

@@ -7,7 +7,9 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_auth_001_to_005_user_registration_login_and_token_refresh(client: AsyncClient) -> None:
+async def test_auth_001_to_005_user_registration_login_and_token_refresh(
+    client: AsyncClient,
+) -> None:
     """AUTH-001..AUTH-005: Register, login, refresh token, list active sessions, and logout."""
     email = f"user_{uuid.uuid4().hex[:6]}@example.com"
     password = "SecurePassword123!"

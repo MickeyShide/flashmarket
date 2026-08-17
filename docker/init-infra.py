@@ -102,6 +102,11 @@ def _get_rabbitmq_urls() -> list[str]:
     return urls
 
 
+def _get_celery_broker_urls() -> list[str]:
+    """Return task-broker URLs whose vhosts need only permissions."""
+    return [url] if (url := os.environ.get("CELERY_BROKER_URL")) else []
+
+
 @retry("Waiting for PostgreSQL")
 async def ensure_database() -> None:
     raw_url = _get_db_url()
@@ -142,7 +147,11 @@ def _rabbitmq_vhost_from_url(raw_url: str) -> str:
     return urllib.parse.unquote(path[1:])
 
 
-def _ensure_vhost_and_permissions(raw_url: str) -> None:
+def _ensure_vhost_and_permissions(
+    raw_url: str,
+    *,
+    install_event_topology: bool = True,
+) -> None:
     url = urlparse(raw_url)
     if not url.hostname:
         raise ValueError("RabbitMQ URL is missing a hostname")
@@ -187,6 +196,9 @@ def _ensure_vhost_and_permissions(raw_url: str) -> None:
                 f"with HTTP {resp.status}"
             )
     print(f"Granted permissions for user '{user}' on vhost '{vhost}'")
+
+    if not install_event_topology:
+        return
 
     for exchange_name, exchange_type in (
         ("flashmarket.retry", "direct"),
@@ -319,12 +331,19 @@ def _ensure_vhost_and_permissions(raw_url: str) -> None:
 @retry("Waiting for RabbitMQ management API")
 def ensure_rabbitmq_vhost() -> None:
     urls = _get_rabbitmq_urls()
-    if not urls:
+    celery_urls = _get_celery_broker_urls()
+    if not urls and not celery_urls:
         print("No RabbitMQ URL configured in environment, skipping RabbitMQ initialization.")
         return
 
+    initialized: set[str] = set()
     for raw_url in urls:
-        _ensure_vhost_and_permissions(raw_url)
+        _ensure_vhost_and_permissions(raw_url, install_event_topology=True)
+        initialized.add(raw_url)
+    for raw_url in celery_urls:
+        if raw_url in initialized:
+            continue
+        _ensure_vhost_and_permissions(raw_url, install_event_topology=False)
 
 
 async def main() -> None:

@@ -9,14 +9,14 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 BACKGROUND: dict[str, set[str]] = {
-    "auth/docker-compose.deploy.yml": {"cleanup", "outbox"},
-    "inventory/docker-compose.deploy.yml": {"consumer", "outbox", "expiry"},
+    "auth/docker-compose.deploy.yml": {"maintenance", "outbox"},
+    "inventory/docker-compose.deploy.yml": {"consumer", "outbox", "maintenance"},
     "orders/docker-compose.deploy.yml": {"consumer", "outbox"},
     "payments/docker-compose.deploy.yml": {"consumer", "outbox"},
     "notifications/docker-compose.deploy.yml": {"consumer", "outbox"},
     "wishlist/docker-compose.deploy.yml": {"consumer", "outbox"},
-    "drops/docker-compose.deploy.yml": {"scheduler", "outbox"},
-    "media/docker-compose.deploy.yml": {"cleanup"},
+    "drops/docker-compose.deploy.yml": {"maintenance", "outbox"},
+    "media/docker-compose.deploy.yml": {"maintenance"},
 }
 
 
@@ -80,8 +80,6 @@ def test_worker_metrics_targets_match_unique_production_aliases() -> None:
     for path, names in BACKGROUND.items():
         services = _load(path)["services"]
         for name in names:
-            if path.startswith("media/"):
-                continue
             service_aliases = service_network = services[name]["networks"]["backend"][
                 "aliases"
             ]

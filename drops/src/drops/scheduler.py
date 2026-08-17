@@ -1,21 +1,21 @@
-"""Background scheduler process for starting and ending flash-sale drops."""
+"""One-shot scheduler operation for starting and ending flash-sale drops."""
 
-import asyncio
 import json
 import logging
 
-from rabbitmq_reliability import periodic_heartbeat
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from drops.domain.entities import DropEventType, DropStatus
 from drops.infrastructure.database import SessionFactory, utc_now
 from drops.infrastructure.models import OutboxEventModel
 from drops.infrastructure.repositories.drop import DropRepository
-from drops.observability import setup_metrics
 
 logger = logging.getLogger("drops.scheduler")
 
 
-async def run_scheduler_tick(session_factory=None) -> None:
+async def run_scheduler_tick(
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+) -> None:
     """Perform one iteration of drop state checks."""
     factory = session_factory or SessionFactory
     now = utc_now()
@@ -58,24 +58,3 @@ async def run_scheduler_tick(session_factory=None) -> None:
             )
             session.add(event)
             logger.info("Drop %s (%s) automatically ended", drop.id, drop.slug)
-
-
-async def main() -> None:
-    """Scheduler main loop."""
-    setup_metrics()
-    logger.info("Starting drops scheduler loop...")
-    async with periodic_heartbeat(
-        "/tmp/flashmarket-heartbeat.json",
-        interval_seconds=10,
-        phase="drops_scheduler",
-    ):
-        while True:
-            try:
-                await run_scheduler_tick()
-            except Exception:
-                logger.exception("Error in scheduler tick")
-            await asyncio.sleep(10)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

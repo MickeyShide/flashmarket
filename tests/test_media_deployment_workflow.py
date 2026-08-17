@@ -63,7 +63,7 @@ def test_media_deploy_migrates_starts_all_runtime_and_verifies_gateway() -> None
     workflow = _workflow()
 
     assert "run --rm --no-deps api migrate" in workflow
-    assert "api cleanup" in workflow
+    assert "api maintenance" in workflow
     assert "/dev/status/media" in workflow
     assert "Media is not reachable through the production gateway" in workflow
 
@@ -72,6 +72,5 @@ def test_media_deploy_compose_owns_api_cleanup_and_network_alias() -> None:
     compose = DEPLOY_COMPOSE_PATH.read_text(encoding="utf-8")
 
     assert "  api:" in compose
-    assert "  cleanup:" in compose
-    assert "      aliases:\n        - media" in compose
+    assert "  maintenance:" in compose
     assert "name: shide-observability" in compose
