@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - frontend/**
+      - docs/architecture/**
       - gateway/**
       - tools/openapi/**
       - auth/src/**
@@ -45,6 +46,7 @@ on:
       - main
     paths:
       - frontend/**
+      - docs/architecture/**
       - gateway/**
       - tools/openapi/**
       - auth/src/**
