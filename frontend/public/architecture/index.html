@@ -3,133 +3,343 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="FlashMarket Interactive Architecture Cockpit.">
+    <meta name="description" content="FlashMarket Interactive Architecture Map.">
     <meta name="theme-color" content="#ffffff">
     <link rel="icon" href="data:,">
-    <title>FlashMarket — Interactive Architecture</title>
+    <title>FLASHMARKET ARCHITECTURE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,600;0,700;0,800;0,900;1,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
-    <a class="skip-link" href="#cockpit">Skip to architecture cockpit</a>
+    <a class="skip-link" href="#main-app">Skip to architecture overview</a>
 
-    <!-- TOP BAR -->
-    <header class="cockpit-header">
-      <div class="header-left">
-        <a class="wordmark" href="#cockpit">
-          <span class="wordmark__signal" aria-hidden="true"></span>
-          <span>FLASHMARKET</span>
-          <span class="wordmark__context">/ ARCHITECTURE COCKPIT</span>
+    <!-- TOP HEADER -->
+    <header class="app-header">
+      <div class="header-brand">
+        <a class="brand-link" href="#main-app">
+          <span class="brand-title">FLASHMARKET</span>
+          <span class="brand-subtitle">ARCHITECTURE</span>
         </a>
-        <div class="system-pills">
-          <span class="sys-pill">9 Microservices</span>
-          <span class="sys-pill">PostgreSQL per service</span>
-          <span class="sys-pill">RabbitMQ Outbox</span>
-          <span class="sys-pill">Celery Workers</span>
-        </div>
       </div>
 
-      <div class="header-right">
-        <a class="nav-btn" href="/dev">DEV HUB ↗</a>
-        <a class="nav-btn" href="/">STORE ↗</a>
+      <nav class="header-nav" aria-label="Main Navigation">
+        <button type="button" class="nav-tab is-active" data-nav-filter="overview">OVERVIEW</button>
+        <button type="button" class="nav-tab" data-nav-filter="services">SERVICES</button>
+        <button type="button" class="nav-tab" data-nav-filter="events">EVENTS</button>
+        <button type="button" class="nav-tab" data-nav-filter="data">DATA STORES</button>
+        <button type="button" class="nav-tab" data-nav-filter="api">API</button>
+      </nav>
+
+      <div class="header-user-actions">
+        <button type="button" class="icon-action-btn" aria-label="Notifications">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        </button>
+        <div class="user-profile-badge">
+          <span>MICKEY</span>
+        </div>
+        <a class="devhub-cta-btn" href="/dev">DEV HUB ↗</a>
+        <a class="cart-icon-btn" href="/" aria-label="Store Cart">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <span class="cart-badge-count">2</span>
+        </a>
       </div>
     </header>
 
-    <!-- MAIN UNIFIED COCKPIT -->
-    <main id="cockpit" class="cockpit-layout">
-      <!-- 1. LIVE SCENARIO BAR -->
-      <section class="scenario-bar" aria-label="Interactive flow scenarios">
-        <div class="scenario-tabs">
-          <span class="scenario-label">⚡ RUN SCENARIO:</span>
-          <button type="button" class="scenario-btn is-active" data-scenario="buy">1. Buy & Checkout (Outbox + AMQP)</button>
-          <button type="button" class="scenario-btn" data-scenario="drop">2. Flash Sale Drop (Atomic Lock)</button>
-          <button type="button" class="scenario-btn" data-scenario="outbox">3. Outbox Crash & Recovery</button>
-          <button type="button" class="scenario-btn" data-scenario="cleanup">4. Celery Stock Cleanup</button>
+    <!-- MAIN DASHBOARD -->
+    <main id="main-app" class="architecture-dashboard">
+      <!-- HERO TITLE & DIAGRAM LEGEND -->
+      <section class="dashboard-topbar">
+        <div class="title-block">
+          <h1>System Architecture</h1>
+          <p>Modular microservices platform for scarce, premium drops. Built for scale, resilience, and speed.</p>
         </div>
 
-        <div class="scenario-player">
-          <button type="button" class="play-btn" data-play-flow>▶ Play Animation</button>
-          <button type="button" class="step-btn" data-step-prev disabled>←</button>
-          <button type="button" class="step-btn" data-step-next>→</button>
-          <div class="flow-status-text" data-flow-status>Ready. Click a scenario or step to trace data flow.</div>
+        <div class="legend-block" aria-label="Connection Types">
+          <button type="button" class="legend-filter is-active" data-filter="http">
+            <span class="legend-line line-http"></span>
+            <span>HTTP (Sync)</span>
+          </button>
+          <button type="button" class="legend-filter is-active" data-filter="event">
+            <span class="legend-line line-event"></span>
+            <span>Events (Async)</span>
+          </button>
+          <button type="button" class="legend-filter is-active" data-filter="data">
+            <span class="legend-line line-data"></span>
+            <span>Data / Cache</span>
+          </button>
         </div>
       </section>
 
-      <!-- 2. INTERACTIVE TOPOLOGY & INSPECTOR -->
-      <section class="workbench-grid">
-        <!-- Visual Map -->
-        <div class="map-viewport">
-          <div class="viewport-toolbar">
-            <div class="legend-items">
-              <span class="leg-item"><i class="leg-line leg-http"></i> HTTP (Sync)</span>
-              <span class="leg-item"><i class="leg-line leg-event"></i> RabbitMQ Events (Async)</span>
-              <span class="leg-item"><i class="leg-line leg-data"></i> PostgreSQL</span>
-              <span class="leg-item"><i class="leg-line leg-cache"></i> Redis / S3</span>
+      <!-- MAIN WORKBENCH: DIAGRAM CANVAS + SERVICE INSPECTOR -->
+      <div class="workbench-container">
+        <!-- INTERACTIVE SVG & NODES CANVAS -->
+        <div class="canvas-panel" id="canvas-panel">
+          <svg class="connections-svg" id="connections-svg" viewBox="0 0 1000 680" preserveAspectRatio="none">
+            <!-- Dynamic and static SVG paths rendered by js -->
+          </svg>
+
+          <div class="nodes-layer" id="nodes-layer">
+            <!-- 1. LEFT COLUMN: CLIENT & EDGE -->
+            <div class="node-card node-client" id="node-component-browser" data-node-id="component-browser">
+              <div class="node-icon-box icon-bg-gray">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+              </div>
+              <strong>Client / Browser</strong>
+              <small>Web · Mobile</small>
             </div>
-            <div class="filter-buttons" data-map-filters></div>
-          </div>
 
-          <div class="architecture-canvas" data-system-map aria-label="Interactive Architecture Map"></div>
+            <div class="node-card node-gateway" id="node-component-gateway" data-node-id="component-gateway">
+              <div class="node-icon-box icon-bg-green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7v10l10 5 10-5V7L12 2z" fill="#009639"/><path d="M8 8v8l8-8v8" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <strong>NGINX Gateway</strong>
+              <small>Edge</small>
+            </div>
+
+            <!-- 2. CORE MICROSERVICES CONTAINER -->
+            <div class="microservices-cluster" id="cluster-microservices">
+              <div class="cluster-label">CORE MICROSERVICES</div>
+              <div class="cluster-grid">
+                <!-- ROW 1: CORE TRANSACTIONAL -->
+                <div class="node-card node-service" id="node-service-auth" data-node-id="service-auth">
+                  <div class="node-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  </div>
+                  <strong>Auth</strong>
+                </div>
+
+                <div class="node-card node-service" id="node-service-catalog" data-node-id="service-catalog">
+                  <div class="node-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                  </div>
+                  <strong>Catalog</strong>
+                </div>
+
+                <div class="node-card node-service is-selected is-active-service" id="node-service-inventory" data-node-id="service-inventory">
+                  <span class="live-dot" aria-hidden="true"></span>
+                  <div class="node-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                  </div>
+                  <strong>Inventory</strong>
+                </div>
+
+                <div class="node-card node-service" id="node-service-orders" data-node-id="service-orders">
+                  <div class="node-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                  </div>
+                  <strong>Orders</strong>
+                </div>
+
+                <div class="node-card node-service" id="node-service-payments" data-node-id="service-payments">
+                  <div class="node-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                  </div>
+                  <strong>Payments</strong>
+                </div>
+
+                <!-- ROW 2: ENGAGEMENT & MEDIA -->
+                <div class="node-card node-service" id="node-service-notifications" data-node-id="service-notifications">
+                  <div class="node-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                  </div>
+                  <strong>Notifications</strong>
+                </div>
+
+                <div class="node-card node-service" id="node-service-wishlist" data-node-id="service-wishlist">
+                  <div class="node-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                  </div>
+                  <strong>Wishlist</strong>
+                </div>
+
+                <div class="node-card node-service" id="node-service-drops" data-node-id="service-drops">
+                  <div class="node-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><circle cx="7" cy="7" r=".5" fill="currentColor"/></svg>
+                  </div>
+                  <strong>Drops</strong>
+                </div>
+
+                <div class="node-card node-service" id="node-service-media" data-node-id="service-media">
+                  <div class="node-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                  </div>
+                  <strong>Media</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. CENTER MIDDLE: ASYNC EVENT BUS & CELERY WORKERS -->
+            <div class="node-card node-infra node-rabbitmq" id="node-component-rabbitmq" data-node-id="component-rabbitmq">
+              <div class="node-icon-box icon-bg-orange">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" fill="#FF6600"/><circle cx="12" cy="12" r="3" fill="#ffffff"/></svg>
+              </div>
+              <div>
+                <strong>RabbitMQ</strong>
+                <small>Event Bus</small>
+              </div>
+            </div>
+
+            <div class="node-card node-infra node-celery" id="node-component-celery" data-node-id="component-celery">
+              <div class="node-icon-box icon-bg-orange-light">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </div>
+              <div>
+                <strong>Celery</strong>
+                <small>Workers</small>
+              </div>
+            </div>
+
+            <!-- 4. BOTTOM ROW: DATA STORES & STORAGE -->
+            <div class="node-card node-infra node-postgres" id="node-component-postgres" data-node-id="component-postgres">
+              <div class="node-icon-box icon-bg-blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#336791" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+              </div>
+              <div>
+                <strong>PostgreSQL</strong>
+                <small>Database</small>
+              </div>
+            </div>
+
+            <div class="node-card node-infra node-redis" id="node-component-redis" data-node-id="component-redis">
+              <div class="node-icon-box icon-bg-red">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#D82C20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div>
+                <strong>Redis</strong>
+                <small>Cache</small>
+              </div>
+            </div>
+
+            <div class="node-card node-infra node-s3" id="node-component-s3" data-node-id="component-s3">
+              <div class="node-icon-box icon-bg-green-light">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v5"/><path d="M21 11H3v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8Z"/><path d="M10 15h4"/></svg>
+              </div>
+              <div>
+                <strong>S3 / MinIO</strong>
+                <small>Object Storage</small>
+              </div>
+            </div>
+
+            <div class="node-card node-infra node-prometheus" id="node-component-prometheus" data-node-id="component-prometheus">
+              <div class="node-icon-box icon-bg-orange">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+              </div>
+              <div>
+                <strong>Prometheus</strong>
+                <small>Observability</small>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Live Instant Inspector -->
-        <aside class="live-inspector" data-connection-inspector aria-live="polite">
-          <p class="eyebrow">Instant Inspector</p>
-          <h3 id="inspector-title">System Overview</h3>
-          <p class="inspector-desc">Hover or click any service or connection line to inspect its inbound/outbound contracts and DB queries.</p>
-          <div class="inspector-content" data-inspector-content></div>
+        <!-- RIGHT SIDEBAR: SERVICE INSPECTOR -->
+        <aside class="inspector-sidebar" id="inspector-sidebar">
+          <div class="inspector-header">
+            <span class="inspector-label">SERVICE INSPECTOR</span>
+            <span class="status-indicator">
+              <i class="status-dot"></i> HEALTHY
+            </span>
+          </div>
+
+          <div class="service-identity">
+            <div class="service-avatar" id="inspector-avatar">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+            </div>
+            <div>
+              <h2 id="inspector-name">Inventory</h2>
+              <span class="service-type-tag" id="inspector-type">Microservice</span>
+            </div>
+          </div>
+
+          <div class="inspector-section">
+            <span class="section-title">RESPONSIBILITY</span>
+            <p id="inspector-responsibility">Stock authority, reservations, drop purchase enforcement, expiry and inventory events.</p>
+          </div>
+
+          <div class="inspector-section">
+            <span class="section-title">MAIN EVENTS (PUBLISHED)</span>
+            <div class="events-chip-group" id="inspector-events">
+              <span class="event-chip">InventoryReserved</span>
+              <span class="event-chip">InventoryCommitted</span>
+              <span class="event-chip">ReservationReleased</span>
+            </div>
+          </div>
+
+          <div class="inspector-section">
+            <span class="section-title">STORAGE</span>
+            <div class="storage-chip-group" id="inspector-storage">
+              <span class="storage-chip">PostgreSQL (inventory)</span>
+            </div>
+          </div>
+
+          <button type="button" class="view-detail-btn" id="open-service-drawer-btn">
+            VIEW SERVICE DETAIL ↗
+          </button>
         </aside>
-      </section>
+      </div>
 
-      <!-- 3. CORE PATTERNS STRIP -->
-      <section class="patterns-strip" aria-label="Core Engineering Mechanisms">
-        <article class="pattern-card">
-          <div class="pat-header">
-            <strong>1. Atomic Stock Update</strong>
-            <code>PostgreSQL</code>
+      <!-- BOTTOM PATTERNS STRIP (4 HIGHLIGHT CARDS) -->
+      <section class="patterns-grid">
+        <article class="pattern-item" data-pattern="atomic">
+          <div class="pattern-icon icon-shield">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           </div>
-          <code>UPDATE stock SET available = available - 1 WHERE available >= 1</code>
-          <p>Prevents overselling under race conditions in a single query without distributed locks.</p>
+          <div class="pattern-content">
+            <div class="pat-top">
+              <strong>Atomic Stock Update</strong>
+              <span class="pat-num">01</span>
+            </div>
+            <p>Prevent overselling with row-level locks and atomic decrement.</p>
+          </div>
         </article>
 
-        <article class="pattern-card">
-          <div class="pat-header">
-            <strong>2. Transactional Outbox</strong>
-            <code>aio-pika relay</code>
+        <article class="pattern-item" data-pattern="outbox">
+          <div class="pattern-icon icon-outbox">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
           </div>
-          <code>INSERT INTO outbox_events (...) in same DB transaction</code>
-          <p>Guarantees at-least-once message delivery even if the application server crashes after commit.</p>
+          <div class="pattern-content">
+            <div class="pat-top">
+              <strong>Transactional Outbox</strong>
+              <span class="pat-num">02</span>
+            </div>
+            <p>Write DB + event in one TX. Crash-safe event publishing.</p>
+          </div>
         </article>
 
-        <article class="pattern-card">
-          <div class="pat-header">
-            <strong>3. Idempotent Consumers</strong>
-            <code>RabbitMQ</code>
+        <article class="pattern-item" data-pattern="idempotent">
+          <div class="pattern-icon icon-sync">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6A1B9A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
           </div>
-          <code>UNIQUE (event_id, consumer_name)</code>
-          <p>Duplicate messages cause zero side effects via database deduplication keys.</p>
+          <div class="pattern-content">
+            <div class="pat-top">
+              <strong>Idempotent Consumers</strong>
+              <span class="pat-num">03</span>
+            </div>
+            <p>Deduplicate by event_id + key. Safe retries, zero side effects.</p>
+          </div>
         </article>
 
-        <article class="pattern-card">
-          <div class="pat-header">
-            <strong>4. Two-Tier Redis Strategy</strong>
-            <code>Redis + PG</code>
+        <article class="pattern-item" data-pattern="redis">
+          <div class="pattern-icon icon-redis">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
           </div>
-          <code>Catalog: Fail-open to DB | Auth sessions: Fail-closed</code>
-          <p>High catalog throughput with strict security guarantees for user authorization.</p>
+          <div class="pattern-content">
+            <div class="pat-top">
+              <strong>Redis Strategy</strong>
+              <span class="pat-num">04</span>
+            </div>
+            <p>Cache hot data, idempotency keys & distributed rate limiting.</p>
+          </div>
         </article>
       </section>
     </main>
 
-    <!-- FULL SERVICE DRAWER (ON DEMAND) -->
+    <!-- FULL SERVICE DETAILS DRAWER -->
     <dialog class="side-dialog" data-service-dialog aria-label="Service Details Drawer">
       <div data-service-dialog-content></div>
     </dialog>
-
-    <div class="connection-tooltip" role="tooltip" data-connection-tooltip hidden></div>
-    <div class="sr-only" aria-live="polite" data-live-region></div>
 
     <script type="module" src="./js/main.js"></script>
   </body>

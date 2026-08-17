@@ -1,247 +1,149 @@
-import {
-  $, $$, entityLabel, escapeHtml, getConnectionKind, resolveVisualNode, statusBadge,
-} from "./utils.js";
+import { $, $$, createEntityIndex, escapeHtml } from "./utils.js";
 
-const POSITIONS = {
-  "component-browser": [8, 12],
-  "component-gateway": [25, 12],
-  "service-auth": [9, 36],
-  "service-catalog": [29, 36],
-  "service-inventory": [49, 36],
-  "service-orders": [69, 36],
-  "service-payments": [89, 36],
-  "service-notifications": [18, 58],
-  "service-wishlist": [39, 58],
-  "service-drops": [60, 58],
-  "service-media": [81, 58],
-  "component-rabbitmq": [24, 82],
-  "component-redis": [44, 82],
-  "component-postgres": [64, 82],
-  "component-s3": [84, 82],
-  "component-prometheus": [12, 94],
-  "component-celery": [88, 94],
+const ICONS = {
+  "service-inventory": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`,
+  "service-auth": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1565C0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  "service-catalog": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1565C0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>`,
+  "service-orders": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>`,
+  "service-payments": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6A1B9A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>`,
+  "service-notifications": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
+  "service-wishlist": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C2185B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>`,
+  "service-drops": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00897B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><circle cx="7" cy="7" r=".5" fill="currentColor"/></svg>`,
+  "service-media": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3949AB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`,
+  "component-gateway": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7v10l10 5 10-5V7L12 2z" fill="#009639"/><path d="M8 8v8l8-8v8" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  "component-rabbitmq": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" fill="#FF6600"/><circle cx="12" cy="12" r="3" fill="#ffffff"/></svg>`,
+  "component-celery": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  "component-postgres": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#336791" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>`,
+  "component-redis": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#D82C20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  "component-s3": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v5"/><path d="M21 11H3v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8Z"/><path d="M10 15h4"/></svg>`,
+  "component-prometheus": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`,
 };
 
-const FILTERS = [
-  { id: "all", label: "All Links" },
-  { id: "http", label: "HTTP (Sync)" },
-  { id: "event", label: "Events (RabbitMQ)" },
-  { id: "data", label: "PostgreSQL / Storage" },
-];
+export function updateInspector(nodeId, data, index) {
+  const entity = index.get(nodeId);
+  if (!entity) return;
 
-function mapNodeKind(entity) {
-  return entity.id.startsWith("service-") ? "service" : "infrastructure";
-}
+  const nameEl = $("#inspector-name");
+  const typeEl = $("#inspector-type");
+  const avatarEl = $("#inspector-avatar");
+  const respEl = $("#inspector-responsibility");
+  const eventsEl = $("#inspector-events");
+  const storageEl = $("#inspector-storage");
+  const drawerBtn = $("#open-service-drawer-btn");
 
-function connectionPath(from, to, offset = 0) {
-  const [x1, y1] = POSITIONS[from] || [50, 50];
-  const [x2, y2] = POSITIONS[to] || [50, 50];
-  const bend = offset * 1.5;
-  const mx = (x1 + x2) / 2 + (y2 - y1) * bend / 100;
-  const my = (y1 + y2) / 2 - (x2 - x1) * bend / 100;
-  return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
-}
-
-export function renderInspector(target, data, index) {
-  const title = $("#inspector-title");
-  const content = $("[data-inspector-content]");
-  if (!title || !content) return;
-
-  if (target.entityType === "services") {
-    const service = target;
-    const db = index.get(service.databaseId);
-    const published = service.publishesEventIds.map((id) => index.get(id)).filter(Boolean);
-    const consumed = service.consumesEventIds.map((id) => index.get(id)).filter(Boolean);
-    const endpoints = service.endpointIds.map((id) => index.get(id)).filter(Boolean);
-
-    title.innerHTML = `${escapeHtml(service.name)} Microservice ${statusBadge(service.status)}`;
-    content.innerHTML = `
-      <div class="insp-section">
-        <strong>Responsibility</strong>
-        <p>${escapeHtml(service.responsibility)}</p>
-      </div>
-
-      <div class="insp-section">
-        <strong>Database</strong>
-        <p><code>${escapeHtml(db?.name || service.slug)}</code> (Private PostgreSQL instance)</p>
-      </div>
-
-      <div class="insp-section">
-        <strong>Outbox Events Published (${published.length})</strong>
-        <div class="insp-tags">${published.map((e) => `<code>${escapeHtml(e.name)}</code>`).join(" ") || "<span class='dim'>None</span>"}</div>
-      </div>
-
-      <div class="insp-section">
-        <strong>Events Consumed (${consumed.length})</strong>
-        <div class="insp-tags">${consumed.map((e) => `<code>${escapeHtml(e.name)}</code>`).join(" ") || "<span class='dim'>None</span>"}</div>
-      </div>
-
-      <div class="insp-section">
-        <strong>Public API (${endpoints.length} routes)</strong>
-        <div class="insp-endpoints">
-          ${endpoints.slice(0, 4).map((ep) => `
-            <div class="insp-ep">
-              <span class="ep-method">${escapeHtml(ep.method)}</span>
-              <code>${escapeHtml(ep.path)}</code>
-            </div>`).join("")}
-        </div>
-      </div>
-
-      <button class="button button--primary" style="width:100%;margin-top:10px" type="button" data-open-drawer-btn="${service.id}">Open Full Spec Drawer →</button>`;
-    return;
+  if (avatarEl) {
+    avatarEl.innerHTML = ICONS[nodeId] || ICONS["service-inventory"];
   }
 
-  if (target.protocol || target.from) {
-    const conn = target;
-    const from = index.get(conn.from);
-    const to = index.get(conn.to);
-    const contract = Array.isArray(conn.contract) ? conn.contract.join(", ") : conn.contract;
+  if (entity.entityType === "services") {
+    const db = index.get(entity.databaseId);
+    const published = entity.publishesEventIds.map((id) => index.get(id)).filter(Boolean);
 
-    title.innerHTML = `${escapeHtml(entityLabel(from, conn.from))} → ${escapeHtml(entityLabel(to, conn.to))}`;
-    content.innerHTML = `
-      <div class="insp-section">
-        <strong>Protocol & Transport</strong>
-        <p><b>${escapeHtml(conn.protocol)}</b> (${escapeHtml(conn.purpose)})</p>
-      </div>
+    if (nameEl) nameEl.textContent = entity.name;
+    if (typeEl) typeEl.textContent = "Microservice";
+    if (respEl) respEl.textContent = entity.responsibility;
 
-      <div class="insp-section">
-        <strong>Contract / Event Name</strong>
-        <p><code>${escapeHtml(contract || "Repository Contract")}</code></p>
-      </div>
-
-      <div class="insp-section">
-        <strong>Consistency Guarantee</strong>
-        <p>${escapeHtml(conn.consistency)}</p>
-      </div>
-
-      <div class="insp-section">
-        <strong>Failure Behavior</strong>
-        <p>${escapeHtml(conn.failureBehaviour)}</p>
-      </div>`;
-  }
-}
-
-export function initSystemMap(data, index, { onOpenService }) {
-  const map = $("[data-system-map]");
-  const controls = $("[data-map-filters]");
-  if (!map || !controls) return { highlightRoute() {} };
-
-  const nodes = [...data.infrastructure, ...data.services].filter((entity) => POSITIONS[entity.id]);
-  const edges = data.connections.map((connection, position) => {
-    const from = resolveVisualNode(connection.from, data, index);
-    const to = resolveVisualNode(connection.to, data, index);
-    return { ...connection, visualFrom: from, visualTo: to, kind: getConnectionKind(connection), offset: (position % 5) - 2 };
-  }).filter((edge) => POSITIONS[edge.visualFrom] && POSITIONS[edge.visualTo] && edge.visualFrom !== edge.visualTo);
-
-  controls.innerHTML = FILTERS.map((filter) => `
-    <button type="button" data-map-filter="${filter.id}" class="${filter.id === "all" ? "is-active" : ""}">
-      ${filter.label}
-    </button>`).join("");
-
-  map.innerHTML = `
-    <svg class="map-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="System connections">
-      ${edges.map((edge) => `
-        <path class="map-edge map-edge--${edge.kind}" d="${connectionPath(edge.visualFrom, edge.visualTo, edge.offset)}"
-          vector-effect="non-scaling-stroke" tabindex="0"
-          data-connection-id="${edge.id}" data-from="${edge.visualFrom}" data-to="${edge.visualTo}" data-kind="${edge.kind}">
-          <title>${escapeHtml(edge.protocol)}: ${escapeHtml(edge.purpose)}</title>
-        </path>`).join("")}
-    </svg>
-    ${nodes.map((node) => {
-      const [left, top] = POSITIONS[node.id];
-      const kind = mapNodeKind(node);
-      const sub = kind === "service" ? "microservice" : node.kind;
-      return `
-        <button type="button" class="map-node map-node--${kind}" style="left:${left}%;top:${top}%" data-map-node="${node.id}" data-status="${node.status}">
-          <strong>${escapeHtml(node.name)}</strong>
-          <small>${escapeHtml(sub)}</small>
-        </button>`;
-    }).join("")}`;
-
-  let activeFilter = "all";
-  let pinnedNode = null;
-
-  function applyFilter(filter) {
-    activeFilter = filter;
-    $$('[data-map-filter]', controls).forEach((btn) => btn.classList.toggle("is-active", btn.dataset.mapFilter === filter));
-    $$(".map-edge", map).forEach((edge) => {
-      const visible = filter === "all" || edge.dataset.kind === filter || (filter === "data" && edge.dataset.kind === "key");
-      edge.classList.toggle("is-hidden", !visible);
-    });
-    const celery = $('[data-map-node="component-celery"]', map);
-    if (celery) celery.hidden = filter !== "all";
-    focusRelations(pinnedNode);
-  }
-
-  function focusRelations(nodeId) {
-    const visibleEdges = $$(".map-edge", map).filter((edge) => !edge.classList.contains("is-hidden"));
-    const relatedNodeIds = new Set(nodeId ? [nodeId] : []);
-    visibleEdges.forEach((edge) => {
-      const related = nodeId && (edge.dataset.from === nodeId || edge.dataset.to === nodeId);
-      edge.classList.toggle("is-related", Boolean(related));
-      edge.classList.toggle("is-muted", Boolean(nodeId && !related));
-      if (related) {
-        relatedNodeIds.add(edge.dataset.from);
-        relatedNodeIds.add(edge.dataset.to);
-      }
-    });
-    $$(".map-node", map).forEach((node) => node.classList.toggle("is-muted", Boolean(nodeId && !relatedNodeIds.has(node.dataset.mapNode))));
-  }
-
-  function highlightRoute(fromId, toId) {
-    const vFrom = resolveVisualNode(fromId, data, index);
-    const vTo = resolveVisualNode(toId, data, index);
-
-    $$(".map-node", map).forEach((node) => {
-      const isSrc = node.dataset.mapNode === vFrom;
-      const isDst = node.dataset.mapNode === vTo;
-      node.classList.toggle("is-pulse-src", isSrc);
-      node.classList.toggle("is-pulse-dst", isDst);
-    });
-
-    $$(".map-edge", map).forEach((edge) => {
-      const isMatch = (edge.dataset.from === vFrom && edge.dataset.to === vTo) ||
-                      (edge.dataset.from === vTo && edge.dataset.to === vFrom);
-      edge.classList.toggle("is-route-active", isMatch);
-    });
-  }
-
-  controls.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-map-filter]");
-    if (btn) applyFilter(btn.dataset.mapFilter);
-  });
-
-  map.addEventListener("mouseover", (e) => {
-    const node = e.target.closest("[data-map-node]");
-    if (node) focusRelations(node.dataset.mapNode);
-  });
-
-  map.addEventListener("mouseout", (e) => {
-    if (e.target.closest("[data-map-node]") && !e.relatedTarget?.closest?.("[data-map-node]")) focusRelations(pinnedNode);
-  });
-
-  map.addEventListener("click", (e) => {
-    const node = e.target.closest("[data-map-node]");
-    if (node) {
-      pinnedNode = node.dataset.mapNode;
-      $$(".map-node", map).forEach((item) => item.classList.toggle("is-selected", item === node));
-      focusRelations(pinnedNode);
-      const entity = index.get(pinnedNode);
-      if (entity) renderInspector(entity, data, index);
-      return;
+    if (eventsEl) {
+      eventsEl.innerHTML = published.length
+        ? published.map((e) => `<span class="event-chip">${escapeHtml(e.name)}</span>`).join("")
+        : `<span class="event-chip" style="color:var(--dim)">None</span>`;
     }
-    const path = e.target.closest("[data-connection-id]");
-    if (path) {
-      const conn = index.get(path.dataset.connectionId);
-      if (conn) renderInspector(conn, data, index);
+
+    if (storageEl) {
+      storageEl.innerHTML = `<span class="storage-chip">PostgreSQL (${escapeHtml(db?.name || entity.slug)})</span>`;
     }
-  });
 
-  document.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-open-drawer-btn]");
-    if (btn) onOpenService(btn.dataset.openDrawerBtn);
-  });
+    if (drawerBtn) {
+      drawerBtn.style.display = "block";
+      drawerBtn.dataset.currentServiceId = entity.id;
+    }
+  } else {
+    if (nameEl) nameEl.textContent = entity.name;
+    if (typeEl) typeEl.textContent = entity.kind || "Infrastructure";
+    if (respEl) respEl.textContent = entity.summary || entity.responsibility || `${entity.name} component in FlashMarket stack.`;
 
-  applyFilter(activeFilter);
-  return { highlightRoute };
+    if (eventsEl) {
+      eventsEl.innerHTML = `<span class="event-chip">Infrastructure Component</span>`;
+    }
+
+    if (storageEl) {
+      storageEl.innerHTML = `<span class="storage-chip">${escapeHtml(entity.name)}</span>`;
+    }
+
+    if (drawerBtn) {
+      drawerBtn.style.display = "none";
+    }
+  }
+}
+
+export function initCanvasConnections() {
+  const svg = $("#connections-svg");
+  if (!svg) return;
+
+  // Render SVG curved connection paths exactly like the diagram
+  svg.innerHTML = `
+    <!-- Defs for arrowheads -->
+    <defs>
+      <marker id="arrow-http" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563EB"/>
+      </marker>
+      <marker id="arrow-event" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="#EA580C"/>
+      </marker>
+      <marker id="arrow-black" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="#000000"/>
+      </marker>
+    </defs>
+
+    <!-- Client to Gateway (Black solid) -->
+    <path d="M 120 195 L 155 195" stroke="#000000" stroke-width="2" marker-end="url(#arrow-black)" />
+
+    <!-- Gateway to Core Services (Blue HTTP solid) -->
+    <!-- Gateway to Auth, Catalog, Inventory, Orders, Payments -->
+    <path class="conn-http" d="M 255 195 H 275 V 100 H 335" marker-end="url(#arrow-http)" />
+    <path class="conn-http" d="M 255 195 H 275 V 100 H 450" />
+    <path class="conn-http" d="M 255 195 H 275 V 100 H 565" />
+    <path class="conn-http" d="M 255 195 H 275 V 100 H 680" />
+    <path class="conn-http" d="M 255 195 H 275 V 100 H 795" />
+
+    <!-- Inter-service HTTP flows -->
+    <path class="conn-http" d="M 430 100 L 450 100" marker-end="url(#arrow-http)" />
+    <path class="conn-http" d="M 545 100 L 565 100" marker-end="url(#arrow-http)" />
+    <path class="conn-http" d="M 660 100 L 680 100" marker-end="url(#arrow-http)" />
+    <path class="conn-http" d="M 775 100 L 795 100" marker-end="url(#arrow-http)" />
+
+    <!-- Gateway branching down to Row 2: Notifications, Wishlist, Drops, Media -->
+    <path class="conn-http" d="M 275 195 V 200 H 335" marker-end="url(#arrow-http)" />
+    <path class="conn-http" d="M 275 200 V 200 H 450" />
+    <path class="conn-http" d="M 275 200 V 200 H 565" />
+    <path class="conn-http" d="M 275 200 V 200 H 680" />
+
+    <!-- Core Services to RabbitMQ (Orange Dashed Lines) -->
+    <path class="conn-event" d="M 520 140 V 310" marker-end="url(#arrow-event)" />
+    <path class="conn-event" d="M 615 140 C 615 220 540 240 520 310" marker-end="url(#arrow-event)" />
+    <path class="conn-event" d="M 730 140 C 730 220 560 260 540 310" marker-end="url(#arrow-event)" />
+    <path class="conn-event" d="M 845 140 C 845 240 600 270 560 310" marker-end="url(#arrow-event)" />
+    <path class="conn-event" d="M 385 240 C 385 270 470 280 490 310" marker-end="url(#arrow-event)" />
+    <path class="conn-event" d="M 500 240 C 500 270 510 280 520 310" marker-end="url(#arrow-event)" />
+    <path class="conn-event" d="M 615 240 C 615 270 540 280 530 310" marker-end="url(#arrow-event)" />
+    <path class="conn-event" d="M 730 240 C 730 270 560 280 540 310" marker-end="url(#arrow-event)" />
+
+    <!-- RabbitMQ to Celery -->
+    <path class="conn-event" d="M 590 340 L 650 340" marker-end="url(#arrow-event)" marker-start="url(#arrow-event)" />
+
+    <!-- Celery to Payments / Orders -->
+    <path class="conn-event" d="M 780 340 C 855 340 855 240 855 140" marker-end="url(#arrow-event)" />
+
+    <!-- Data Stores (Dotted Purple Lines) -->
+    <!-- Gateway to PostgreSQL -->
+    <path class="conn-data" d="M 205 250 C 205 380 175 420 175 480" />
+    <!-- Services to PostgreSQL -->
+    <path class="conn-data" d="M 385 240 C 385 360 200 400 180 480" />
+    <!-- Services to Redis -->
+    <path class="conn-data" d="M 500 240 C 500 380 360 400 360 480" />
+    <!-- Services to S3 -->
+    <path class="conn-data" d="M 730 240 C 730 380 545 400 545 480" />
+    <!-- RabbitMQ to Prometheus -->
+    <path class="conn-data" d="M 520 370 C 520 440 735 440 735 480" />
+  `;
 }
