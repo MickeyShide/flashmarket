@@ -78,10 +78,10 @@ services:
       flashmarket.autoheal: "true"
     healthcheck: &worker-health
       test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${INVENTORY_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
-      interval: 15s
-      timeout: 3s
-      retries: 3
-      start_period: 45s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   outbox:
     <<: *inventory-runtime
@@ -123,10 +123,10 @@ services:
       flashmarket.autoheal: "true"
     healthcheck:
       test: ["CMD-SHELL", "celery -A inventory.celery_app:app inspect ping --destination inventory-maintenance@$${HOSTNAME} --timeout 5"]
-      interval: 15s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   nginx:
     image: nginx:1.30-alpine

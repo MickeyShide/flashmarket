@@ -374,6 +374,10 @@ jobs:
           wait_for_healthy() {
             service="$1"
             container="$(docker compose --env-file .env ps -q "$service")"
+            if [[ -z "$container" ]]; then
+              docker compose --env-file .env logs --tail 100 "$service"
+              return 1
+            fi
             for attempt in $(seq 1 60); do
               health="$(
                 docker inspect \
@@ -385,6 +389,9 @@ jobs:
               fi
               sleep 2
             done
+            docker inspect \
+              --format '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{printf "%q" .Output}}{{println}}{{end}}' \
+              "$container" || true
             docker compose --env-file .env logs --tail 100 "$service"
             return 1
           }
