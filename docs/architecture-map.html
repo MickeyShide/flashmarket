@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlashMarket — Интерактивная карта архитектуры, роутов и событий</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #0B0F17;
+      --bg-card: #131B2A;
+      --bg-card-hover: #1A2438;
+      --bg-glass: rgba(19, 27, 42, 0.85);
+      --border: #23314D;
+      --border-focus: #3B82F6;
+      
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      
+      --method-get: #3B82F6;
+      --method-post: #10B981;
+      --method-patch: #F59E0B;
+      --method-delete: #EF4444;
+      
+      --accent-sync: #38BDF8;
+      --accent-event: #EC4899;
+      --accent-db: #8B5CF6;
+      --accent-celery: #F97316;
+      
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.4);
+      --shadow-lg: 0 10px 30px rgba(0,0,0,0.6);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Header */
+    header {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #3B82F6, #EC4899);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: #fff;
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      position: relative;
+      width: 280px;
+    }
+    .search-box input {
+      width: 100%;
+      background: #0D131F;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 8px 12px 8px 34px;
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .search-box input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+    .search-box svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+    }
+
+    /* Scenario Pills */
+    .scenario-bar {
+      background: #0F1626;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+    }
+    .scenario-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .scenario-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .scenario-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border-color: #3B82F6;
+    }
+    .scenario-btn.active {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: #3B82F6;
+      color: #60A5FA;
+    }
+
+    /* Flow Stepper Bar (Active when scenario chosen) */
+    .flow-stepper {
+      display: none;
+      background: linear-gradient(90deg, #131F37, #1E1B38);
+      border-bottom: 1px solid var(--border-focus);
+      padding: 10px 24px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .flow-stepper.active { display: flex; }
+    .flow-step-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .flow-step-badge {
+      background: #3B82F6;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .flow-step-text {
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .flow-step-text strong {
+      color: #93C5FD;
+    }
+    .flow-nav-btns {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .flow-nav-btn {
+      background: #0F172A;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .flow-nav-btn:hover { background: #1E293B; }
+    .flow-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
+    /* Main Content Layout */
+    .app-body {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      flex: 1;
+      height: calc(100vh - 110px);
+      overflow: hidden;
+    }
+
+    /* Services Map Canvas */
+    .canvas-container {
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .tier-section {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .tier-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .tier-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    /* Service Card */
+    .service-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .service-card:hover {
+      border-color: #384A6E;
+      box-shadow: var(--shadow-sm);
+    }
+    .service-card.highlighted {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), var(--shadow-lg);
+      background: #162035;
+    }
+    .service-card.dimmed {
+      opacity: 0.3;
+      filter: grayscale(0.4);
+    }
+
+    .service-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .service-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .service-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      background: #1E293B;
+      color: #94A3B8;
+    }
+    .service-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .service-role {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    .service-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #0F172A;
+      color: var(--text-dim);
+      border: 1px solid #1E293B;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .tag-db { color: #A78BFA; border-color: #3B2E58; }
+    .tag-redis { color: #F87171; border-color: #5C2626; }
+    .tag-celery { color: #FB923C; border-color: #5C321E; }
+
+    /* Routes List inside Service */
+    .routes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .route-item {
+      background: #0E1524;
+      border: 1px solid #1A2438;
+      border-radius: var(--radius-sm);
+      padding: 7px 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+    .route-item:hover {
+      background: #172136;
+      border-color: #2D3E61;
+    }
+    .route-item.selected {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: #3B82F6;
+    }
+    .route-item.flow-active {
+      background: rgba(236, 72, 153, 0.18);
+      border-color: #EC4899;
+      box-shadow: 0 0 10px rgba(236, 72, 153, 0.25);
+    }
+
+    .route-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+    }
+    .method-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 3px;
+      min-width: 44px;
+      text-align: center;
+    }
+    .m-get { background: rgba(59, 130, 246, 0.15); color: var(--method-get); }
+    .m-post { background: rgba(16, 185, 129, 0.15); color: var(--method-post); }
+    .m-patch { background: rgba(245, 158, 11, 0.15); color: var(--method-patch); }
+    .m-delete { background: rgba(239, 68, 68, 0.15); color: var(--method-delete); }
+
+    .route-path {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .route-desc-short {
+      font-size: 11px;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    /* Events Section in Service */
+    .service-events {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-top: 1px solid #1E293B;
+      padding-top: 8px;
+    }
+    .events-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+    .event-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: rgba(236, 72, 153, 0.08);
+      color: #F472B6;
+      border: 1px solid rgba(236, 72, 153, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .event-badge:hover {
+      background: rgba(236, 72, 153, 0.18);
+      border-color: #EC4899;
+    }
+    .event-badge.flow-active {
+      background: #EC4899;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    /* Right Inspector Sidebar */
+    .inspector-panel {
+      background: #0E1422;
+      border-left: 1px solid var(--border);
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .inspector-empty {
+      color: var(--text-dim);
+      font-size: 13px;
+      text-align: center;
+      margin-top: 60px;
+      line-height: 1.6;
+    }
+
+    .ins-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+    }
+    .ins-type {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #60A5FA;
+    }
+    .ins-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      word-break: break-all;
+    }
+
+    .ins-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ins-sec-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .ins-sec-body {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      background: var(--bg-card);
+      border: 1px solid #1E293B;
+      padding: 10px;
+      border-radius: var(--radius-sm);
+    }
+    .ins-sec-body strong {
+      color: var(--text-main);
+    }
+    .ins-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: #070A10;
+      color: #38BDF8;
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+    .ins-event-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: rgba(236, 72, 153, 0.15);
+      color: #F472B6;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(236, 72, 153, 0.3);
+      display: inline-block;
+      margin-top: 4px;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">⚡</div>
+      <div>
+        <div class="brand-title">FlashMarket Architecture Map</div>
+        <div class="brand-subtitle">Интерактивная карта сервисов, роутов и потоков данных</div>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Поиск роута, события или сервиса...">
+      </div>
+    </div>
+  </header>
+
+  <!-- Interactive Scenario Bar -->
+  <div class="scenario-bar">
+    <span class="scenario-label">Сценарии:</span>
+    <button class="scenario-btn" onclick="startFlow('checkout')">🛍️ 1. Покупка в 1 клик (Flash Checkout)</button>
+    <button class="scenario-btn" onclick="startFlow('payment_fail')">❌ 2. Ошибка оплаты и авто-возврат</button>
+    <button class="scenario-btn" onclick="startFlow('celery_expire')">⏰ 3. Истечение брони по таймеру (Celery 5s)</button>
+    <button class="scenario-btn" onclick="startFlow('promocode')">🎟️ 4. Промокод и расчет чекаута</button>
+    <button class="scenario-btn" onclick="resetFlow()">🔄 Сброс фильтров</button>
+  </div>
+
+  <!-- Stepper for active flow -->
+  <div class="flow-stepper" id="flowStepper">
+    <div class="flow-step-info">
+      <span class="flow-step-badge" id="stepBadge">Шаг 1 из 5</span>
+      <span class="flow-step-text" id="stepText">Инициализация бронирования товара...</span>
+    </div>
+    <div class="flow-nav-btns">
+      <button class="flow-nav-btn" onclick="prevStep()">◀ Назад</button>
+      <button class="flow-nav-btn" onclick="nextStep()">Далее ▶</button>
+      <button class="flow-close-btn" onclick="resetFlow()" title="Закрыть сценарий">✕</button>
+    </div>
+  </div>
+
+  <!-- Main Work Area -->
+  <div class="app-body">
+    
+    <!-- Canvas with Service Cards -->
+    <div class="canvas-container" id="canvasContainer">
+
+      <!-- Edge Tier -->
+      <div class="tier-section">
+        <div class="tier-header">1. Входной шлюз (Edge Gateway)</div>
+        <div class="services-grid">
+          
+          <div class="service-card" id="card-gateway" data-service="gateway">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">🌐</div>
+                <div>
+                  <div class="service-name">API Gateway</div>
+                  <div class="service-role">Nginx Reverse Proxy & Rate Limiting</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag">Rate Limits: Auth 5r/s, Orders 10r/s, Catalog 50r/s</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" onclick="inspectRoute('gateway', '/*')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/*</span>
+                </div>
+                <span class="route-desc-short">Frontend SPA</span>
+              </div>
+              <div class="route-item" onclick="inspectRoute('gateway', '/api/v1/*')">
+                <div class="route-left">
+                  <span class="method-badge m-post">ALL</span>
+                  <span class="route-path">/api/v1/*</span>
+                </div>
+                <span class="route-desc-short">Прокси в сервисы</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Core Commerce Tier -->
+      <div class="tier-section">
+        <div class="tier-header">2. Ядро коммерции (Core Commerce Services)</div>
+        <div class="services-grid">
+
+          <!-- Inventory Service -->
+          <div class="service-card" id="card-inventory" data-service="inventory">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">📦</div>
+                <div>
+                  <div class="service-name">Inventory Service</div>
+                  <div class="service-role">Склад, блокировки FOR UPDATE, брони</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag tag-db">Postgres: stocks, reservations</span>
+              <span class="tag tag-redis">Redis DB 2</span>
+              <span class="tag tag-celery">Celery: expire 5s</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" id="r-inv-get" onclick="inspectRoute('inventory', 'GET /api/v1/stocks/{product_id}')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/api/v1/stocks/{product_id}</span>
+                </div>
+                <span class="route-desc-short">Остаток</span>
+              </div>
+              <div class="route-item" id="r-inv-reserve" onclick="inspectRoute('inventory', 'POST /api/v1/stocks/{product_id}/reserve')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/stocks/{id}/reserve</span>
+                </div>
+                <span class="route-desc-short">Бронь (FOR UPDATE)</span>
+              </div>
+              <div class="route-item" id="r-inv-commit" onclick="inspectRoute('inventory', 'POST /api/v1/stocks/{product_id}/commit')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/stocks/{id}/commit</span>
+                </div>
+                <span class="route-desc-short">Списание в продажу</span>
+              </div>
+              <div class="route-item" id="r-inv-release" onclick="inspectRoute('inventory', 'POST /api/v1/stocks/{product_id}/release')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/stocks/{id}/release</span>
+                </div>
+                <span class="route-desc-short">Возврат стока</span>
+              </div>
+            </div>
+            <div class="service-events">
+              <div class="events-label">События Outbox / Очереди:</div>
+              <div class="event-badge" id="ev-inv-reserved" onclick="inspectEvent('inventory.InventoryReserved')">
+                <span>outbox ➔ inventory.InventoryReserved</span>
+              </div>
+              <div class="event-badge" id="ev-inv-committed" onclick="inspectEvent('inventory.InventoryCommitted')">
+                <span>outbox ➔ inventory.InventoryCommitted</span>
+              </div>
+              <div class="event-badge" id="ev-inv-released" onclick="inspectEvent('inventory.ReservationReleased')">
+                <span>outbox ➔ inventory.ReservationReleased</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Orders Service -->
+          <div class="service-card" id="card-orders" data-service="orders">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">🛒</div>
+                <div>
+                  <div class="service-name">Orders Service</div>
+                  <div class="service-role">Заказы, чекауты, промокоды</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag tag-db">Postgres: orders, promocodes</span>
+              <span class="tag tag-celery">Celery: expire 5s</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" id="r-ord-create" onclick="inspectRoute('orders', 'POST /api/v1/orders')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/api/v1/orders</span>
+                </div>
+                <span class="route-desc-short">Создать заказ</span>
+              </div>
+              <div class="route-item" id="r-ord-batch" onclick="inspectRoute('orders', 'POST /api/v1/orders/batch')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/api/v1/orders/batch</span>
+                </div>
+                <span class="route-desc-short">Чекаут корзины</span>
+              </div>
+              <div class="route-item" id="r-ord-get" onclick="inspectRoute('orders', 'GET /api/v1/orders/{order_id}')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/api/v1/orders/{order_id}</span>
+                </div>
+                <span class="route-desc-short">Детали заказа</span>
+              </div>
+              <div class="route-item" id="r-ord-promo" onclick="inspectRoute('orders', 'POST /api/v1/promocodes/validate')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/promocodes/validate</span>
+                </div>
+                <span class="route-desc-short">Скидка</span>
+              </div>
+            </div>
+            <div class="service-events">
+              <div class="events-label">События Outbox / Очереди:</div>
+              <div class="event-badge" id="ev-ord-created" onclick="inspectEvent('orders.OrderCreated')">
+                <span>outbox ➔ orders.OrderCreated</span>
+              </div>
+              <div class="event-badge" id="ev-ord-cancelled" onclick="inspectEvent('orders.OrderCancelled')">
+                <span>outbox ➔ orders.OrderCancelled</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payments Service -->
+          <div class="service-card" id="card-payments" data-service="payments">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">💳</div>
+                <div>
+                  <div class="service-name">Payments Service</div>
+                  <div class="service-role">Оплата заказов, mock/real шлюз</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag tag-db">Postgres: payments</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" id="r-pay-create" onclick="inspectRoute('payments', 'POST /api/v1/payments')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/api/v1/payments</span>
+                </div>
+                <span class="route-desc-short">Создать счет</span>
+              </div>
+              <div class="route-item" id="r-pay-confirm" onclick="inspectRoute('payments', 'POST /api/v1/payments/{payment_id}/confirm')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/payments/{id}/confirm</span>
+                </div>
+                <span class="route-desc-short">Оплата успешна</span>
+              </div>
+              <div class="route-item" id="r-pay-fail" onclick="inspectRoute('payments', 'POST /api/v1/payments/{payment_id}/fail')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/payments/{id}/fail</span>
+                </div>
+                <span class="route-desc-short">Ошибка оплаты</span>
+              </div>
+            </div>
+            <div class="service-events">
+              <div class="events-label">События Outbox / Очереди:</div>
+              <div class="event-badge" id="ev-pay-succeeded" onclick="inspectEvent('payments.PaymentSucceeded')">
+                <span>outbox ➔ payments.PaymentSucceeded</span>
+              </div>
+              <div class="event-badge" id="ev-pay-failed" onclick="inspectEvent('payments.PaymentFailed')">
+                <span>outbox ➔ payments.PaymentFailed</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Catalog Service -->
+          <div class="service-card" id="card-catalog" data-service="catalog">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">🏷️</div>
+                <div>
+                  <div class="service-name">Catalog Service</div>
+                  <div class="service-role">Витрина товаров, категории, бренды, SKU</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag tag-db">Postgres: products, categories, variants</span>
+              <span class="tag tag-redis">Redis DB 1 (Tree)</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" onclick="inspectRoute('catalog', 'GET /api/v1/products')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/api/v1/products</span>
+                </div>
+                <span class="route-desc-short">Поиск и фильтры</span>
+              </div>
+              <div class="route-item" onclick="inspectRoute('catalog', 'GET /api/v1/products/{slug}')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/api/v1/products/{slug}</span>
+                </div>
+                <span class="route-desc-short">Товар по slug</span>
+              </div>
+              <div class="route-item" onclick="inspectRoute('catalog', 'POST /api/v1/products/batch')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/api/v1/products/batch</span>
+                </div>
+                <span class="route-desc-short">Список по ID</span>
+              </div>
+              <div class="route-item" onclick="inspectRoute('catalog', 'GET /api/v1/categories')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/api/v1/categories</span>
+                </div>
+                <span class="route-desc-short">Дерево категорий</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drops Service -->
+          <div class="service-card" id="card-drops" data-service="drops">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">🔥</div>
+                <div>
+                  <div class="service-name">Drops Service</div>
+                  <div class="service-role">Flash-распродажи, таймеры, спец-лимиты</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag tag-db">Postgres: drops, drop_items</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" onclick="inspectRoute('drops', 'GET /api/v1/drops/active')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/api/v1/drops/active</span>
+                </div>
+                <span class="route-desc-short">Активные дропы</span>
+              </div>
+              <div class="route-item" id="r-drop-policy" onclick="inspectRoute('drops', 'GET /api/v1/drops/id/{drop_id}')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/drops/id/{drop_id}</span>
+                </div>
+                <span class="route-desc-short">⚡ Политика дропа</span>
+              </div>
+              <div class="route-item" onclick="inspectRoute('drops', 'POST /api/v1/admin/drops')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/admin/drops</span>
+                </div>
+                <span class="route-desc-short">Создать дроп</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Supporting Services Tier -->
+      <div class="tier-section">
+        <div class="tier-header">3. Вспомогательные сервисы (Supporting Services)</div>
+        <div class="services-grid">
+
+          <!-- Auth Service -->
+          <div class="service-card" id="card-auth" data-service="auth">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">🔐</div>
+                <div>
+                  <div class="service-name">Auth Service</div>
+                  <div class="service-role">JWT (EdDSA/RS256), сессии, профили</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag tag-db">Postgres: users, sessions, audit</span>
+              <span class="tag tag-redis">Redis DB 0</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" onclick="inspectRoute('auth', 'POST /api/v1/auth/login')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/api/v1/auth/login</span>
+                </div>
+                <span class="route-desc-short">Вход + JWT</span>
+              </div>
+              <div class="route-item" onclick="inspectRoute('auth', 'POST /api/v1/auth/refresh')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/api/v1/auth/refresh</span>
+                </div>
+                <span class="route-desc-short">Ротация токена</span>
+              </div>
+              <div class="route-item" onclick="inspectRoute('auth', 'GET /.well-known/jwks.json')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/.well-known/jwks.json</span>
+                </div>
+                <span class="route-desc-short">Публичные ключи</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Wishlist Service -->
+          <div class="service-card" id="card-wishlist" data-service="wishlist">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">❤️</div>
+                <div>
+                  <div class="service-name">Wishlist Service</div>
+                  <div class="service-role">Избранное с защитой Advisory Locks</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag tag-db">Postgres: wishlist_items</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" onclick="inspectRoute('wishlist', 'POST /api/v1/wishlist/users/{id}/items')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/users/{id}/items</span>
+                </div>
+                <span class="route-desc-short">В избранное</span>
+              </div>
+              <div class="route-item" onclick="inspectRoute('wishlist', 'GET /api/v1/wishlist/users/{id}/items')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/users/{id}/items</span>
+                </div>
+                <span class="route-desc-short">Список</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notifications Service -->
+          <div class="service-card" id="card-notifications" data-service="notifications">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">🔔</div>
+                <div>
+                  <div class="service-name">Notifications Service</div>
+                  <div class="service-role">Системные уведомления клиентам</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag tag-db">Postgres: notifications</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" id="r-notif-get" onclick="inspectRoute('notifications', 'GET /api/v1/notifications/users/{id}')">
+                <div class="route-left">
+                  <span class="method-badge m-get">GET</span>
+                  <span class="route-path">/users/{id}</span>
+                </div>
+                <span class="route-desc-short">Список</span>
+              </div>
+            </div>
+            <div class="service-events">
+              <div class="events-label">События Outbox / Очереди:</div>
+              <div class="event-badge" id="ev-notif-created" onclick="inspectEvent('notifications.NotificationCreated')">
+                <span>outbox ➔ notifications.NotificationCreated</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Media Service -->
+          <div class="service-card" id="card-media" data-service="media">
+            <div class="service-head">
+              <div class="service-title-wrap">
+                <div class="service-icon">🖼️</div>
+                <div>
+                  <div class="service-name">Media Service</div>
+                  <div class="service-role">Прямая загрузка в MinIO / S3</div>
+                </div>
+              </div>
+            </div>
+            <div class="service-tags">
+              <span class="tag tag-db">Postgres: media_assets</span>
+              <span class="tag">MinIO / S3 Presigned</span>
+            </div>
+            <div class="routes-list">
+              <div class="route-item" onclick="inspectRoute('media', 'POST /api/v1/media/uploads')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/api/v1/media/uploads</span>
+                </div>
+                <span class="route-desc-short">S3 Presigned URL</span>
+              </div>
+              <div class="route-item" onclick="inspectRoute('media', 'POST /api/v1/media/assets/{id}/complete')">
+                <div class="route-left">
+                  <span class="method-badge m-post">POST</span>
+                  <span class="route-path">/assets/{id}/complete</span>
+                </div>
+                <span class="route-desc-short">Готово (READY)</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Inspector Sidebar -->
+    <div class="inspector-panel" id="inspectorPanel">
+      <div class="inspector-empty" id="inspectorEmpty">
+        👉 Кликните на любой роут, событие или выберите сценарий сверху, чтобы увидеть связи и логику.
+      </div>
+      
+      <div id="inspectorContent" style="display: none; flex-direction: column; gap: 16px;">
+        <div class="ins-header">
+          <span class="ins-type" id="insType">API ROUTE</span>
+          <span class="ins-title" id="insTitle">POST /api/v1/stocks/{product_id}/reserve</span>
+        </div>
+
+        <div class="ins-section">
+          <div class="ins-sec-title">Что делает (по-простому)</div>
+          <div class="ins-sec-body" id="insDesc">
+            Бронирует товар под пользователя.
+          </div>
+        </div>
+
+        <div class="ins-section" id="secDb">
+          <div class="ins-sec-title">База данных и Блокировки</div>
+          <div class="ins-sec-body" id="insDb">
+            <span class="ins-code">SELECT ... FOR UPDATE</span> на строку товара.
+          </div>
+        </div>
+
+        <div class="ins-section" id="secSync">
+          <div class="ins-sec-title">Синхронный вызов (HTTP)</div>
+          <div class="ins-sec-body" id="insSync">
+            —
+          </div>
+        </div>
+
+        <div class="ins-section" id="secOutbox">
+          <div class="ins-sec-title">Асинхронные события (RabbitMQ)</div>
+          <div class="ins-sec-body" id="insOutbox">
+            —
+          </div>
+        </div>
+
+        <div class="ins-section" id="secConsumers">
+          <div class="ins-sec-title">Кто слушает и реагирует</div>
+          <div class="ins-sec-body" id="insConsumers">
+            —
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Database of routes details
+    const ROUTE_DATA = {
+      "gateway:/*": {
+        type: "GATEWAY ROUTE",
+        title: "GET /*",
+        desc: "Раздает статику SPA приложения (HTML, JS, CSS) или отдает страницу витрины.",
+        db: "Без БД",
+        sync: "Nginx локальный статический root",
+        outbox: "—",
+        consumers: "Браузер клиента"
+      },
+      "gateway:/api/v1/*": {
+        type: "GATEWAY ROUTE",
+        title: "ALL /api/v1/*",
+        desc: "Маршрутизирует API запросы в соответствующие микросервисы и применяет per-IP rate limits.",
+        db: "Shared memory Nginx для счетчиков запросов",
+        sync: "Proxy Pass во внутренние сервисы",
+        outbox: "—",
+        consumers: "Микросервисы платформы"
+      },
+      "inventory:GET /api/v1/stocks/{product_id}": {
+        type: "INVENTORY ROUTE",
+        title: "GET /api/v1/stocks/{product_id}",
+        desc: "Быстро возвращает доступное и зарезервированное количество товара.",
+        db: "PostgreSQL: чтение таблицы stocks (только если нет в кэше)",
+        sync: "Redis DB 2 (Read-Through кэш остатка)",
+        outbox: "—",
+        consumers: "Витрина Catalog, Клиент"
+      },
+      "inventory:POST /api/v1/stocks/{product_id}/reserve": {
+        type: "INVENTORY ROUTE",
+        title: "POST /api/v1/stocks/{product_id}/reserve",
+        desc: "Бронирует штуки товара под покупателя на время оплаты (по умолчанию 5-15 минут).",
+        db: "SELECT ... FOR UPDATE на строку stock. Уменьшает available, увеличивает reserved, создает запись в reservations.",
+        sync: "Если это дроп — делает GET /api/v1/drops/id/{id} для проверки лимита на пользователя.",
+        outbox: "<span class='ins-event-pill'>inventory.InventoryReserved</span> (атомарно пишется в outbox_events)",
+        consumers: "Сохраняется в Outbox для аудита и внешних потребителей."
+      },
+      "inventory:POST /api/v1/stocks/{product_id}/commit": {
+        type: "INVENTORY ROUTE",
+        title: "POST /api/v1/stocks/{product_id}/commit",
+        desc: "Окончательно списывает товар в продажу после успешной оплаты.",
+        db: "SELECT ... FOR UPDATE. Переводит бронь в COMMITTED, уменьшает reserved, увеличивает sold.",
+        sync: "Обновляет счетчик в Redis DB 2",
+        outbox: "<span class='ins-event-pill'>inventory.InventoryCommitted</span>",
+        consumers: "Служебный аудит"
+      },
+      "inventory:POST /api/v1/stocks/{product_id}/release": {
+        type: "INVENTORY ROUTE",
+        title: "POST /api/v1/stocks/{product_id}/release",
+        desc: "Возвращает зарезервированный товар обратно на склад, если оплата отменилась или истекло время.",
+        db: "SELECT ... FOR UPDATE. Переводит бронь в RELEASED, уменьшает reserved, увеличивает available.",
+        sync: "Обновляет кэш в Redis DB 2",
+        outbox: "<span class='ins-event-pill'>inventory.ReservationReleased</span>",
+        consumers: "Orders Service: слушает это событие и автоматически отменяет связанный заказ!"
+      },
+      "orders:POST /api/v1/orders": {
+        type: "ORDERS ROUTE",
+        title: "POST /api/v1/orders",
+        desc: "Создает заказ в статусе PENDING на основе сделанной ранее резервации стока.",
+        db: "Вставка в таблицу orders (status=PENDING)",
+        sync: "—",
+        outbox: "<span class='ins-event-pill'>orders.OrderCreated</span>",
+        consumers: "Inventory (привязывает order_id к брони), Notifications (шлет клиенту письмо о заказе)"
+      },
+      "orders:POST /api/v1/orders/batch": {
+        type: "ORDERS ROUTE",
+        title: "POST /api/v1/orders/batch",
+        desc: "Атомарно оформляет чекаут из нескольких забронированных товаров и применяет скидочный промокод.",
+        db: "Вставка чекаута, позиций orders, фиксация использования промокода.",
+        sync: "—",
+        outbox: "<span class='ins-event-pill'>orders.OrderCreated</span> (для каждой позиции)",
+        consumers: "Inventory, Notifications"
+      },
+      "orders:GET /api/v1/orders/{order_id}": {
+        type: "ORDERS ROUTE",
+        title: "GET /api/v1/orders/{order_id}",
+        desc: "Возвращает детали заказа, состав и статус оплаты.",
+        db: "Чтение таблицы orders",
+        sync: "—",
+        outbox: "—",
+        consumers: "Личный кабинет пользователя"
+      },
+      "orders:POST /api/v1/promocodes/validate": {
+        type: "ORDERS ROUTE",
+        title: "POST /api/v1/promocodes/validate",
+        desc: "Проверяет промокод на дату, лимит использований и считает сумму скидки.",
+        db: "Чтение таблицы promocodes",
+        sync: "—",
+        outbox: "—",
+        consumers: "Форма чекаута"
+      },
+      "payments:POST /api/v1/payments": {
+        type: "PAYMENTS ROUTE",
+        title: "POST /api/v1/payments",
+        desc: "Создает платеж в статусе PENDING для указанного заказа.",
+        db: "Вставка в таблицу payments",
+        sync: "—",
+        outbox: "—",
+        consumers: "Платежный шлюз"
+      },
+      "payments:POST /api/v1/payments/{payment_id}/confirm": {
+        type: "PAYMENTS ROUTE",
+        title: "POST /api/v1/payments/{payment_id}/confirm",
+        desc: "Фиксирует успешное поступление денег (SUCCEEDED).",
+        db: "Обновление статуса платежа в payments",
+        sync: "—",
+        outbox: "<span class='ins-event-pill'>payments.PaymentSucceeded</span>",
+        consumers: "Orders (переводит заказ в PAID) и Inventory (переводит бронь в COMMITTED и sold +1)"
+      },
+      "payments:POST /api/v1/payments/{payment_id}/fail": {
+        type: "PAYMENTS ROUTE",
+        title: "POST /api/v1/payments/{payment_id}/fail",
+        desc: "Фиксирует ошибку или отказ в оплате (FAILED).",
+        db: "Обновление payments (status=FAILED)",
+        sync: "—",
+        outbox: "<span class='ins-event-pill'>payments.PaymentFailed</span>",
+        consumers: "Orders (отменяет заказ в CANCELLED) и Inventory (освобождает бронь stock.available +1)"
+      },
+      "drops:GET /api/v1/drops/id/{drop_id}": {
+        type: "DROPS ROUTE",
+        title: "GET /api/v1/drops/id/{drop_id}",
+        desc: "Критический эндпоинт: отдает политику дропа (лимит на человека, тайм-аут оплаты, активен ли дроп).",
+        db: "Чтение таблицы drops и drop_items",
+        sync: "Синхронно вызывается сервисом Inventory перед созданием брони!",
+        outbox: "—",
+        consumers: "Inventory Service"
+      }
+    };
+
+    const EVENT_DATA = {
+      "inventory.InventoryReserved": {
+        type: "RABBITMQ EVENT",
+        title: "inventory.InventoryReserved",
+        desc: "Сигнализирует, что физический товар успешно заблокирован на складе под пользователя.",
+        db: "Генерируется в StockService.reserve() внутри транзакции бронирования",
+        sync: "—",
+        outbox: "Transactional Outbox worker отправляет в exchange 'flashmarket.events'",
+        consumers: "Аудит, внешние аналитические системы"
+      },
+      "inventory.InventoryCommitted": {
+        type: "RABBITMQ EVENT",
+        title: "inventory.InventoryCommitted",
+        desc: "Сигнализирует, что товар окончательно продан и бронь закрыта.",
+        db: "Генерируется при подтверждении оплаты",
+        sync: "—",
+        outbox: "Exchange 'flashmarket.events'",
+        consumers: "Аудит"
+      },
+      "inventory.ReservationReleased": {
+        type: "RABBITMQ EVENT",
+        title: "inventory.ReservationReleased",
+        desc: "Сигнализирует, что бронь аннулирована и товар вернулся в доступный остаток.",
+        db: "Генерируется при отмене платежа или Celery воркером экспирации",
+        sync: "—",
+        outbox: "Exchange 'flashmarket.events'",
+        consumers: "Orders Service: консьюмер автоматически отменяет ожидающий заказ!"
+      },
+      "orders.OrderCreated": {
+        type: "RABBITMQ EVENT",
+        title: "orders.OrderCreated",
+        desc: "Сигнализирует о создании нового заказа.",
+        db: "Генерируется при успешном создании заказа / чекаута",
+        sync: "—",
+        outbox: "Exchange 'flashmarket.events'",
+        consumers: "Inventory (связывает бронь с order_id), Notifications (создает пуш/письмо клиенту)"
+      },
+      "orders.OrderCancelled": {
+        type: "RABBITMQ EVENT",
+        title: "orders.OrderCancelled",
+        desc: "Сигнализирует об отмене заказа.",
+        db: "Генерируется при отмене заказа",
+        sync: "—",
+        outbox: "Exchange 'flashmarket.events'",
+        consumers: "Inventory (освобождает остаток), Notifications (уведомляет об отмене)"
+      },
+      "payments.PaymentSucceeded": {
+        type: "RABBITMQ EVENT",
+        title: "payments.PaymentSucceeded",
+        desc: "Главный триггер успешной покупки! Подтверждает оплату заказа.",
+        db: "Генерируется платежным сервисом при подтверждении транзакции",
+        sync: "—",
+        outbox: "Exchange 'flashmarket.events'",
+        consumers: "Orders (заказ -> PAID), Inventory (бронь -> COMMITTED, сток списан в sold)"
+      },
+      "payments.PaymentFailed": {
+        type: "RABBITMQ EVENT",
+        title: "payments.PaymentFailed",
+        desc: "Триггер сбоя оплаты. Запускает автоматический возврат товара на склад.",
+        db: "Генерируется при ошибке/отмене оплаты",
+        sync: "—",
+        outbox: "Exchange 'flashmarket.events'",
+        consumers: "Orders (заказ -> CANCELLED), Inventory (бронь -> RELEASED, товар снова available)"
+      },
+      "notifications.NotificationCreated": {
+        type: "RABBITMQ EVENT",
+        title: "notifications.NotificationCreated",
+        desc: "Создано новое уведомление для клиента.",
+        db: "Генерируется Notification сервисом",
+        sync: "—",
+        outbox: "Exchange 'flashmarket.events'",
+        consumers: "Шлюз рассылок / WebSocket"
+      }
+    };
+
+    // Scenarios definition
+    const SCENARIOS = {
+      checkout: {
+        title: "🛍️ Оформление заказа (Flash Checkout)",
+        steps: [
+          {
+            badge: "Шаг 1 из 5",
+            text: "Клиент бронирует товар: вызов <strong>POST /stocks/{id}/reserve</strong> в <strong>Inventory</strong>.",
+            highlightCards: ["card-gateway", "card-inventory", "card-drops"],
+            highlightRoutes: ["r-inv-reserve", "r-drop-policy"],
+            highlightEvents: ["ev-inv-reserved"],
+            inspectKey: "inventory:POST /api/v1/stocks/{product_id}/reserve"
+          },
+          {
+            badge: "Шаг 2 из 5",
+            text: "Создание заказа: вызов <strong>POST /api/v1/orders</strong>. Сервис Orders публикует <strong>orders.OrderCreated</strong>.",
+            highlightCards: ["card-orders", "card-inventory", "card-notifications"],
+            highlightRoutes: ["r-ord-create"],
+            highlightEvents: ["ev-ord-created"],
+            inspectKey: "orders.OrderCreated"
+          },
+          {
+            badge: "Шаг 3 из 5",
+            text: "Создание счета: вызов <strong>POST /api/v1/payments</strong> со статусом PENDING.",
+            highlightCards: ["card-payments"],
+            highlightRoutes: ["r-pay-create"],
+            highlightEvents: [],
+            inspectKey: "payments:POST /api/v1/payments"
+          },
+          {
+            badge: "Шаг 4 из 5",
+            text: "Оплата прошла: вызов <strong>POST /payments/{id}/confirm</strong>. Outbox пушит <strong>payments.PaymentSucceeded</strong>!",
+            highlightCards: ["card-payments"],
+            highlightRoutes: ["r-pay-confirm"],
+            highlightEvents: ["ev-pay-succeeded"],
+            inspectKey: "payments.PaymentSucceeded"
+          },
+          {
+            badge: "Шаг 5 из 5",
+            text: "Финализация: <strong>Inventory</strong> списывает товар (COMMITTED), <strong>Orders</strong> переводит заказ в PAID.",
+            highlightCards: ["card-inventory", "card-orders"],
+            highlightRoutes: ["r-inv-commit"],
+            highlightEvents: ["ev-inv-committed"],
+            inspectKey: "inventory:POST /api/v1/stocks/{product_id}/commit"
+          }
+        ]
+      },
+      payment_fail: {
+        title: "❌ Ошибка оплаты и авто-возврат товара",
+        steps: [
+          {
+            badge: "Шаг 1 из 3",
+            text: "Платеж не прошел: вызов <strong>POST /payments/{id}/fail</strong>. Публикуется <strong>payments.PaymentFailed</strong>.",
+            highlightCards: ["card-payments"],
+            highlightRoutes: ["r-pay-fail"],
+            highlightEvents: ["ev-pay-failed"],
+            inspectKey: "payments.PaymentFailed"
+          },
+          {
+            badge: "Шаг 2 из 3",
+            text: "<strong>Inventory</strong> получает событие и освобождает товар (available +1, emit <strong>inventory.ReservationReleased</strong>).",
+            highlightCards: ["card-inventory"],
+            highlightRoutes: ["r-inv-release"],
+            highlightEvents: ["ev-inv-released"],
+            inspectKey: "inventory.ReservationReleased"
+          },
+          {
+            badge: "Шаг 3 из 3",
+            text: "<strong>Orders</strong> получает событие отмены и помечает заказ как CANCELLED.",
+            highlightCards: ["card-orders"],
+            highlightRoutes: ["r-ord-create"],
+            highlightEvents: ["ev-ord-cancelled"],
+            inspectKey: "orders.OrderCancelled"
+          }
+        ]
+      },
+      celery_expire: {
+        title: "⏰ Истечение брони по таймеру (Celery)",
+        steps: [
+          {
+            badge: "Шаг 1 из 3",
+            text: "Celery Beat каждые 5с запускает задачу <strong>expire_reservations</strong> в <strong>Inventory</strong>.",
+            highlightCards: ["card-inventory"],
+            highlightRoutes: [],
+            highlightEvents: [],
+            inspectKey: "inventory:POST /api/v1/stocks/{product_id}/release"
+          },
+          {
+            badge: "Шаг 2 из 3",
+            text: "Просроченные брони (SKIP LOCKED) переводятся в EXPIRED, товар возвращается на склад и пушится <strong>inventory.ReservationReleased</strong>.",
+            highlightCards: ["card-inventory"],
+            highlightRoutes: ["r-inv-release"],
+            highlightEvents: ["ev-inv-released"],
+            inspectKey: "inventory.ReservationReleased"
+          },
+          {
+            badge: "Шаг 3 из 3",
+            text: "Консьюмер в <strong>Orders</strong> получает <strong>inventory.ReservationReleased</strong> и отменяет зависший заказ!",
+            highlightCards: ["card-orders"],
+            highlightRoutes: [],
+            highlightEvents: ["ev-ord-cancelled"],
+            inspectKey: "orders.OrderCancelled"
+          }
+        ]
+      },
+      promocode: {
+        title: "🎟️ Применение промокода и чекаут",
+        steps: [
+          {
+            badge: "Шаг 1 из 2",
+            text: "Клиент вводит промокод: <strong>POST /api/v1/promocodes/validate</strong> в <strong>Orders</strong> (проверка лимитов и дат).",
+            highlightCards: ["card-orders"],
+            highlightRoutes: ["r-ord-promo"],
+            highlightEvents: [],
+            inspectKey: "orders:POST /api/v1/promocodes/validate"
+          },
+          {
+            badge: "Шаг 2 из 2",
+            text: "Оформление чекаута <strong>POST /api/v1/orders/batch</strong> с примененной скидкой и созданием позиций заказа.",
+            highlightCards: ["card-orders"],
+            highlightRoutes: ["r-ord-batch"],
+            highlightEvents: ["ev-ord-created"],
+            inspectKey: "orders:POST /api/v1/orders/batch"
+          }
+        ]
+      }
+    };
+
+    let activeScenarioKey = null;
+    let currentStepIndex = 0;
+
+    function inspectRoute(service, routeKey) {
+      const fullKey = `${service}:${routeKey}`;
+      const data = ROUTE_DATA[fullKey] || {
+        type: "API ROUTE",
+        title: routeKey,
+        desc: `Эндпоинт сервиса ${service.toUpperCase()}.`,
+        db: "PostgreSQL",
+        sync: "—",
+        outbox: "—",
+        consumers: "—"
+      };
+
+      showInspector(data);
+      highlightSingleRoute(fullKey);
+    }
+
+    function inspectEvent(eventName) {
+      const data = EVENT_DATA[eventName] || {
+        type: "RABBITMQ EVENT",
+        title: eventName,
+        desc: "Асинхронное событие шины сообщений FlashMarket.",
+        db: "Transactional Outbox",
+        sync: "—",
+        outbox: "RabbitMQ Topic Exchange 'flashmarket.events'",
+        consumers: "Заинтересованные сервисы"
+      };
+
+      showInspector(data);
+    }
+
+    function showInspector(data) {
+      document.getElementById('inspectorEmpty').style.display = 'none';
+      const content = document.getElementById('inspectorContent');
+      content.style.display = 'flex';
+
+      document.getElementById('insType').innerText = data.type;
+      document.getElementById('insTitle').innerText = data.title;
+      document.getElementById('insDesc').innerHTML = data.desc;
+      document.getElementById('insDb').innerHTML = data.db;
+      document.getElementById('insSync').innerHTML = data.sync;
+      document.getElementById('insOutbox').innerHTML = data.outbox;
+      document.getElementById('insConsumers').innerHTML = data.consumers;
+    }
+
+    function highlightSingleRoute(fullKey) {
+      document.querySelectorAll('.route-item').forEach(el => el.classList.remove('selected'));
+      document.querySelectorAll('.service-card').forEach(el => el.classList.remove('highlighted'));
+    }
+
+    // Scenarios Stepper Logic
+    function startFlow(key) {
+      activeScenarioKey = key;
+      currentStepIndex = 0;
+      
+      document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      document.getElementById('flowStepper').classList.add('active');
+      renderCurrentStep();
+    }
+
+    function renderCurrentStep() {
+      if (!activeScenarioKey) return;
+      const scenario = SCENARIOS[activeScenarioKey];
+      const step = scenario.steps[currentStepIndex];
+
+      document.getElementById('stepBadge').innerText = step.badge;
+      document.getElementById('stepText').innerHTML = step.text;
+
+      // Update card highlights
+      document.querySelectorAll('.service-card').forEach(card => {
+        const id = card.id;
+        if (step.highlightCards.includes(id)) {
+          card.classList.add('highlighted');
+          card.classList.remove('dimmed');
+        } else {
+          card.classList.remove('highlighted');
+          card.classList.add('dimmed');
+        }
+      });
+
+      // Update route highlights
+      document.querySelectorAll('.route-item').forEach(r => r.classList.remove('flow-active'));
+      step.highlightRoutes.forEach(rId => {
+        const el = document.getElementById(rId);
+        if (el) el.classList.add('flow-active');
+      });
+
+      // Update event highlights
+      document.querySelectorAll('.event-badge').forEach(e => e.classList.remove('flow-active'));
+      step.highlightEvents.forEach(eId => {
+        const el = document.getElementById(eId);
+        if (el) el.classList.add('flow-active');
+      });
+
+      // Show in inspector
+      if (step.inspectKey) {
+        if (ROUTE_DATA[step.inspectKey]) {
+          showInspector(ROUTE_DATA[step.inspectKey]);
+        } else if (EVENT_DATA[step.inspectKey]) {
+          showInspector(EVENT_DATA[step.inspectKey]);
+        }
+      }
+    }
+
+    function nextStep() {
+      if (!activeScenarioKey) return;
+      const total = SCENARIOS[activeScenarioKey].steps.length;
+      if (currentStepIndex < total - 1) {
+        currentStepIndex++;
+        renderCurrentStep();
+      }
+    }
+
+    function prevStep() {
+      if (!activeScenarioKey) return;
+      if (currentStepIndex > 0) {
+        currentStepIndex--;
+        renderCurrentStep();
+      }
+    }
+
+    function resetFlow() {
+      activeScenarioKey = null;
+      document.getElementById('flowStepper').classList.remove('active');
+      document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.service-card').forEach(card => {
+        card.classList.remove('highlighted', 'dimmed');
+      });
+      document.querySelectorAll('.route-item').forEach(r => r.classList.remove('flow-active', 'selected'));
+      document.querySelectorAll('.event-badge').forEach(e => e.classList.remove('flow-active'));
+      document.getElementById('inspectorContent').style.display = 'none';
+      document.getElementById('inspectorEmpty').style.display = 'block';
+    }
+
+    // Search filter
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      const q = e.target.value.toLowerCase().trim();
+      if (!q) {
+        document.querySelectorAll('.service-card, .route-item, .event-badge').forEach(el => {
+          el.style.display = '';
+          el.classList.remove('dimmed');
+        });
+        return;
+      }
+
+      document.querySelectorAll('.service-card').forEach(card => {
+        const text = card.innerText.toLowerCase();
+        if (text.includes(q)) {
+          card.style.display = '';
+          card.classList.remove('dimmed');
+        } else {
+          card.classList.add('dimmed');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

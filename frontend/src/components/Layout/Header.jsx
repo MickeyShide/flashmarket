@@ -146,6 +146,20 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
             )}
           </button>
 
+          {/* Architecture Map Link Button */}
+          <button
+            onClick={() => {
+              setCurrentView('architecture');
+              if (window.location.pathname !== '/architecture') {
+                window.history.pushState({}, '', '/architecture');
+              }
+            }}
+            className="hidden md:inline-flex px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider bg-white text-black hover:bg-black hover:text-[#BFF532] rounded transition-colors items-center gap-1 border border-black cursor-pointer"
+            title="Интерактивная карта архитектуры (/architecture)"
+          >
+            <span>MAP</span>
+          </button>
+
           {/* Developer Hub Link Button */}
           <button
             onClick={() => {

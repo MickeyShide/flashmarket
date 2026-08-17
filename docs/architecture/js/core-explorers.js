@@ -40,27 +40,27 @@ function serviceDialogMarkup(service, data, index) {
       </header>
 
       <section class="dialog-section">
-        <h3>Responsibility</h3>
+        <h3>Обязанности</h3>
         <p>${escapeHtml(service.responsibility)}</p>
       </section>
 
       <section class="dialog-section">
-        <h3>Storage & Data Ownership</h3>
-        <p><strong>Owns:</strong> ${escapeHtml(service.owns.join(", "))}</p>
-        <p><strong>PostgreSQL DB:</strong> <code>${escapeHtml(database?.name || service.slug)}</code></p>
+        <h3>Хранилище и данные</h3>
+        <p><strong>Владеет:</strong> ${escapeHtml(service.owns.join(", "))}</p>
+        <p><strong>База данных PostgreSQL:</strong> <code>${escapeHtml(database?.name || service.slug)}</code></p>
         ${tables.length ? tagList(tables.map((t) => t.name)) : ""}
       </section>
 
       <section class="dialog-section">
-        <h3>Integration Events</h3>
+        <h3>События интеграции</h3>
         <div class="event-tags-group">
-          <div><strong>Publishes:</strong> ${published.length ? tagList(published.map((e) => e.name)) : "<span class='dim'>None</span>"}</div>
-          <div style="margin-top:6px"><strong>Consumes:</strong> ${consumed.length ? tagList(consumed.map((e) => e.name)) : "<span class='dim'>None</span>"}</div>
+          <div><strong>Публикует (Outbox):</strong> ${published.length ? tagList(published.map((e) => e.name)) : "<span class='dim'>Нет</span>"}</div>
+          <div style="margin-top:6px"><strong>Слушает (Inbox):</strong> ${consumed.length ? tagList(consumed.map((e) => e.name)) : "<span class='dim'>Нет</span>"}</div>
         </div>
       </section>
 
       <section class="dialog-section">
-        <h3>Endpoints (${endpoints.length})</h3>
+        <h3>Эндпоинты (${endpoints.length})</h3>
         <div class="endpoint-list">
           ${endpoints.slice(0, 8).map((ep) => `
             <div class="endpoint">
@@ -75,7 +75,7 @@ function serviceDialogMarkup(service, data, index) {
 
       ${workers.length ? `
         <section class="dialog-section">
-          <h3>Workers (${workers.length})</h3>
+          <h3>Воркеры (${workers.length})</h3>
           ${workers.map((w) => `
             <article class="worker-card">
               <strong>${escapeHtml(w.role)}</strong>
@@ -85,7 +85,7 @@ function serviceDialogMarkup(service, data, index) {
 
       ${decisions.length ? `
         <section class="dialog-section">
-          <h3>Engineering Decisions</h3>
+          <h3>Архитектурные решения</h3>
           ${list(decisions.map((d) => `<b>${d.title}</b>: ${d.whyItMatters}`))}
         </section>` : ""}
 

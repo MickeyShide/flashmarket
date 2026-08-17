@@ -15,9 +15,12 @@ export default defineConfig({
     port: 3000,
     host: '0.0.0.0',
     strictPort: true,
+    hmr: {
+      clientPort: 8080,
+    },
     watch: {
       usePolling,
-      interval: usePolling ? 100 : undefined,
+      interval: usePolling ? 1000 : undefined,
     },
     proxy: {
       '/api': {

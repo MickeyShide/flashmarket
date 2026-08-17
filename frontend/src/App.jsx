@@ -16,8 +16,11 @@ import { flattenCategories } from './utils/formatters';
 import { DropsSection } from './components/Drops/DropsSection';
 import { usePaginatedResource } from './hooks/usePaginatedResource';
 
+import { parseRoute, formatRouteUrl } from './utils/router';
+
 const lazyNamed = (loader, exportName) => lazy(() => loader().then(module => ({ default: module[exportName] })));
 
+import ArchitectureView from './components/Architecture/ArchitectureView';
 const DevHub = lazy(() => import('./components/DevHub/DevHub'));
 const CategoriesView = lazyNamed(() => import('./components/Catalog/CategoriesView'), 'CategoriesView');
 const ProductDetail = lazyNamed(() => import('./components/Product/ProductDetail'), 'ProductDetail');
@@ -29,29 +32,28 @@ const DropDetail = lazyNamed(() => import('./components/Drops/DropDetail'), 'Dro
 const AdminView = lazyNamed(() => import('./components/Admin/AdminView'), 'AdminView');
 
 export const App = () => {
-  // Navigation & View Routing
-  const [currentView, setCurrentView] = useState(() => {
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/dev')) {
-      return 'dev';
-    }
-    return 'catalog';
-  }); // 'catalog' | 'product' | 'cart' | 'checkout' | 'auth' | 'order-detail' | 'dev' | 'drops' | 'drop-detail' | 'admin'
+  // Navigation & View Routing from current URL
+  const initialRoute = parseRoute();
+  const [currentView, setCurrentView] = useState(initialRoute.view);
   const isDeveloperView = currentView === 'dev';
 
-  const [selectedProductSlug, setSelectedProductSlug] = useState(null);
-  const [selectedOrderId, setSelectedOrderId] = useState(null);
-  const [selectedDropIdentifier, setSelectedDropIdentifier] = useState(null);
+  const [selectedProductSlug, setSelectedProductSlug] = useState(initialRoute.productSlug || null);
+  const [selectedOrderId, setSelectedOrderId] = useState(initialRoute.orderId || null);
+  const [selectedDropIdentifier, setSelectedDropIdentifier] = useState(initialRoute.dropIdentifier || null);
   const [selectedDropInfo, setSelectedDropInfo] = useState(null);
-  const [profileTab, setProfileTab] = useState('profile'); // 'profile' | 'wishlist' | 'orders' | 'notifications'
+  const [profileTab, setProfileTab] = useState(initialRoute.profileTab || 'profile');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  // Sync URL pathname with currentView
+  // Sync browser back/forward buttons (popstate) with state
   useEffect(() => {
     const handlePopState = () => {
-      if (window.location.pathname.startsWith('/dev')) {
-        setCurrentView('dev');
-      } else {
-        setCurrentView('catalog');
+      const route = parseRoute(window.location.pathname);
+      setCurrentView(route.view);
+      setSelectedProductSlug(route.productSlug || null);
+      setSelectedDropIdentifier(route.dropIdentifier || null);
+      setSelectedOrderId(route.orderId || null);
+      if (route.profileTab) {
+        setProfileTab(route.profileTab);
       }
     };
 
@@ -59,18 +61,20 @@ export const App = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Update browser history when view changes manually
+  // Sync state changes with browser URL and history
   useEffect(() => {
-    if (currentView === 'dev') {
-      if (window.location.pathname !== '/dev') {
-        window.history.pushState({}, '', '/dev');
-      }
-    } else {
-      if (window.location.pathname === '/dev') {
-        window.history.pushState({}, '', '/');
-      }
+    const targetUrl = formatRouteUrl({
+      view: currentView,
+      productSlug: selectedProductSlug,
+      dropIdentifier: selectedDropIdentifier,
+      orderId: selectedOrderId,
+      profileTab,
+    });
+
+    if (window.location.pathname !== targetUrl) {
+      window.history.pushState({}, '', targetUrl);
     }
-  }, [currentView]);
+  }, [currentView, selectedProductSlug, selectedDropIdentifier, selectedOrderId, profileTab]);
 
   // Global Data & Catalog Filters
   const [categoriesData, setCategoriesData] = useState([]);
@@ -178,6 +182,10 @@ export const App = () => {
   }, []);
 
   const handleGoHome = () => {
+    setSelectedProductSlug(null);
+    setSelectedDropIdentifier(null);
+    setSelectedOrderId(null);
+    setSelectedDropInfo(null);
     setCurrentView('catalog');
     setActiveCategoryId(null);
     setActiveBrandId(null);
@@ -186,7 +194,6 @@ export const App = () => {
     setActivePriceTo('');
     setActiveSort('created_at');
     setActiveSearch('');
-    setSelectedDropInfo(null);
   };
 
   const handleOpenProduct = (slug, dropInfo = null) => {
@@ -244,7 +251,7 @@ export const App = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1">
+      <main className="flex-1 flex flex-col">
         <Suspense fallback={<div className="spinner" aria-label="Загрузка страницы" />}>
         {currentView === 'catalog' && (
           <>
@@ -377,6 +384,12 @@ export const App = () => {
 
         {currentView === 'admin' && (
           <AdminView
+            onBack={() => setCurrentView('catalog')}
+          />
+        )}
+
+        {currentView === 'architecture' && (
+          <ArchitectureView
             onBack={() => setCurrentView('catalog')}
           />
         )}
