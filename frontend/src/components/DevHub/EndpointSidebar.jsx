@@ -1,11 +1,11 @@
 import React from 'react';
 
 const METHOD_STYLES = {
-  GET: 'text-emerald-400',
-  POST: 'text-blue-400',
-  PUT: 'text-amber-400',
-  PATCH: 'text-amber-400',
-  DELETE: 'text-rose-400',
+  GET: 'text-[#2E7D32] bg-[#E8F5E9] border-[#C8E6C9]',
+  POST: 'text-[#1565C0] bg-[#E3F2FD] border-[#BBDEFB]',
+  PUT: 'text-[#E65100] bg-[#FFF3E0] border-[#FFE0B2]',
+  PATCH: 'text-[#E65100] bg-[#FFF3E0] border-[#FFE0B2]',
+  DELETE: 'text-[#C62828] bg-[#FFEBEE] border-[#FFCDD2]',
 };
 
 export const EndpointSidebar = ({
@@ -20,21 +20,21 @@ export const EndpointSidebar = ({
   serviceFilter,
   onServiceFilterChange,
 }) => (
-  <aside className="flex h-[700px] flex-col border-b border-[#27272A] bg-[#141414] font-mono lg:border-b-0 lg:border-r">
+  <aside className="flex h-[700px] flex-col border-b border-border-color bg-[#FAFAFA] font-mono lg:border-b-0 lg:border-r">
     {/* Search & Filters Header */}
-    <div className="space-y-2.5 border-b border-[#27272A] p-3.5">
+    <div className="space-y-2.5 border-b border-border-color p-3.5 bg-white">
       {/* Search Input */}
       <div className="relative">
         <input
           value={searchQuery}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Поиск по маршруту или описанию..."
-          className="w-full border border-[#333333] bg-[#1A1A1A] px-3 py-2 text-[11px] text-white outline-none placeholder:text-zinc-500 focus:border-accent-lime rounded-sm"
+          className="w-full border border-border-color bg-white px-3 py-2 text-[11px] text-black outline-none placeholder:text-text-muted focus:border-black rounded-sm font-sans"
         />
         {searchQuery && (
           <button
             onClick={() => onSearchChange('')}
-            className="absolute right-2.5 top-2 text-zinc-400 hover:text-white text-xs font-bold"
+            className="absolute right-2.5 top-2 text-text-muted hover:text-black text-xs font-bold cursor-pointer"
           >
             ✕
           </button>
@@ -45,9 +45,9 @@ export const EndpointSidebar = ({
       <select
         value={serviceFilter || ''}
         onChange={(event) => onServiceFilterChange(event.target.value || null)}
-        className="w-full border border-[#333333] bg-[#1A1A1A] px-3 py-1.5 text-[10px] uppercase tracking-wider text-zinc-200 outline-none focus:border-accent-lime rounded-sm cursor-pointer"
+        className="w-full border border-border-color bg-white px-3 py-1.5 text-[10px] uppercase tracking-wider text-black outline-none focus:border-black rounded-sm cursor-pointer font-mono"
       >
-        <option value="">Все сервисы</option>
+        <option value="">Все сервисы ({services.length})</option>
         {services.map((service) => (
           <option key={service.id} value={service.id}>
             {service.name} ({service.operationCount})
@@ -56,7 +56,7 @@ export const EndpointSidebar = ({
       </select>
 
       {/* Access Category Filter Chips */}
-      <div className="grid grid-cols-4 gap-1 p-1 bg-[#1A1A1A] border border-[#27272A] rounded-sm">
+      <div className="grid grid-cols-4 gap-1 p-1 bg-[#F5F5F5] border border-border-color rounded-sm">
         {['all', 'anonymous', 'authenticated', 'admin'].map((filter) => {
           const isActive = accessFilter === filter;
           return (
@@ -64,8 +64,8 @@ export const EndpointSidebar = ({
               key={filter}
               onClick={() => onAccessFilterChange(filter)}
               title={filter}
-              className={`py-1 text-[8.5px] uppercase font-black tracking-wider rounded-sm transition-colors text-center truncate ${
-                isActive ? 'bg-accent-lime text-black' : 'text-zinc-400 hover:text-white hover:bg-[#27272A]'
+              className={`py-1 text-[8.5px] uppercase font-black tracking-wider rounded-sm transition-colors text-center truncate cursor-pointer ${
+                isActive ? 'bg-black text-[#BFF532]' : 'text-text-muted hover:text-black hover:bg-white'
               }`}
             >
               {filter === 'authenticated' ? 'auth' : filter === 'anonymous' ? 'public' : filter}
@@ -76,43 +76,45 @@ export const EndpointSidebar = ({
     </div>
 
     {/* Endpoint List */}
-    <div className="flex-1 overflow-y-auto divide-y divide-[#202023]">
+    <div className="flex-1 overflow-y-auto divide-y divide-border-color bg-[#FAFAFA]">
       {endpoints.length === 0 ? (
-        <p className="p-6 text-xs text-zinc-500 text-center font-sans">
+        <p className="p-6 text-xs text-text-muted text-center font-sans">
           Операции по заданным фильтрам не найдены.
         </p>
       ) : (
         endpoints.map((endpoint) => {
           const isSelected = selectedEndpointId === endpoint.id;
+          const methodClass = METHOD_STYLES[endpoint.method] || 'text-zinc-800 bg-zinc-100 border-zinc-200';
+
           return (
             <button
               key={endpoint.id}
               onClick={() => onSelectEndpoint(endpoint.id)}
-              className={`block w-full px-3.5 py-3 text-left transition-colors focus:outline-none ${
+              className={`block w-full px-3.5 py-3 text-left transition-colors focus:outline-none cursor-pointer ${
                 isSelected
-                  ? 'bg-[#27272A] border-l-2 border-accent-lime text-white'
-                  : 'hover:bg-[#1D1D20] text-zinc-300'
+                  ? 'bg-white border-l-4 border-black text-black shadow-xs'
+                  : 'hover:bg-white text-zinc-700'
               }`}
             >
               <div className="mb-1 flex items-center justify-between gap-2 text-[9.5px] uppercase tracking-wider font-extrabold">
-                <span className={METHOD_STYLES[endpoint.method] || 'text-zinc-300'}>
+                <span className={`px-1.5 py-0.5 rounded-sm border font-mono ${methodClass}`}>
                   {endpoint.method}
                 </span>
-                <span className={`text-[8.5px] px-1.5 py-0.2 rounded ${
+                <span className={`text-[8.5px] px-1.5 py-0.5 rounded-sm border font-mono ${
                   endpoint.access === 'admin' 
-                    ? 'text-rose-400 bg-rose-500/10' 
+                    ? 'text-red-700 bg-red-50 border-red-200' 
                     : endpoint.access === 'authenticated'
-                    ? 'text-cyan-400 bg-cyan-500/10'
-                    : 'text-zinc-500 bg-zinc-800'
+                    ? 'text-blue-700 bg-blue-50 border-blue-200'
+                    : 'text-zinc-600 bg-zinc-100 border-zinc-200'
                 }`}>
                   {endpoint.access === 'authenticated' ? 'auth' : endpoint.access}
                 </span>
               </div>
 
-              <div className="truncate text-[11px] font-bold text-white font-mono">
+              <div className="truncate text-[11px] font-bold text-black font-mono">
                 {endpoint.path}
               </div>
-              <div className="mt-0.5 truncate text-[10.5px] text-zinc-400 font-sans">
+              <div className="mt-0.5 truncate text-[10.5px] text-text-muted font-sans">
                 {endpoint.summary}
               </div>
             </button>
@@ -122,3 +124,4 @@ export const EndpointSidebar = ({
     </div>
   </aside>
 );
+

@@ -4,9 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Interactive architecture explorer for the FlashMarket distributed marketplace backend.">
-    <meta name="theme-color" content="#0b0e12">
+    <meta name="theme-color" content="#ffffff">
     <link rel="icon" href="data:,">
     <title>FlashMarket — Architecture Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300..900;1,300..900&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
@@ -32,8 +35,10 @@
       </nav>
 
       <div class="header-actions">
+        <a class="header-link" href="/dev" title="Developer Hub API Explorer">DEV HUB ↗</a>
+        <a class="header-link" href="/" title="Store">МАГАЗИН ↗</a>
         <button class="search-trigger" type="button" data-search-open aria-haspopup="dialog">
-          <span>Search system</span>
+          <span>Search</span>
           <kbd>⌘ K</kbd>
         </button>
         <div class="mode-switch" role="group" aria-label="Content depth">
@@ -238,9 +243,13 @@
     </main>
 
     <footer class="site-footer">
-      <div><span class="wordmark__signal" aria-hidden="true"></span> FlashMarket Architecture Explorer</div>
+      <div><span class="wordmark__signal" aria-hidden="true"></span> FLASHMARKET ARCHITECTURE EXPLORER</div>
       <p>Repository-audited snapshot · 2026-08-14 · No runtime data is changed by this page.</p>
-      <a href="#main">Back to top ↑</a>
+      <div class="footer-links">
+        <a href="/dev">DEV HUB ↗</a>
+        <a href="/">МАГАЗИН ↗</a>
+        <a href="#main">Back to top ↑</a>
+      </div>
     </footer>
 
     <dialog class="side-dialog" data-service-dialog aria-label="Service details">

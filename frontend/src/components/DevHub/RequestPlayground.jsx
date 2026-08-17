@@ -45,7 +45,7 @@ export const RequestPlayground = ({ endpoint, user, accessToken }) => {
     setConfirming(false);
   }, [endpoint]);
 
-  if (!endpoint) return <aside className="h-full border-l border-[#27272A] bg-[#141414]" />;
+  if (!endpoint) return <aside className="h-full border-l border-border-color bg-[#FAFAFA]" />;
 
   const run = async (confirmed = false) => {
     if (shouldConfirm(endpoint) && !confirmed) {
@@ -83,14 +83,14 @@ export const RequestPlayground = ({ endpoint, user, accessToken }) => {
       : renderedResponse;
 
   return (
-    <aside className="h-[700px] overflow-y-auto border-t border-[#27272A] bg-[#141414] font-mono lg:border-l lg:border-t-0 text-zinc-100">
+    <aside className="h-[700px] overflow-y-auto border-t border-border-color bg-[#FAFAFA] font-mono lg:border-l lg:border-t-0 text-text-main">
       
       {/* Playground Console Header */}
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#27272A] bg-[#111111] px-4 py-3">
-        <span className="text-[10.5px] font-black uppercase tracking-wider text-white">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border-color bg-white px-4 py-3">
+        <span className="text-[10.5px] font-black uppercase tracking-wider text-black">
           КОНСОЛЬ ЗАПРОСОВ
         </span>
-        <span className="max-w-44 truncate text-[9.5px] uppercase text-zinc-400 font-bold">
+        <span className="max-w-44 truncate text-[9.5px] uppercase text-text-muted font-bold">
           {window.location.host}
         </span>
       </div>
@@ -104,12 +104,12 @@ export const RequestPlayground = ({ endpoint, user, accessToken }) => {
         ].map(([title, parameters, values, setValues]) =>
           parameters.length ? (
             <fieldset key={title} className="space-y-2">
-              <legend className="mb-1 text-[9.5px] font-extrabold uppercase tracking-wider text-zinc-400">
+              <legend className="mb-1 text-[9.5px] font-extrabold uppercase tracking-wider text-text-muted">
                 {title} Параметры
               </legend>
               {parameters.map((parameter) => (
                 <label key={parameter.name} className="block">
-                  <span className="mb-1 flex justify-between text-[9px] text-zinc-400">
+                  <span className="mb-1 flex justify-between text-[9px] text-text-muted">
                     <span>{parameter.name}</span>
                     <span>{parameter.required ? 'обязательно' : parameter.type}</span>
                   </span>
@@ -118,7 +118,7 @@ export const RequestPlayground = ({ endpoint, user, accessToken }) => {
                     onChange={(event) =>
                       setValues((current) => ({ ...current, [parameter.name]: event.target.value }))
                     }
-                    className="w-full border border-[#333333] bg-[#1A1A1A] px-3 py-2 text-xs text-white outline-none focus:border-accent-lime rounded-sm"
+                    className="w-full border border-border-color bg-white px-3 py-2 text-xs text-black outline-none focus:border-black rounded-sm"
                   />
                 </label>
               ))}
@@ -129,12 +129,12 @@ export const RequestPlayground = ({ endpoint, user, accessToken }) => {
         {/* Request Body */}
         {endpoint.requestBody && (
           <label className="block">
-            <span className="mb-1.5 flex justify-between text-[9.5px] font-extrabold uppercase tracking-wider text-zinc-400">
+            <span className="mb-1.5 flex justify-between text-[9.5px] font-extrabold uppercase tracking-wider text-text-muted">
               <span>Тело запроса (JSON)</span>
               <button
                 type="button"
                 onClick={() => setBody(endpoint.requestBody.initialValue || '')}
-                className="hover:text-white underline cursor-pointer"
+                className="hover:text-black underline cursor-pointer font-bold"
               >
                 Сбросить
               </button>
@@ -144,14 +144,14 @@ export const RequestPlayground = ({ endpoint, user, accessToken }) => {
               value={body}
               onChange={(event) => setBody(event.target.value)}
               spellCheck="false"
-              className="w-full resize-y border border-[#333333] bg-[#1A1A1A] p-3 text-[11px] leading-relaxed text-emerald-300 outline-none focus:border-accent-lime rounded-sm"
+              className="w-full resize-y border border-border-color bg-white p-3 text-[11px] leading-relaxed text-zinc-900 outline-none focus:border-black rounded-sm"
             />
           </label>
         )}
 
         {/* Additional Headers */}
         <label className="block">
-          <span className="mb-1.5 block text-[9.5px] font-extrabold uppercase tracking-wider text-zinc-400">
+          <span className="mb-1.5 block text-[9.5px] font-extrabold uppercase tracking-wider text-text-muted">
             Заголовки (Headers)
           </span>
           <textarea
@@ -159,34 +159,34 @@ export const RequestPlayground = ({ endpoint, user, accessToken }) => {
             value={headers}
             onChange={(event) => setHeaders(event.target.value)}
             spellCheck="false"
-            className="w-full resize-y border border-[#333333] bg-[#1A1A1A] p-2.5 text-[11px] leading-relaxed text-amber-200 outline-none focus:border-accent-lime rounded-sm"
+            className="w-full resize-y border border-border-color bg-white p-2.5 text-[11px] leading-relaxed text-zinc-900 outline-none focus:border-black rounded-sm"
           />
         </label>
 
         {/* Role Access Restriction Warning */}
         {!access.allowed && (
-          <div className="border border-amber-400/30 bg-amber-400/10 p-3 text-[10.5px] leading-relaxed text-amber-200 rounded-sm font-sans">
+          <div className="border border-amber-300 bg-amber-50 p-3 text-[10.5px] leading-relaxed text-amber-900 rounded-sm font-sans">
             {access.reason}
           </div>
         )}
 
         {/* Confirmation modal for dangerous operations */}
         {confirming && (
-          <div role="alertdialog" className="border border-rose-500/40 bg-rose-500/10 p-4 rounded-sm">
-            <div className="text-[10.5px] font-black uppercase text-rose-300">Подтвердите выполнение</div>
-            <div className="mt-1 break-all text-[10px] text-zinc-300 font-mono">
+          <div role="alertdialog" className="border border-red-300 bg-red-50 p-4 rounded-sm">
+            <div className="text-[10.5px] font-black uppercase text-red-800">Подтвердите выполнение</div>
+            <div className="mt-1 break-all text-[10px] text-zinc-700 font-mono">
               {endpoint.method} {endpoint.path}
             </div>
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() => run(true)}
-                className="bg-rose-600 px-3 py-1.5 text-[9.5px] font-black uppercase text-white rounded-sm cursor-pointer"
+                className="bg-red-600 hover:bg-red-700 px-3 py-1.5 text-[9.5px] font-black uppercase text-white rounded-sm cursor-pointer"
               >
                 Выполнить
               </button>
               <button
                 onClick={() => setConfirming(false)}
-                className="border border-zinc-700 bg-[#1A1A1A] px-3 py-1.5 text-[9.5px] uppercase text-zinc-300 rounded-sm cursor-pointer"
+                className="border border-border-color bg-white hover:bg-zinc-100 px-3 py-1.5 text-[9.5px] uppercase text-black rounded-sm cursor-pointer"
               >
                 Отмена
               </button>
@@ -198,47 +198,47 @@ export const RequestPlayground = ({ endpoint, user, accessToken }) => {
         <button
           onClick={() => run(false)}
           disabled={!access.allowed || running}
-          className="w-full bg-accent-lime text-black px-4 py-3 text-[10.5px] font-black tracking-[1.5px] uppercase rounded-sm cursor-pointer hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[#27272A] disabled:text-zinc-500 transition-all shadow-md"
+          className="w-full bg-[#BFF532] text-black px-4 py-3 text-[10.5px] font-black tracking-[1.5px] uppercase rounded-sm cursor-pointer hover:bg-black hover:text-[#BFF532] disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400 transition-all shadow-xs border border-black"
         >
           {running ? 'ОТПРАВКА ЗАПРОСА...' : `ОТПРАВИТЬ ${endpoint.method}`}
         </button>
 
         {error && (
-          <div className="border border-rose-500/30 bg-rose-500/10 p-3 text-[10.5px] leading-relaxed text-rose-300 rounded-sm">
+          <div className="border border-red-300 bg-red-50 p-3 text-[10.5px] leading-relaxed text-red-800 rounded-sm">
             {error}
           </div>
         )}
 
         {/* Response output viewer */}
         {response && (
-          <section className="border-t border-[#27272A] pt-4">
+          <section className="border-t border-border-color pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase font-bold">
-              <span className={response.ok ? 'text-accent-lime' : 'text-rose-400'}>
+              <span className={response.ok ? 'text-[#2E7D32]' : 'text-red-700'}>
                 HTTP {response.status} {response.statusText}
               </span>
-              <span className="text-zinc-400">{response.elapsedMs} ms</span>
+              <span className="text-text-muted">{response.elapsedMs} ms</span>
             </div>
 
             {Object.keys(response.headers).length > 0 && (
-              <pre className="mt-2.5 overflow-auto border border-[#27272A] bg-[#111111] p-2.5 text-[9.5px] leading-relaxed text-zinc-400 rounded-sm">
+              <pre className="mt-2.5 overflow-auto border border-border-color bg-white p-2.5 text-[9.5px] leading-relaxed text-zinc-700 rounded-sm">
                 {JSON.stringify(response.headers, null, 2)}
               </pre>
             )}
 
-            <pre className="mt-2.5 max-h-80 overflow-auto border border-[#27272A] bg-[#111111] p-3 text-[10.5px] leading-relaxed text-zinc-200 rounded-sm">
+            <pre className="mt-2.5 max-h-80 overflow-auto border border-border-color bg-white p-3 text-[10.5px] leading-relaxed text-zinc-900 rounded-sm">
               {truncatedResponse || '(пустое тело ответа)'}
             </pre>
 
-            <div className="mt-2 flex gap-3 text-[9.5px] uppercase font-bold text-zinc-400">
+            <div className="mt-2.5 flex gap-2 text-[9.5px] uppercase font-bold">
               <button
                 onClick={() => navigator.clipboard.writeText(renderedResponse)}
-                className="hover:text-accent-lime transition-colors cursor-pointer"
+                className="bg-white border border-border-color px-2.5 py-1 rounded-sm text-black hover:bg-black hover:text-white transition-colors cursor-pointer"
               >
                 Скопировать ответ
               </button>
               <button
                 onClick={download}
-                className="hover:text-accent-lime transition-colors cursor-pointer"
+                className="bg-white border border-border-color px-2.5 py-1 rounded-sm text-black hover:bg-black hover:text-white transition-colors cursor-pointer"
               >
                 Скачать JSON
               </button>
@@ -250,3 +250,4 @@ export const RequestPlayground = ({ endpoint, user, accessToken }) => {
     </aside>
   );
 };
+

@@ -41,32 +41,32 @@ export const ApiExplorer = ({
   }, [selectedEndpoint, selectedEndpointId, onSelectedEndpointIdChange]);
 
   return (
-    <section id="api-explorer" className="scroll-mt-16 bg-[#121212] border-b border-[#27272A] py-8 md:py-12">
+    <section id="api-explorer" className="scroll-mt-16 bg-[#F9FAFB] border-b border-border-color py-8 md:py-12">
       <div className="max-w-[1280px] mx-auto px-3.5 md:px-6">
         
         {/* Section Header matching FlashMarket store design */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-6">
           <div>
-            <div className="font-mono text-[9.5px] md:text-[10.5px] tracking-[1.5px] uppercase font-bold text-accent-lime mb-1">
+            <div className="font-mono text-[9.5px] md:text-[10.5px] tracking-[1.5px] uppercase font-bold text-text-muted mb-1">
               ИНТЕРАКТИВНЫЙ EXPLORER
             </div>
-            <h2 className="font-sans font-black text-lg md:text-2xl tracking-[1px] md:tracking-[2.5px] uppercase text-white">
+            <h2 className="font-sans font-black text-lg md:text-2xl tracking-[1px] md:tracking-[2.5px] uppercase text-black">
               API EXPLORER
             </h2>
           </div>
-          <div className="font-mono text-[10.5px] uppercase tracking-wider text-zinc-400 font-extrabold">
+          <div className="font-mono text-[10.5px] uppercase tracking-wider text-text-muted font-extrabold">
             {filteredEndpoints.length} из {endpoints.length} операций
           </div>
         </div>
 
         {/* Mobile View Switcher Tabs */}
-        <div className="grid grid-cols-3 gap-1 bg-[#18181B] border border-[#27272A] p-1 rounded font-mono text-[10px] uppercase font-bold lg:hidden mb-3">
+        <div className="grid grid-cols-3 gap-1 bg-white border border-border-color p-1 rounded-sm font-mono text-[10px] uppercase font-bold lg:hidden mb-3">
           {['list', 'details', 'playground'].map((tab) => (
             <button
               key={tab}
               onClick={() => setMobileTab(tab)}
-              className={`py-2 rounded transition-colors text-center ${
-                mobileTab === tab ? 'bg-accent-lime text-black' : 'text-zinc-400 hover:text-white'
+              className={`py-2 rounded-sm transition-colors text-center ${
+                mobileTab === tab ? 'bg-black text-[#BFF532]' : 'text-text-muted hover:text-black'
               }`}
             >
               {tab === 'list' ? 'Список' : tab === 'details' ? 'Схема' : 'Консоль'}
@@ -75,7 +75,7 @@ export const ApiExplorer = ({
         </div>
 
         {/* Main Explorer Unified Frame */}
-        <div className="grid min-h-[700px] overflow-hidden border border-[#27272A] bg-[#141414] rounded-md shadow-2xl lg:grid-cols-[300px_minmax(340px,1fr)_380px]">
+        <div className="grid min-h-[700px] overflow-hidden border border-border-color bg-white rounded-sm shadow-sm lg:grid-cols-[300px_minmax(340px,1fr)_380px]">
           <div className={`${mobileTab === 'list' ? 'block' : 'hidden'} lg:block`}>
             <EndpointSidebar
               endpoints={filteredEndpoints}
@@ -102,3 +102,4 @@ export const ApiExplorer = ({
     </section>
   );
 };
+
