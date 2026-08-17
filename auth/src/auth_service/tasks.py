@@ -29,7 +29,13 @@ async def cleanup_expired_data_once() -> int:
     return total
 
 
-@app.task(name="flashmarket.auth.cleanup_expired_data")  # type: ignore[untyped-decorator]
+@app.task(  # type: ignore[untyped-decorator]
+    name="flashmarket.auth.cleanup_expired_data",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    max_retries=3,
+    acks_late=True,
+)
 def cleanup_expired_data_task() -> int:
     """Celery entry point for Auth cleanup."""
     return runner.run(cleanup_expired_data_once())

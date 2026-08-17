@@ -37,7 +37,13 @@ async def expire_reservations_once() -> int:
     return expired
 
 
-@app.task(name="flashmarket.inventory.expire_reservations")  # type: ignore[untyped-decorator]
+@app.task(  # type: ignore[untyped-decorator]
+    name="flashmarket.inventory.expire_reservations",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    max_retries=3,
+    acks_late=True,
+)
 def expire_reservations_task() -> int:
     """Celery entry point for reservation expiry."""
     return runner.run(expire_reservations_once())

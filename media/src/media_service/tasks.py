@@ -38,7 +38,13 @@ async def cleanup_expired_assets_once() -> int:
     return processed
 
 
-@app.task(name="flashmarket.media.cleanup_expired_assets")  # type: ignore[untyped-decorator]
+@app.task(  # type: ignore[untyped-decorator]
+    name="flashmarket.media.cleanup_expired_assets",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    max_retries=3,
+    acks_late=True,
+)
 def cleanup_expired_assets_task() -> int:
     """Celery entry point for Media cleanup."""
     return runner.run(cleanup_expired_assets_once())
