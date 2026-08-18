@@ -20,8 +20,6 @@ import { parseRoute, formatRouteUrl } from './utils/router';
 
 const lazyNamed = (loader, exportName) => lazy(() => loader().then(module => ({ default: module[exportName] })));
 
-import ArchitectureView from './components/Architecture/ArchitectureView';
-const DevHub = lazy(() => import('./components/DevHub/DevHub'));
 const CategoriesView = lazyNamed(() => import('./components/Catalog/CategoriesView'), 'CategoriesView');
 const ProductDetail = lazyNamed(() => import('./components/Product/ProductDetail'), 'ProductDetail');
 const CartView = lazyNamed(() => import('./components/Cart/CartView'), 'CartView');
@@ -35,7 +33,6 @@ export const App = () => {
   // Navigation & View Routing from current URL
   const initialRoute = parseRoute();
   const [currentView, setCurrentView] = useState(initialRoute.view);
-  const isDeveloperView = currentView === 'dev';
 
   const [selectedProductSlug, setSelectedProductSlug] = useState(initialRoute.productSlug || null);
   const [selectedOrderId, setSelectedOrderId] = useState(initialRoute.orderId || null);
@@ -104,7 +101,6 @@ export const App = () => {
 
   // Initial load: Categories & Brands
   useEffect(() => {
-    if (isDeveloperView) return undefined;
     async function initData() {
       try {
         const [cats, bnd] = await Promise.all([
@@ -119,7 +115,7 @@ export const App = () => {
     }
     initData();
     return undefined;
-  }, [isDeveloperView]);
+  }, []);
 
   // Fetch Catalog Products
   const fetchCatalogPage = useCallback(async ({ limit, offset, signal }) => {
@@ -157,10 +153,9 @@ export const App = () => {
     loadMore: handleLoadMore
   } = usePaginatedResource({ fetchPage: fetchCatalogPage, pageSize: CATALOG_LIMIT });
 
-  const catalogEnabled = !isDeveloperView;
   useEffect(() => {
-    if (catalogEnabled) reloadCatalog();
-  }, [catalogEnabled, activeCategoryId, activeBrandId, activeSize, activePriceFrom, activePriceTo, activeSort, activeSearch, reloadCatalog]);
+    reloadCatalog();
+  }, [activeCategoryId, activeBrandId, activeSize, activePriceFrom, activePriceTo, activeSort, activeSearch, reloadCatalog]);
 
   // Filter actions
   const handleFilterCategory = (catId) => {
@@ -214,19 +209,6 @@ export const App = () => {
 
   const activeBrand = brandsData.find(b => b.id === activeBrandId);
   const activeCategory = activeCategoryId ? flattenCategories(categoriesData).find(c => c.id === activeCategoryId) : null;
-
-  if (currentView === 'dev') {
-    return (
-      <Suspense fallback={<div className="min-h-screen bg-[#0B0B0C]" aria-busy="true" />}>
-        <DevHub
-          onBackToStore={() => {
-            handleGoHome();
-            window.history.pushState({}, '', '/');
-          }}
-        />
-      </Suspense>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-primary text-text-main font-sans">
@@ -384,12 +366,6 @@ export const App = () => {
 
         {currentView === 'admin' && (
           <AdminView
-            onBack={() => setCurrentView('catalog')}
-          />
-        )}
-
-        {currentView === 'architecture' && (
-          <ArchitectureView
             onBack={() => setCurrentView('catalog')}
           />
         )}

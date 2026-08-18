@@ -6,17 +6,7 @@
 export function parseRoute(pathname = (typeof window !== 'undefined' ? window.location.pathname : '/')) {
   const path = pathname || '/';
 
-  // 1. Developer Hub
-  if (path.startsWith('/dev')) {
-    return { view: 'dev' };
-  }
-
-  // 2. Interactive System Architecture
-  if (path.startsWith('/architecture') || path.startsWith('/docs/architecture')) {
-    return { view: 'architecture' };
-  }
-
-  // 3. Admin Panel
+  // 1. Admin Panel
   if (path.startsWith('/admin')) {
     return { view: 'admin' };
   }
@@ -86,10 +76,6 @@ export function parseRoute(pathname = (typeof window !== 'undefined' ? window.lo
 
 export function formatRouteUrl({ view, productSlug, dropIdentifier, orderId, profileTab }) {
   switch (view) {
-    case 'dev':
-      return '/dev';
-    case 'architecture':
-      return '/architecture';
     case 'admin':
       return '/admin';
     case 'product':

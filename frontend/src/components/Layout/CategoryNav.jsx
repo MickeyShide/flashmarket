@@ -61,24 +61,6 @@ export const CategoryNav = ({
           ИЗБРАННОЕ
         </button>
 
-        {/* АРХИТЕКТУРА */}
-        <button
-          className={`text-[12px] md:text-[11.5px] font-extrabold tracking-[1.5px] uppercase cursor-pointer py-1 relative w-full md:w-auto text-left md:text-center flex items-center gap-1.5 ${currentView === 'architecture' ? 'text-black' : 'text-text-main hover:text-black'}`}
-          onClick={() => {
-            setCurrentView('architecture');
-            if (window.location.pathname !== '/architecture') {
-              window.history.pushState({}, '', '/architecture');
-            }
-            closeMobileNav();
-          }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] inline-block"></span>
-          АРХИТЕКТУРА
-          {currentView === 'architecture' && (
-            <span className="hidden md:block absolute -bottom-[2px] left-0 right-0 h-[2px] bg-black"></span>
-          )}
-        </button>
-
         {/* Mobile-only Notification link */}
         {user && (
           <button
@@ -122,21 +104,6 @@ export const CategoryNav = ({
             АДМИН ПАНЕЛЬ
           </button>
         )}
-
-        {/* Mobile-only Dev Hub Button */}
-        <button
-          className="md:hidden text-[12px] font-extrabold tracking-[1.5px] uppercase cursor-pointer py-1 w-full text-left flex items-center gap-2"
-          onClick={() => {
-            setCurrentView('dev');
-            if (window.location.pathname !== '/dev') {
-              window.history.pushState({}, '', '/dev');
-            }
-            closeMobileNav();
-          }}
-        >
-          <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-black text-[#BFF532] rounded border border-black">DEV</span>
-          DEVELOPER HUB
-        </button>
       </div>
     </nav>
   );
