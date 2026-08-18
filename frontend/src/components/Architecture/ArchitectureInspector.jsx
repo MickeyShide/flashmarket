@@ -147,7 +147,6 @@ export const ArchitectureInspector = ({
       modules: expl.modules,
     });
     setSubView('detail');
-    if (isMobile) setSheetHeight(SHEET_FULL);
     onIsolateRoute({ pairs: expl.pairs, nodes: expl.nodes });
   };
 
@@ -160,7 +159,7 @@ export const ArchitectureInspector = ({
       modules: handler.modules,
     });
     setSubView('detail');
-    if (isMobile) setSheetHeight(SHEET_FULL);
+
     onIsolateRoute({ pairs: handler.pairs, nodes: handler.nodes });
   };
 
@@ -173,7 +172,7 @@ export const ArchitectureInspector = ({
       modules: task.modules,
     });
     setSubView('detail');
-    if (isMobile) setSheetHeight(SHEET_FULL);
+
     onIsolateRoute({ pairs: task.pairs, nodes: task.nodes });
   };
 
