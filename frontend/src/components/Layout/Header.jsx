@@ -23,10 +23,10 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
   const displayLabel = rawLabel.length > 16 ? rawLabel.slice(0, 16) + '…' : rawLabel;
 
   return (
-    <header className="bg-white border-b border-border-color sticky top-0 z-[100] w-full">
-      <div className="max-w-[1280px] mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-3">
+    <header className="bg-white border-b border-border-color sticky top-0 z-[100] w-full relative">
+      <div className="max-w-[1280px] mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-3 relative">
         {/* Left */}
-        <div className="flex items-center gap-[8px] md:gap-[12px]">
+        <div className="flex items-center gap-[8px] md:gap-[12px] z-10">
           <button
             className="md:hidden p-1 flex items-center justify-center cursor-pointer"
             onClick={toggleMobileNav}
@@ -41,7 +41,10 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
         </div>
 
         {/* Center - Brand Title */}
-        <div className="text-center flex-1 min-w-0 cursor-pointer" onClick={goHome}>
+        <div
+          className="text-center flex-1 min-w-0 cursor-pointer md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:flex-initial md:z-10"
+          onClick={goHome}
+        >
           <h1 className="font-sans font-black text-sm md:text-xl tracking-[1px] md:tracking-[2.5px] uppercase select-none whitespace-nowrap leading-none">
             FLASHMARKET
           </h1>
@@ -51,7 +54,7 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
         </div>
 
         {/* Right */}
-        <div className="flex items-center justify-end gap-2 md:gap-[12px] relative" ref={notifRef}>
+        <div className="flex items-center justify-end gap-2 md:gap-[12px] relative z-10 ml-auto" ref={notifRef}>
           {/* Admin view button if user is ADMIN */}
           {user?.role === 'ADMIN' && (
             <button
