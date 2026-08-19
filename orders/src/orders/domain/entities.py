@@ -23,6 +23,7 @@ class OrderEventType(StrEnum):
     PAYMENT_REQUESTED = "PaymentRequested"
     ORDER_CONFIRMED = "OrderConfirmed"
     ORDER_CANCELLED = "OrderCancelled"
+    PAYMENT_REFUND_REQUESTED = "PaymentRefundRequested"
 
 
 class DiscountType(StrEnum):

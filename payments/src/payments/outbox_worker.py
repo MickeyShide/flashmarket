@@ -30,8 +30,9 @@ EVENT_ROUTING_KEYS: dict[str, str] = {
     PaymentEventType.PAYMENT_SUCCEEDED: "payments.PaymentSucceeded",
     PaymentEventType.PAYMENT_FAILED: "payments.PaymentFailed",
     PaymentEventType.PAYMENT_CANCELLED: "payments.PaymentCancelled",
+    PaymentEventType.PAYMENT_REFUNDED: "payments.PaymentRefunded",
 }
-ROUTED_EVENTS = {"payments.PaymentSucceeded", "payments.PaymentFailed"}
+ROUTED_EVENTS = {"payments.PaymentSucceeded", "payments.PaymentFailed", "payments.PaymentRefunded"}
 
 
 async def publish_outbox_batch(

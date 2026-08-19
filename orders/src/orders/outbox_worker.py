@@ -31,6 +31,7 @@ EVENT_ROUTING_KEYS: dict[str, str] = {
     OrderEventType.PAYMENT_REQUESTED: "orders.PaymentRequested",
     OrderEventType.ORDER_CONFIRMED: "orders.OrderConfirmed",
     OrderEventType.ORDER_CANCELLED: "orders.OrderCancelled",
+    OrderEventType.PAYMENT_REFUND_REQUESTED: "orders.PaymentRefundRequested",
 }
 
 

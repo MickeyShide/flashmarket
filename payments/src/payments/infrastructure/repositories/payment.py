@@ -44,6 +44,15 @@ class PaymentRepository:
         )
         return result.first()
 
+    async def get_by_order_id_for_update(self, order_id: UUID) -> PaymentModel | None:
+        """Fetch the payment for an order with an exclusive row lock."""
+        result = await self._session.scalars(
+            select(PaymentModel)
+            .where(PaymentModel.order_id == order_id)
+            .with_for_update()
+        )
+        return result.first()
+
     async def count_by_user(self, user_id: UUID) -> int:
         """Return the total number of payments for a user."""
         result = await self._session.scalar(

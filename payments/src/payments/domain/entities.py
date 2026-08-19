@@ -12,6 +12,7 @@ class PaymentStatus(StrEnum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
 
 
 class PaymentEventType(StrEnum):
@@ -20,3 +21,4 @@ class PaymentEventType(StrEnum):
     PAYMENT_SUCCEEDED = "PaymentSucceeded"
     PAYMENT_FAILED = "PaymentFailed"
     PAYMENT_CANCELLED = "PaymentCancelled"
+    PAYMENT_REFUNDED = "PaymentRefunded"

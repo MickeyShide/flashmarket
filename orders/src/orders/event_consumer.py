@@ -69,10 +69,23 @@ async def handle_payment_succeeded(
         logger.info("Order %s already confirmed", order_id)
         return
     if order.status == OrderStatus.CANCELLED:
-        logger.error(
-            "CRITICAL: Order %s was already CANCELLED, but received PaymentSucceeded %s; manual intervention/refund required",
+        logger.warning(
+            "Order %s was already CANCELLED, but received PaymentSucceeded %s; emitting PaymentRefundRequested",
             order_id,
             payment_id,
+        )
+        await _emit_order_event(
+            session,
+            OrderEventType.PAYMENT_REFUND_REQUESTED,
+            {
+                "order_id": str(order.id),
+                "reservation_id": str(order.reservation_id),
+                "payment_id": str(payment_id),
+                "user_id": str(order.user_id),
+                "amount": payload.get("amount", int(order.final_price)),
+                "currency": order.currency,
+                "reason": "order_already_cancelled",
+            },
         )
         return
     if order.status != OrderStatus.AWAITING_PAYMENT:

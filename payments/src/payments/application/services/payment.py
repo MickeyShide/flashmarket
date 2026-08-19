@@ -6,6 +6,7 @@ import json
 import uuid
 from datetime import UTC
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from payments.application.schemas import CreatePaymentRequest
@@ -44,7 +45,45 @@ class PaymentService:
             status=PaymentStatus.PENDING,
             expires_at=data.expires_at,
         )
-        await self._payment_repo.create(payment)
+        try:
+            await self._payment_repo.create(payment)
+            await self._session.commit()
+            await self._session.refresh(payment)
+            return payment
+        except IntegrityError:
+            await self._session.rollback()
+            existing = await self._payment_repo.get_by_order_id(data.order_id)
+            if existing is not None:
+                return existing
+            raise
+
+    async def refund_payment(
+        self, payment_id: uuid.UUID, reason: str = "order_cancelled_compensation"
+    ) -> PaymentModel:
+        """Refund a payment for a cancelled order and emit PaymentRefunded."""
+        payment = await self._payment_repo.get_by_id_for_update(payment_id)
+        if payment is None:
+            raise PaymentNotFound
+        if payment.status == PaymentStatus.REFUNDED:
+            return payment
+        if payment.status != PaymentStatus.SUCCESS:
+            raise InvalidPaymentState(f"Cannot refund payment in status {payment.status}")
+
+        payment.status = PaymentStatus.REFUNDED
+        await self._payment_repo.update(payment)
+
+        payload = {
+            "payment_id": str(payment.id),
+            "order_id": str(payment.order_id),
+            "user_id": str(payment.user_id),
+            "amount": payment.amount,
+            "currency": payment.currency,
+            "reason": reason,
+        }
+        await self._outbox_repo.add(
+            PaymentEventType.PAYMENT_REFUNDED,
+            json.dumps(payload, separators=(",", ":")),
+        )
         await self._session.commit()
         await self._session.refresh(payment)
         return payment
