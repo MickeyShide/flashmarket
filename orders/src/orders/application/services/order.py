@@ -57,14 +57,17 @@ class OrderService:
         price = data.price
         currency = data.currency
         if self._catalog_client:
-            cat_price = await self._catalog_client.get_price(data.product_id)
-            if cat_price is not None:
-                if cat_price.price != data.price:
-                    raise InvalidOrderState(
-                        f"Price mismatch: provided {data.price}, authoritative is {cat_price.price}"
-                    )
-                price = cat_price.price
-                currency = cat_price.currency
+            cat_price = await self._catalog_client.get_price(data.product_id, variant_id=data.variant_id)
+            if cat_price is None:
+                raise InvalidOrderState(
+                    f"Unable to verify authoritative price from catalog for product {data.product_id}"
+                )
+            if cat_price.price != Decimal(str(data.price)):
+                raise InvalidOrderState(
+                    f"Price mismatch: provided {data.price}, authoritative is {cat_price.price}"
+                )
+            price = int(cat_price.price)
+            currency = cat_price.currency
 
         original_total = Decimal(str(price * data.quantity))
         discount_amount = Decimal("0")
@@ -147,8 +150,12 @@ class OrderService:
             if await self._order_repo.get_by_reservation_id(line.reservation_id) is not None:
                 raise DuplicateOrder
             if self._catalog_client:
-                cat_price = await self._catalog_client.get_price(line.product_id)
-                if cat_price is not None and cat_price.price != line.price:
+                cat_price = await self._catalog_client.get_price(line.product_id, variant_id=line.variant_id)
+                if cat_price is None:
+                    raise InvalidOrderState(
+                        f"Unable to verify authoritative price from catalog for product {line.product_id}"
+                    )
+                if cat_price.price != Decimal(str(line.price)):
                     raise InvalidOrderState(
                         f"Price mismatch for {line.product_id}: "
                         f"provided {line.price}, authoritative is {cat_price.price}"

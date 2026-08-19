@@ -145,7 +145,9 @@ async def test_batch_creation_atomicity_rolls_back_on_single_mismatch(
 
     mock_catalog = AsyncMock(spec=CatalogClient)
 
-    async def get_price(pid: uuid.UUID) -> CatalogProductPrice | None:
+    async def get_price(
+        pid: uuid.UUID, variant_id: uuid.UUID | None = None
+    ) -> CatalogProductPrice | None:
         if pid == prod_valid_1:
             return CatalogProductPrice(product_id=prod_valid_1, price=1000, currency="RUB")
         if pid == prod_invalid_2:
