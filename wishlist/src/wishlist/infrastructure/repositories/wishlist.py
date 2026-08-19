@@ -1,5 +1,6 @@
 """Repository for managing wishlist items in database."""
 
+import hashlib
 import json
 from dataclasses import dataclass
 from uuid import UUID
@@ -86,7 +87,8 @@ class WishlistRepository:
         """Serialize concurrent wishlist modifications for a user on PostgreSQL."""
         if self._session.get_bind().dialect.name != "postgresql":
             return
-        key = int.from_bytes(user_id.bytes[:8], "big", signed=True)
+        digest = hashlib.sha256(b"wishlist:" + user_id.bytes).digest()
+        key = int.from_bytes(digest[:8], "big", signed=True)
         await self._session.execute(select(func.pg_advisory_xact_lock(key)))
 
     async def get_product_ids_for_user(self, user_id: UUID, product_ids: list[UUID]) -> set[UUID]:

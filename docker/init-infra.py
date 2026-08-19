@@ -65,7 +65,8 @@ def retry(message: str):
     return decorator
 
 
-def _get_db_url() -> str | None:
+def _get_db_urls() -> list[str]:
+    urls: list[str] = []
     for key in [
         "DATABASE_URL",
         "CATALOG_DATABASE_URL",
@@ -79,8 +80,8 @@ def _get_db_url() -> str | None:
         "MEDIA_DATABASE_URL",
     ]:
         if val := os.environ.get(key):
-            return val
-    return None
+            urls.append(val)
+    return urls
 
 
 def _get_rabbitmq_urls() -> list[str]:
@@ -109,34 +110,36 @@ def _get_celery_broker_urls() -> list[str]:
 
 @retry("Waiting for PostgreSQL")
 async def ensure_database() -> None:
-    raw_url = _get_db_url()
-    if not raw_url:
+    raw_urls = _get_db_urls()
+    if not raw_urls:
         print("No database URL configured in environment, skipping DB initialization.")
         return
 
-    url = urlparse(raw_url)
-    target_db = url.path.lstrip("/")
-    if not target_db:
-        print("Database URL missing database name", file=sys.stderr)
-        sys.exit(1)
+    processed_dbs: set[str] = set()
+    for raw_url in raw_urls:
+        url = urlparse(raw_url)
+        target_db = url.path.lstrip("/")
+        if not target_db or target_db in processed_dbs:
+            continue
+        processed_dbs.add(target_db)
 
-    admin_dsn = url._replace(path="/postgres", scheme="postgresql").geturl()
-    if url.hostname:
-        db_port = url.port or 5432
-        resolved_ip = resolve_host_ipv4(url.hostname, db_port)
-        admin_dsn = admin_dsn.replace(f"@{url.hostname}:", f"@{resolved_ip}:")
-    conn = await asyncpg.connect(admin_dsn)
-    try:
-        exists = await conn.fetchval(
-            "SELECT 1 FROM pg_database WHERE datname = $1", target_db
-        )
-        if exists:
-            print(f"PostgreSQL database '{target_db}' already exists")
-            return
-        await conn.execute(f'CREATE DATABASE "{target_db}"')
-        print(f"PostgreSQL database '{target_db}' created")
-    finally:
-        await conn.close()
+        admin_dsn = url._replace(path="/postgres", scheme="postgresql").geturl()
+        if url.hostname:
+            db_port = url.port or 5432
+            resolved_ip = resolve_host_ipv4(url.hostname, db_port)
+            admin_dsn = admin_dsn.replace(f"@{url.hostname}:", f"@{resolved_ip}:")
+        conn = await asyncpg.connect(admin_dsn)
+        try:
+            exists = await conn.fetchval(
+                "SELECT 1 FROM pg_database WHERE datname = $1", target_db
+            )
+            if exists:
+                print(f"PostgreSQL database '{target_db}' already exists")
+                continue
+            await conn.execute(f'CREATE DATABASE "{target_db}"')
+            print(f"PostgreSQL database '{target_db}' created")
+        finally:
+            await conn.close()
 
 
 def _rabbitmq_vhost_from_url(raw_url: str) -> str:

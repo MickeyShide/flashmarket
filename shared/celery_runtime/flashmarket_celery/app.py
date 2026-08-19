@@ -43,6 +43,9 @@ def create_app(
     app.conf.update(
         accept_content=["json"],
         beat_schedule=dict(beat_schedule or {}),
+        beat_schedule_filename=os.getenv(
+            "CELERY_BEAT_SCHEDULE_FILENAME", "/tmp/celerybeat-schedule"
+        ),
         broker_connection_retry_on_startup=True,
         enable_utc=True,
         result_backend=None,

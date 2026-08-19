@@ -24,6 +24,7 @@ from rabbitmq_reliability import (
     run_forever,
 )
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from notifications.config import get_settings
@@ -59,8 +60,11 @@ async def _create_notification(
         status=NotificationStatus.PENDING,
         event_key=event_key,
     )
-    await repo.create(notification)
-    logger.info("Created notification %s for user %s", notification.id, user_id)
+    try:
+        await repo.create(notification)
+        logger.info("Created notification %s for user %s", notification.id, user_id)
+    except IntegrityError:
+        logger.info("Notification with event_key %s already exists, skipping", event_key)
 
 
 async def handle_order_created(
