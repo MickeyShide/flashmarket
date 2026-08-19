@@ -313,11 +313,11 @@ class RefreshAccess:
                     payload=event_data,
                 )
             )
+            await uow.commit()
             try:
                 await session_store.deactivate(login_session.id)
-            except SessionStoreError as exc:
-                raise SessionStoreUnavailable from exc
-            await uow.commit()
+            except SessionStoreError:
+                pass
             raise RefreshTokenReuseDetected
 
         if (
@@ -396,11 +396,11 @@ class LogoutUser:
                     payload={"user_id": str(command.identity.user_id)},
                 )
             )
+        await uow.commit()
         try:
             await session_store.deactivate(command.identity.session_id)
-        except SessionStoreError as exc:
-            raise SessionStoreUnavailable from exc
-        await uow.commit()
+        except SessionStoreError:
+            pass
 
 
 class IntrospectAccessToken:

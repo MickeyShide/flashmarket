@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("AUTH_ENVIRONMENT", "test")
 os.environ.setdefault("AUTH_REFRESH_TOKEN_TRANSPORT", "body")
+os.environ.setdefault("AUTH_REFRESH_COOKIE_SECURE", "false")
 
 from auth_service.key_management import generate_jwt_key_pair  # noqa: E402
 

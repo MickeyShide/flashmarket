@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     refresh_token_transport: Literal["cookie", "body"] = "cookie"
     refresh_cookie_name: str = "flashmarket_refresh"
     csrf_cookie_name: str = "flashmarket_csrf"
-    refresh_cookie_secure: bool = False
+    refresh_cookie_secure: bool = True
     refresh_cookie_samesite: Literal["strict", "lax"] = "strict"
 
     rate_limit_enabled: bool = True

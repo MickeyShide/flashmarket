@@ -142,11 +142,6 @@ class ChangePassword:
             user.id,
             reason="password_changed",
         )
-        try:
-            await session_store.deactivate_many(session_ids)
-        except SessionStoreError as exc:
-            raise SessionStoreUnavailable from exc
-
         uow.audit.add(
             command.context,
             event_type=EventType.PASSWORD_CHANGED.value,
@@ -162,4 +157,8 @@ class ChangePassword:
             )
         )
         await uow.commit()
+        try:
+            await session_store.deactivate_many(session_ids)
+        except SessionStoreError:
+            pass
         return len(session_ids)
