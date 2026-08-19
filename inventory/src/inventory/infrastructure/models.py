@@ -35,7 +35,12 @@ class StockModel(Base):
             "reserved + sold <= total",
             name="ck_stocks_reservation_invariant",
         ),
-        UniqueConstraint("product_id", "variant_id", name="uq_stocks_product_variant"),
+        UniqueConstraint(
+            "product_id",
+            "variant_id",
+            name="uq_stocks_product_variant",
+            postgresql_nulls_not_distinct=True,
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
