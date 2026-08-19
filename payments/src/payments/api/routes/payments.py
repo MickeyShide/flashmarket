@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from payments.api.dependencies import CurrentPrincipal, get_payment_service
+from payments.api.dependencies import AdminPrincipal, CurrentPrincipal, get_payment_service
 from payments.application.schemas import (
     CreatePaymentRequest,
     PaymentListParams,
@@ -100,16 +100,10 @@ async def list_payments(
 )
 async def confirm_payment(
     payment_id: UUID,
-    principal: CurrentPrincipal,
+    admin: AdminPrincipal,
     service: PaymentService = Depends(get_payment_service),
 ) -> PaymentResponse:
-    """Mark a pending payment as successful."""
-    p = await service.get_payment(payment_id)
-    if principal.role != "ADMIN" and p.user_id != principal.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot confirm another user's payment",
-        )
+    """Mark a pending payment as successful (admin/provider callback only)."""
     payment = await service.confirm_payment(payment_id)
     return _payment_response(payment)
 
@@ -121,16 +115,10 @@ async def confirm_payment(
 )
 async def fail_payment(
     payment_id: UUID,
-    principal: CurrentPrincipal,
+    admin: AdminPrincipal,
     service: PaymentService = Depends(get_payment_service),
 ) -> PaymentResponse:
-    """Mark a pending payment as failed."""
-    p = await service.get_payment(payment_id)
-    if principal.role != "ADMIN" and p.user_id != principal.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot fail another user's payment",
-        )
+    """Mark a pending payment as failed (admin/provider callback only)."""
     payment = await service.fail_payment(payment_id)
     return _payment_response(payment)
 

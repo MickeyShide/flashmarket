@@ -5,7 +5,16 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Index, Integer, String, Text, Uuid
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from payments.domain.entities import PaymentStatus
@@ -16,7 +25,10 @@ class PaymentModel(Base):
     """Payment attempt bound to an order."""
 
     __tablename__ = "payments"
-    __table_args__ = (CheckConstraint("amount > 0", name="ck_payments_amount_positive"),)
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_payments_amount_positive"),
+        UniqueConstraint("order_id", name="uq_payments_order_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
     order_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
