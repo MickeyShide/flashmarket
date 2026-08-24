@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
@@ -27,10 +26,12 @@ from rabbitmq_reliability import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from payments.application.services.payment import PaymentService
 from payments.config import get_settings
-from payments.domain.entities import PaymentEventType, PaymentStatus
+from payments.domain.entities import PaymentStatus
 from payments.infrastructure.database import SessionFactory, engine
 from payments.infrastructure.models import PaymentModel, ProcessedEventModel
+from payments.infrastructure.providers import build_payment_provider
 from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ async def handle_payment_requested(
         user_id=user_id,
         amount=amount,
         currency=currency,
-        provider="mock",
+        provider=get_settings().payment_provider,
         status=PaymentStatus.PENDING,
         expires_at=expires_at,
     )
@@ -81,7 +82,6 @@ async def handle_payment_refund_requested(
     payment_id = payload.get("payment_id")
     order_id = payload.get("order_id")
     payment_repo = PaymentRepository(session)
-    outbox_repo = OutboxRepository(session)
     payment = None
     if payment_id:
         payment = await payment_repo.get_by_id_for_update(uuid.UUID(str(payment_id)))
@@ -91,26 +91,27 @@ async def handle_payment_refund_requested(
     if payment is None:
         logger.warning("No payment found to refund for payload %s", payload)
         return
-    if payment.status == PaymentStatus.REFUNDED:
-        logger.info("Payment %s already refunded", payment.id)
-        return
-
-    payment.status = PaymentStatus.REFUNDED
-    await payment_repo.update(payment)
-
-    refund_payload = {
-        "payment_id": str(payment.id),
-        "order_id": str(payment.order_id),
-        "user_id": str(payment.user_id),
-        "amount": payment.amount,
-        "currency": payment.currency,
-        "reason": payload.get("reason", "order_cancelled_compensation"),
-    }
-    await outbox_repo.add(
-        PaymentEventType.PAYMENT_REFUNDED,
-        json.dumps(refund_payload, separators=(",", ":")),
+    settings = get_settings()
+    service = PaymentService(
+        session=session,
+        payment_repo=payment_repo,
+        outbox_repo=OutboxRepository(session),
+        provider=build_payment_provider(settings),
+        provider_name=settings.payment_provider,
+        return_url=settings.yookassa_return_url or "http://localhost/payment/return",
+        test_mode_required=settings.yookassa_test_mode_required,
     )
-    logger.info("Refunded payment %s for cancelled order %s", payment.id, payment.order_id)
+    payment = await service.refund_payment(
+        payment.id,
+        reason=str(payload.get("reason", "order_cancelled_compensation")),
+        commit=False,
+    )
+    logger.info(
+        "Refund status %s for payment %s and cancelled order %s",
+        payment.refund_status,
+        payment.id,
+        payment.order_id,
+    )
 
 
 HANDLERS: dict[str, Handler] = {

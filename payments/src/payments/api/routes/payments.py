@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from payments.api.dependencies import AdminPrincipal, CurrentPrincipal, get_payment_service
 from payments.application.schemas import (
+    CheckoutResponse,
     CreatePaymentRequest,
     PaymentListParams,
     PaymentListResponse,
@@ -29,16 +30,62 @@ def _payment_response(payment: PaymentModel) -> PaymentResponse:
 )
 async def create_payment(
     data: CreatePaymentRequest,
+    admin: AdminPrincipal,
+    service: PaymentService = Depends(get_payment_service),
+) -> PaymentResponse:
+    """Create a pending payment for an administrative mock workflow."""
+    del admin
+    payment = await service.create_payment(data)
+    return _payment_response(payment)
+
+
+@router.post(
+    "/orders/{order_id:uuid}/checkout",
+    response_model=CheckoutResponse,
+    summary="Start or resume hosted checkout",
+)
+async def start_checkout(
+    order_id: UUID,
+    principal: CurrentPrincipal,
+    service: PaymentService = Depends(get_payment_service),
+) -> CheckoutResponse:
+    """Create a provider payment from the authoritative PaymentRequested event."""
+    payment = await service.get_payment_by_order_id(order_id)
+    if principal.role != "ADMIN" and payment.user_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot pay another user's order",
+        )
+    payment = await service.start_checkout(order_id)
+    if payment.confirmation_url is None:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Payment provider did not return a confirmation URL",
+        )
+    return CheckoutResponse(
+        payment_id=payment.id,
+        status=payment.status,
+        confirmation_url=payment.confirmation_url,
+    )
+
+
+@router.get(
+    "/orders/{order_id:uuid}",
+    response_model=PaymentResponse,
+    summary="Get payment by order",
+)
+async def get_order_payment(
+    order_id: UUID,
     principal: CurrentPrincipal,
     service: PaymentService = Depends(get_payment_service),
 ) -> PaymentResponse:
-    """Create a pending payment for an order."""
-    if principal.role != "ADMIN" and data.user_id != principal.user_id:
+    """Return the authoritative payment for an order."""
+    payment = await service.get_payment_by_order_id(order_id)
+    if principal.role != "ADMIN" and payment.user_id != principal.user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot create payment for another user",
+            detail="Cannot view another user's payment",
         )
-    payment = await service.create_payment(data)
     return _payment_response(payment)
 
 
@@ -104,6 +151,7 @@ async def confirm_payment(
     service: PaymentService = Depends(get_payment_service),
 ) -> PaymentResponse:
     """Mark a pending payment as successful (admin/provider callback only)."""
+    del admin
     payment = await service.confirm_payment(payment_id)
     return _payment_response(payment)
 
@@ -119,6 +167,7 @@ async def fail_payment(
     service: PaymentService = Depends(get_payment_service),
 ) -> PaymentResponse:
     """Mark a pending payment as failed (admin/provider callback only)."""
+    del admin
     payment = await service.fail_payment(payment_id)
     return _payment_response(payment)
 

@@ -6,9 +6,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from payments.domain.entities import PaymentStatus
 from payments.event_consumer import handle_payment_requested
-from payments.infrastructure.models import OutboxEventModel, PaymentModel
+from payments.infrastructure.models import OutboxEventModel
 from payments.outbox_worker import publish_outbox_batch
 
 

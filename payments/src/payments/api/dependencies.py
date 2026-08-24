@@ -7,9 +7,11 @@ from fastapi import Depends
 from jwt_verifier import JWTVerifier, Principal, create_auth_dependencies
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from payments.application.contracts import PaymentProvider
 from payments.application.services.payment import PaymentService
 from payments.config import get_settings
 from payments.infrastructure.database import get_db
+from payments.infrastructure.providers import build_payment_provider
 from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
@@ -35,12 +37,25 @@ CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]
 AdminPrincipal = Annotated[Principal, Depends(require_admin)]
 
 
-def get_payment_service(db: DbSession) -> PaymentService:
+def get_payment_provider() -> PaymentProvider:
+    """Build the configured external payment provider."""
+    return build_payment_provider()
+
+
+def get_payment_service(
+    db: DbSession,
+    provider: PaymentProvider = Depends(get_payment_provider),
+) -> PaymentService:
     """Build a payment service for the current request."""
+    settings = get_settings()
     return PaymentService(
         session=db,
         payment_repo=PaymentRepository(db),
         outbox_repo=OutboxRepository(db),
+        provider=provider,
+        provider_name=settings.payment_provider,
+        return_url=settings.yookassa_return_url or "http://localhost/payment/return",
+        test_mode_required=settings.yookassa_test_mode_required,
     )
 
 

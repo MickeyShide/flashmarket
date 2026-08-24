@@ -9,7 +9,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from payments.api.dependencies import get_verifier
 from payments.api.error_handlers import payment_error_handler
-from payments.api.routes import health, metrics, payments
+from payments.api.routes import health, metrics, payments, webhooks
 from payments.config import get_settings
 from payments.domain.exceptions import PaymentError
 from payments.infrastructure.database import engine
@@ -61,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(metrics.router)
     app.include_router(payments.router)
+    app.include_router(webhooks.router)
 
     return app
 

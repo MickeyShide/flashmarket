@@ -17,6 +17,7 @@ os.environ.setdefault("PAYMENTS_ENVIRONMENT", "test")
 from pathlib import Path
 
 from jwt_verifier.testing import TestKeyStore
+
 from payments.api.dependencies import get_verifier
 from payments.config import get_settings
 from payments.infrastructure.database import Base, get_db  # noqa: E402
@@ -67,7 +68,11 @@ async def client(
     admin_token = jwt_keystore.create_token(role="ADMIN")
     headers = {"Authorization": f"Bearer {admin_token}"}
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://localhost", headers=headers) as test_client:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://localhost",
+        headers=headers,
+    ) as test_client:
         yield test_client
 
 

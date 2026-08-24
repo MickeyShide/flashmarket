@@ -41,6 +41,9 @@ class PaymentResponse(BaseModel):
     provider: str
     status: PaymentStatus
     external_id: str | None
+    external_status: str | None = None
+    cancellation_reason: str | None = None
+    provider_test: bool | None = None
     expires_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -53,6 +56,22 @@ class PaymentListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class CheckoutResponse(BaseModel):
+    """Browser-safe data needed to continue a hosted payment."""
+
+    payment_id: uuid.UUID
+    status: PaymentStatus
+    confirmation_url: str
+
+
+class YooKassaWebhook(BaseModel):
+    """Minimal incoming YooKassa notification envelope."""
+
+    type: str
+    event: str
+    object: dict[str, object]
 
 
 class ErrorDetail(BaseModel):
