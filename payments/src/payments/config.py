@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     rabbitmq_exchange: str = "flashmarket.events"
     allow_insecure_internal_services: bool = False
     payment_timeout_seconds: int = 300
+    payment_provider: Literal["mock", "yookassa"] = "mock"
+    yookassa_shop_id: str | None = None
+    yookassa_secret_key: SecretStr | None = None
+    yookassa_api_url: str = "https://api.yookassa.ru/v3"
+    yookassa_return_url: str | None = None
+    yookassa_test_mode_required: Literal[True] = True
+    yookassa_connect_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
+    yookassa_read_timeout_seconds: float = Field(default=15.0, gt=0, le=60)
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
     rabbitmq_publish_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
@@ -112,6 +120,27 @@ class Settings(BaseSettings):
             errors.append("wildcard trusted hosts are forbidden")
         if errors:
             raise ValueError("Invalid production configuration: " + "; ".join(errors))
+        return self
+
+    @model_validator(mode="after")
+    def validate_payment_provider_settings(self) -> Settings:
+        """Require complete, test-only YooKassa configuration when enabled."""
+        if self.payment_provider != "yookassa":
+            return self
+
+        errors: list[str] = []
+        if not self.yookassa_shop_id:
+            errors.append("PAYMENTS_YOOKASSA_SHOP_ID is required")
+        if self.yookassa_secret_key is None or not self.yookassa_secret_key.get_secret_value():
+            errors.append("PAYMENTS_YOOKASSA_SECRET_KEY is required")
+        if not self.yookassa_return_url:
+            errors.append("PAYMENTS_YOOKASSA_RETURN_URL is required")
+        elif not self.yookassa_return_url.startswith(("http://", "https://")):
+            errors.append("PAYMENTS_YOOKASSA_RETURN_URL must be an absolute HTTP(S) URL")
+        if not self.yookassa_api_url.startswith("https://"):
+            errors.append("PAYMENTS_YOOKASSA_API_URL must use HTTPS")
+        if errors:
+            raise ValueError("Invalid YooKassa configuration: " + "; ".join(errors))
         return self
 
     @model_validator(mode="after")

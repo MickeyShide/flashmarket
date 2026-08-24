@@ -40,6 +40,16 @@ HTTP_IN_PROGRESS = Gauge(
     "payments_http_requests_in_progress",
     "HTTP requests currently in progress",
 )
+PROVIDER_OPERATIONS = Counter(
+    "payments_provider_operations_total",
+    "External payment provider operations",
+    labelnames=("operation", "result"),
+)
+WEBHOOK_EVENTS = Counter(
+    "payments_provider_webhooks_total",
+    "Incoming payment provider notifications",
+    labelnames=("event", "result"),
+)
 
 SENSITIVE_KEYS = {
     "password",

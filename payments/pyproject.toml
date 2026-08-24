@@ -8,6 +8,7 @@ dependencies = [
     "alembic>=1.18,<2",
     "asyncpg>=0.31,<1",
     "fastapi>=0.140,<1",
+    "httpx>=0.28,<1",
     "prometheus-client>=0.26,<1",
     "pydantic-settings>=2.14,<3",
     "sqlalchemy>=2.0,<3",
@@ -24,7 +25,6 @@ rabbitmq_reliability = { path = "../shared/rabbitmq_reliability" }
 [dependency-groups]
 dev = [
     "aiosqlite>=0.22,<1",
-    "httpx>=0.28,<1",
     "mypy>=2.1,<3",
     "pytest>=9.1,<10",
     "pytest-asyncio>=1.4,<2",

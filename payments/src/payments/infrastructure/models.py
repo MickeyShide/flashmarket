@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     Index,
@@ -43,6 +44,12 @@ class PaymentModel(Base):
         server_default="PENDING",
     )
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    external_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    confirmation_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    cancellation_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_test: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    refund_external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    refund_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now

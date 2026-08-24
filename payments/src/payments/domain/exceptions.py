@@ -24,3 +24,31 @@ class InvalidPaymentState(PaymentError):
 
     code = "invalid_payment_state"
     message = "Invalid payment state"
+
+
+class PaymentNotReady(PaymentError):
+    """Raised while the order payment event has not been consumed yet."""
+
+    code = "payment_not_ready"
+    message = "Payment is still being prepared"
+
+
+class PaymentProviderUnavailable(PaymentError):
+    """Raised when a provider result is temporarily unknown."""
+
+    code = "payment_provider_unavailable"
+    message = "Payment provider is temporarily unavailable"
+
+
+class PaymentProviderRejected(PaymentError):
+    """Raised when the provider rejects a request."""
+
+    code = "payment_provider_rejected"
+    message = "Payment provider rejected the operation"
+
+
+class PaymentVerificationFailed(PaymentError):
+    """Raised when provider data does not match the local payment."""
+
+    code = "payment_verification_failed"
+    message = "Payment verification failed"

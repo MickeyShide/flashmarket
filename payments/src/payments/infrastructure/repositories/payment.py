@@ -31,7 +31,10 @@ class PaymentRepository:
     async def get_by_id_for_update(self, payment_id: UUID) -> PaymentModel | None:
         """Fetch a payment by primary key with an exclusive row lock."""
         result = await self._session.scalars(
-            select(PaymentModel).where(PaymentModel.id == payment_id).with_for_update()
+            select(PaymentModel)
+            .where(PaymentModel.id == payment_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
         return result.first()
 
@@ -44,12 +47,30 @@ class PaymentRepository:
         )
         return result.first()
 
+    async def get_by_external_id(self, external_id: str) -> PaymentModel | None:
+        """Fetch a payment by provider identifier."""
+        result = await self._session.scalars(
+            select(PaymentModel).where(PaymentModel.external_id == external_id)
+        )
+        return result.first()
+
+    async def get_by_external_id_for_update(self, external_id: str) -> PaymentModel | None:
+        """Fetch a provider payment with an exclusive row lock."""
+        result = await self._session.scalars(
+            select(PaymentModel)
+            .where(PaymentModel.external_id == external_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.first()
+
     async def get_by_order_id_for_update(self, order_id: UUID) -> PaymentModel | None:
         """Fetch the payment for an order with an exclusive row lock."""
         result = await self._session.scalars(
             select(PaymentModel)
             .where(PaymentModel.order_id == order_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         return result.first()
 

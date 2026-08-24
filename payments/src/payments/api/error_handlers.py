@@ -7,11 +7,19 @@ from payments.domain.exceptions import (
     InvalidPaymentState,
     PaymentError,
     PaymentNotFound,
+    PaymentNotReady,
+    PaymentProviderRejected,
+    PaymentProviderUnavailable,
+    PaymentVerificationFailed,
 )
 
 ERROR_STATUS: dict[type[PaymentError], int] = {
     PaymentNotFound: status.HTTP_404_NOT_FOUND,
+    PaymentNotReady: status.HTTP_409_CONFLICT,
     InvalidPaymentState: status.HTTP_409_CONFLICT,
+    PaymentProviderUnavailable: status.HTTP_503_SERVICE_UNAVAILABLE,
+    PaymentProviderRejected: status.HTTP_502_BAD_GATEWAY,
+    PaymentVerificationFailed: status.HTTP_409_CONFLICT,
 }
 
 
