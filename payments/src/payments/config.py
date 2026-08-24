@@ -65,7 +65,10 @@ class Settings(BaseSettings):
     yookassa_secret_key: SecretStr | None = None
     yookassa_api_url: str = "https://api.yookassa.ru/v3"
     yookassa_return_url: str | None = None
-    yookassa_test_mode_required: Literal[True] = True
+    # Keep this as a bool so pydantic-settings can parse the string value
+    # supplied by environment variables. A model validator below still makes
+    # disabling the guard impossible.
+    yookassa_test_mode_required: bool = True
     yookassa_connect_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
     yookassa_read_timeout_seconds: float = Field(default=15.0, gt=0, le=60)
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
@@ -125,6 +128,8 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_payment_provider_settings(self) -> Settings:
         """Require complete, test-only YooKassa configuration when enabled."""
+        if not self.yookassa_test_mode_required:
+            raise ValueError("PAYMENTS_YOOKASSA_TEST_MODE_REQUIRED must be true")
         if self.payment_provider != "yookassa":
             return self
 

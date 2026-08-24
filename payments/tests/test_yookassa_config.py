@@ -23,6 +23,16 @@ def test_yookassa_accepts_complete_test_configuration() -> None:
     assert settings.yookassa_test_mode_required is True
 
 
+def test_yookassa_test_guard_parses_true_environment_string(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PAYMENTS_YOOKASSA_TEST_MODE_REQUIRED", "true")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.yookassa_test_mode_required is True
+
+
 def test_real_yookassa_mode_cannot_be_enabled() -> None:
     with pytest.raises(ValidationError):
         Settings(

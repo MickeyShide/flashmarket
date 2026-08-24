@@ -27,6 +27,7 @@ def _payment_response(payment: PaymentModel) -> PaymentResponse:
     response_model=PaymentResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a payment for an order",
+    openapi_extra={"x-flashmarket-access": "admin"},
 )
 async def create_payment(
     data: CreatePaymentRequest,
@@ -43,6 +44,7 @@ async def create_payment(
     "/orders/{order_id:uuid}/checkout",
     response_model=CheckoutResponse,
     summary="Start or resume hosted checkout",
+    openapi_extra={"x-flashmarket-access": "authenticated"},
 )
 async def start_checkout(
     order_id: UUID,
@@ -73,6 +75,7 @@ async def start_checkout(
     "/orders/{order_id:uuid}",
     response_model=PaymentResponse,
     summary="Get payment by order",
+    openapi_extra={"x-flashmarket-access": "authenticated"},
 )
 async def get_order_payment(
     order_id: UUID,
@@ -114,6 +117,7 @@ async def get_payment(
     "/users/{user_id}",
     response_model=PaymentListResponse,
     summary="List user payments",
+    openapi_extra={"x-flashmarket-access": "authenticated"},
 )
 async def list_payments(
     user_id: UUID,
@@ -144,6 +148,7 @@ async def list_payments(
     "/{payment_id}/confirm",
     response_model=PaymentResponse,
     summary="Confirm payment succeeded",
+    openapi_extra={"x-flashmarket-access": "admin"},
 )
 async def confirm_payment(
     payment_id: UUID,
@@ -160,6 +165,7 @@ async def confirm_payment(
     "/{payment_id}/fail",
     response_model=PaymentResponse,
     summary="Fail payment",
+    openapi_extra={"x-flashmarket-access": "admin"},
 )
 async def fail_payment(
     payment_id: UUID,
@@ -176,6 +182,7 @@ async def fail_payment(
     "/{payment_id}/cancel",
     response_model=PaymentResponse,
     summary="Cancel payment",
+    openapi_extra={"x-flashmarket-access": "authenticated"},
 )
 async def cancel_payment(
     payment_id: UUID,

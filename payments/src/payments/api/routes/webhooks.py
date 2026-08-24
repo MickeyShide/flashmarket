@@ -11,7 +11,12 @@ from payments.observability import WEBHOOK_EVENTS
 router = APIRouter(prefix="/api/v1/payments/webhooks", tags=["payment-webhooks"])
 
 
-@router.post("/yookassa", status_code=200, summary="Receive a YooKassa notification")
+@router.post(
+    "/yookassa",
+    status_code=200,
+    summary="Receive a YooKassa notification",
+    openapi_extra={"x-flashmarket-access": "anonymous"},
+)
 async def yookassa_webhook(
     notification: YooKassaWebhook,
     service: PaymentService = Depends(get_payment_service),

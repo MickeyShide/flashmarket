@@ -4267,6 +4267,30 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "PaymentsCheckoutResponse": {
+        "description": "Browser-safe data needed to continue a hosted payment.",
+        "properties": {
+          "confirmation_url": {
+            "title": "Confirmation Url",
+            "type": "string"
+          },
+          "payment_id": {
+            "format": "uuid",
+            "title": "Payment Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PaymentsPaymentStatus"
+          }
+        },
+        "required": [
+          "payment_id",
+          "status",
+          "confirmation_url"
+        ],
+        "title": "CheckoutResponse",
+        "type": "object"
+      },
       "PaymentsCreatePaymentRequest": {
         "description": "Payload for creating a payment for an order.",
         "properties": {
@@ -4373,6 +4397,17 @@
             "title": "Amount",
             "type": "integer"
           },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -4405,6 +4440,17 @@
             ],
             "title": "External Id"
           },
+          "external_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Status"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -4418,6 +4464,17 @@
           "provider": {
             "title": "Provider",
             "type": "string"
+          },
+          "provider_test": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Test"
           },
           "status": {
             "$ref": "#/components/schemas/PaymentsPaymentStatus"
@@ -4455,7 +4512,8 @@
           "PENDING",
           "SUCCESS",
           "FAILED",
-          "CANCELLED"
+          "CANCELLED",
+          "REFUNDED"
         ],
         "title": "PaymentStatus",
         "type": "string"
@@ -4498,6 +4556,31 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "PaymentsYooKassaWebhook": {
+        "description": "Minimal incoming YooKassa notification envelope.",
+        "properties": {
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "object": {
+            "additionalProperties": true,
+            "title": "Object",
+            "type": "object"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "event",
+          "object"
+        ],
+        "title": "YooKassaWebhook",
         "type": "object"
       },
       "WishlistAddToWishlistRequest": {
@@ -7838,7 +7921,7 @@
     },
     "/api/v1/orders/{order_id}/confirm": {
       "post": {
-        "description": "Confirm an order after a successful payment.",
+        "description": "Confirm an order after a successful payment (admin/internal only).",
         "operationId": "confirm_order_api_v1_orders__order_id__confirm_post",
         "parameters": [
           {
@@ -7893,13 +7976,13 @@
         "tags": [
           "orders"
         ],
-        "x-flashmarket-access": "authenticated",
+        "x-flashmarket-access": "admin",
         "x-flashmarket-service": "orders"
       }
     },
     "/api/v1/orders/{order_id}/fail": {
       "post": {
-        "description": "Mark an order as cancelled after a failed payment.",
+        "description": "Mark an order as cancelled after a failed payment (admin/internal only).",
         "operationId": "fail_order_api_v1_orders__order_id__fail_post",
         "parameters": [
           {
@@ -7954,13 +8037,13 @@
         "tags": [
           "orders"
         ],
-        "x-flashmarket-access": "authenticated",
+        "x-flashmarket-access": "admin",
         "x-flashmarket-service": "orders"
       }
     },
     "/api/v1/payments": {
       "post": {
-        "description": "Create a pending payment for an order.",
+        "description": "Create a pending payment for an administrative mock workflow.",
         "operationId": "create_payment_api_v1_payments_post",
         "requestBody": {
           "content": {
@@ -8000,6 +8083,108 @@
           }
         ],
         "summary": "Create a payment for an order",
+        "tags": [
+          "payments"
+        ],
+        "x-flashmarket-access": "admin",
+        "x-flashmarket-service": "payments"
+      }
+    },
+    "/api/v1/payments/orders/{order_id}": {
+      "get": {
+        "description": "Return the authoritative payment for an order.",
+        "operationId": "get_order_payment_api_v1_payments_orders__order_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsPaymentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsHTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get payment by order",
+        "tags": [
+          "payments"
+        ],
+        "x-flashmarket-access": "authenticated",
+        "x-flashmarket-service": "payments"
+      }
+    },
+    "/api/v1/payments/orders/{order_id}/checkout": {
+      "post": {
+        "description": "Create a provider payment from the authoritative PaymentRequested event.",
+        "operationId": "start_checkout_api_v1_payments_orders__order_id__checkout_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsCheckoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsHTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Start or resume hosted checkout",
         "tags": [
           "payments"
         ],
@@ -8078,6 +8263,55 @@
           "payments"
         ],
         "x-flashmarket-access": "authenticated",
+        "x-flashmarket-service": "payments"
+      }
+    },
+    "/api/v1/payments/webhooks/yookassa": {
+      "post": {
+        "description": "Treat the notification as a hint and verify current state through YooKassa API.",
+        "operationId": "yookassa_webhook_api_v1_payments_webhooks_yookassa_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentsYooKassaWebhook"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Yookassa Webhook Api V1 Payments Webhooks Yookassa Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsHTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [],
+        "summary": "Receive a YooKassa notification",
+        "tags": [
+          "payment-webhooks"
+        ],
+        "x-flashmarket-access": "anonymous",
         "x-flashmarket-service": "payments"
       }
     },
@@ -8185,7 +8419,7 @@
     },
     "/api/v1/payments/{payment_id}/confirm": {
       "post": {
-        "description": "Mark a pending payment as successful.",
+        "description": "Mark a pending payment as successful (admin/provider callback only).",
         "operationId": "confirm_payment_api_v1_payments__payment_id__confirm_post",
         "parameters": [
           {
@@ -8230,13 +8464,13 @@
         "tags": [
           "payments"
         ],
-        "x-flashmarket-access": "authenticated",
+        "x-flashmarket-access": "admin",
         "x-flashmarket-service": "payments"
       }
     },
     "/api/v1/payments/{payment_id}/fail": {
       "post": {
-        "description": "Mark a pending payment as failed.",
+        "description": "Mark a pending payment as failed (admin/provider callback only).",
         "operationId": "fail_payment_api_v1_payments__payment_id__fail_post",
         "parameters": [
           {
@@ -8281,7 +8515,7 @@
         "tags": [
           "payments"
         ],
-        "x-flashmarket-access": "authenticated",
+        "x-flashmarket-access": "admin",
         "x-flashmarket-service": "payments"
       }
     },
