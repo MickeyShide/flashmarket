@@ -26,6 +26,7 @@ const CartView = lazyNamed(() => import('./components/Cart/CartView'), 'CartView
 const CheckoutView = lazyNamed(() => import('./components/Checkout/CheckoutView'), 'CheckoutView');
 const ProfileView = lazyNamed(() => import('./components/Profile/ProfileView'), 'ProfileView');
 const OrderDetailView = lazyNamed(() => import('./components/Order/OrderDetailView'), 'OrderDetailView');
+const PaymentReturnView = lazyNamed(() => import('./components/Payment/PaymentReturnView'), 'PaymentReturnView');
 const DropDetail = lazyNamed(() => import('./components/Drops/DropDetail'), 'DropDetail');
 const AdminView = lazyNamed(() => import('./components/Admin/AdminView'), 'AdminView');
 
@@ -44,7 +45,7 @@ export const App = () => {
   // Sync browser back/forward buttons (popstate) with state
   useEffect(() => {
     const handlePopState = () => {
-      const route = parseRoute(window.location.pathname);
+      const route = parseRoute(window.location.pathname, window.location.search);
       setCurrentView(route.view);
       setSelectedProductSlug(route.productSlug || null);
       setSelectedDropIdentifier(route.dropIdentifier || null);
@@ -68,7 +69,7 @@ export const App = () => {
       profileTab,
     });
 
-    if (window.location.pathname !== targetUrl) {
+    if (`${window.location.pathname}${window.location.search}` !== targetUrl) {
       window.history.pushState({}, '', targetUrl);
     }
   }, [currentView, selectedProductSlug, selectedDropIdentifier, selectedOrderId, profileTab]);
@@ -358,6 +359,17 @@ export const App = () => {
           <OrderDetailView
             orderId={selectedOrderId}
             onBack={() => {
+              setCurrentView('auth');
+              setProfileTab('orders');
+            }}
+          />
+        )}
+
+        {currentView === 'payment-return' && (
+          <PaymentReturnView
+            orderId={selectedOrderId}
+            onOpenOrder={handleOpenOrder}
+            onGoToOrders={() => {
               setCurrentView('auth');
               setProfileTab('orders');
             }}

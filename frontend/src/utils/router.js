@@ -3,12 +3,23 @@
  * Parses pathnames into views and converts application state back into clean URLs.
  */
 
-export function parseRoute(pathname = (typeof window !== 'undefined' ? window.location.pathname : '/')) {
+export function parseRoute(
+  pathname = (typeof window !== 'undefined' ? window.location.pathname : '/'),
+  search = (typeof window !== 'undefined' ? window.location.search : '')
+) {
   const path = pathname || '/';
 
   // 1. Admin Panel
   if (path.startsWith('/admin')) {
     return { view: 'admin' };
+  }
+
+  if (path === '/payment/return') {
+    const params = new URLSearchParams(search || '');
+    return {
+      view: 'payment-return',
+      orderId: params.get('order_id') || null,
+    };
   }
 
   // 4. Product Details: /product/:slug or /products/:slug
@@ -90,6 +101,10 @@ export function formatRouteUrl({ view, productSlug, dropIdentifier, orderId, pro
       return '/cart';
     case 'checkout':
       return '/checkout';
+    case 'payment-return':
+      return orderId
+        ? `/payment/return?order_id=${encodeURIComponent(orderId)}`
+        : '/payment/return';
     case 'order-detail':
       return orderId ? `/orders/${encodeURIComponent(orderId)}` : '/profile/orders';
     case 'auth':

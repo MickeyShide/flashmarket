@@ -30,6 +30,11 @@ test('parseRoute maps URLs to correct views and parameters', () => {
     view: 'checkout',
   });
 
+  assert.deepEqual(parseRoute('/payment/return', '?order_id=order-123'), {
+    view: 'payment-return',
+    orderId: 'order-123',
+  });
+
   assert.deepEqual(parseRoute('/profile/wishlist'), {
     view: 'auth',
     profileTab: 'wishlist',
@@ -84,6 +89,10 @@ test('formatRouteUrl generates clean canonical URLs', () => {
   assert.equal(formatRouteUrl({ view: 'drops' }), '/drops');
   assert.equal(formatRouteUrl({ view: 'cart' }), '/cart');
   assert.equal(formatRouteUrl({ view: 'checkout' }), '/checkout');
+  assert.equal(
+    formatRouteUrl({ view: 'payment-return', orderId: 'ord-1' }),
+    '/payment/return?order_id=ord-1'
+  );
   assert.equal(formatRouteUrl({ view: 'auth', profileTab: 'orders' }), '/profile/orders');
   assert.equal(formatRouteUrl({ view: 'auth', profileTab: 'wishlist' }), '/profile/wishlist');
   assert.equal(formatRouteUrl({ view: 'order-detail', orderId: 'ord-1' }), '/orders/ord-1');

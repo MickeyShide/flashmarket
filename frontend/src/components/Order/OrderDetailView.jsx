@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../services/api';
 import { formatDate, formatPrice, getOrderStatusClass, getOrderStatusLabel } from '../../utils/formatters';
 
 export const OrderDetailView = ({ orderId, onBack }) => {
-  const { user, loadNotifications } = useAuth();
   const { triggerToast } = useToast();
 
   const [order, setOrder] = useState(null);
@@ -37,41 +35,27 @@ export const OrderDetailView = ({ orderId, onBack }) => {
 
     setPaying(true);
     try {
-      // 1. Create payment using final price amount
-      const payment = await apiJson('/api/v1/payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: orderId,
-          user_id: user.id,
-          amount: payableAmountKopecks,
-          currency: currency || 'RUB',
-          provider: 'mock',
-          expires_at: order.payment_expires_at || null
-        })
-      });
-
-      // 2. Confirm payment via mock provider
-      await apiJson(`/api/v1/payments/${payment.id}/confirm`, {
-        method: 'POST'
-      });
-
-      // 3. Confirm order
-      try {
-        await apiJson(`/api/v1/orders/${orderId}/confirm?payment_id=${payment.id}`, {
-          method: 'POST'
-        });
-      } catch (e) {
-        console.warn('Order confirm endpoint error:', e);
+      let checkout = null;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          checkout = await apiJson(`/api/v1/payments/orders/${orderId}/checkout`, {
+            method: 'POST'
+          });
+          break;
+        } catch (err) {
+          if (err.data?.error?.code !== 'payment_not_ready' || attempt === 4) {
+            throw err;
+          }
+          await new Promise(resolve => window.setTimeout(resolve, 300 * (attempt + 1)));
+        }
       }
-
-      triggerToast('Оплата прошла успешно!');
-      loadNotifications();
-      fetchOrderDetails();
-
+      if (!checkout?.confirmation_url) {
+        throw new Error('Платёжная ссылка не получена');
+      }
+      window.sessionStorage.setItem('flashmarket:lastPaymentOrderId', orderId);
+      window.location.assign(checkout.confirmation_url);
     } catch (err) {
       triggerToast('Ошибка оплаты: ' + err.message, true);
-    } finally {
       setPaying(false);
     }
   };
