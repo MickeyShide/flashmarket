@@ -31,7 +31,10 @@ from payments.config import get_settings
 from payments.domain.entities import PaymentStatus
 from payments.infrastructure.database import SessionFactory, engine
 from payments.infrastructure.models import PaymentModel, ProcessedEventModel
-from payments.infrastructure.providers import build_payment_provider
+from payments.infrastructure.providers import (
+    close_shared_payment_provider,
+    get_shared_payment_provider,
+)
 from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
 
 logger = logging.getLogger(__name__)
@@ -96,7 +99,7 @@ async def handle_payment_refund_requested(
         session=session,
         payment_repo=payment_repo,
         outbox_repo=OutboxRepository(session),
-        provider=build_payment_provider(settings),
+        provider=get_shared_payment_provider(),
         provider_name=settings.payment_provider,
         return_url=settings.yookassa_return_url or "http://localhost/payment/return",
         test_mode_required=settings.yookassa_test_mode_required,
@@ -197,6 +200,7 @@ async def run() -> None:
             label="Payments consumer",
         )
     finally:
+        await close_shared_payment_provider()
         await engine.dispose()
 
 

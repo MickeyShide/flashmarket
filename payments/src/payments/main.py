@@ -13,6 +13,7 @@ from payments.api.routes import health, metrics, payments, webhooks
 from payments.config import get_settings
 from payments.domain.exceptions import PaymentError
 from payments.infrastructure.database import engine
+from payments.infrastructure.providers import close_shared_payment_provider
 from payments.observability import (
     request_observability_middleware,
     setup_metrics,
@@ -23,8 +24,11 @@ from payments.observability import (
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application-wide resources."""
     get_verifier().validate_startup()
-    yield
-    await engine.dispose()
+    try:
+        yield
+    finally:
+        await close_shared_payment_provider()
+        await engine.dispose()
 
 
 def create_app() -> FastAPI:

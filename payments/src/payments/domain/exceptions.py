@@ -40,11 +40,39 @@ class PaymentProviderUnavailable(PaymentError):
     message = "Payment provider is temporarily unavailable"
 
 
+class PaymentProviderResultUnknown(PaymentProviderUnavailable):
+    """Raised when a financial write may have succeeded remotely."""
+
+    code = "payment_provider_result_unknown"
+    message = "Payment provider result is still being determined"
+
+
+class PaymentProviderRateLimited(PaymentProviderUnavailable):
+    """Raised when the provider asks the caller to reduce request rate."""
+
+    code = "payment_provider_rate_limited"
+    message = "Payment provider is busy; retry later"
+
+
 class PaymentProviderRejected(PaymentError):
     """Raised when the provider rejects a request."""
 
     code = "payment_provider_rejected"
     message = "Payment provider rejected the operation"
+
+
+class PaymentProviderAuthenticationFailed(PaymentProviderRejected):
+    """Raised when configured provider credentials are invalid."""
+
+    code = "payment_provider_authentication_failed"
+    message = "Payment provider credentials were rejected"
+
+
+class PaymentProviderMalformedResponse(PaymentProviderRejected):
+    """Raised when a successful provider response violates its contract."""
+
+    code = "payment_provider_malformed_response"
+    message = "Payment provider returned an invalid response"
 
 
 class PaymentVerificationFailed(PaymentError):

@@ -11,7 +11,7 @@ from payments.application.contracts import PaymentProvider
 from payments.application.services.payment import PaymentService
 from payments.config import get_settings
 from payments.infrastructure.database import get_db
-from payments.infrastructure.providers import build_payment_provider
+from payments.infrastructure.providers import get_shared_payment_provider
 from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
@@ -38,8 +38,8 @@ AdminPrincipal = Annotated[Principal, Depends(require_admin)]
 
 
 def get_payment_provider() -> PaymentProvider:
-    """Build the configured external payment provider."""
-    return build_payment_provider()
+    """Return the process-lifetime external payment provider."""
+    return get_shared_payment_provider()
 
 
 def get_payment_service(

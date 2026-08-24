@@ -24,14 +24,14 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 ## 2. Provider HTTP resilience
 
-- [~] One process-lifetime pooled `httpx.AsyncClient` for API and worker processes.
-- [ ] Explicit connection/keep-alive pool limits.
-- [ ] Separate read/write concurrency gates.
-- [ ] Typed provider error taxonomy for rejection, rate limiting, and uncertain results.
-- [ ] Increasing backoff with jitter; no zero-delay retry.
-- [ ] Interactive retry budget separated from durable worker retries.
-- [ ] Circuit breaker that does not turn uncertain writes into definite failures.
-- [ ] Sanitized provider error IDs and latency/concurrency metrics.
+- [x] One process-lifetime pooled `httpx.AsyncClient` for API and worker processes.
+- [x] Explicit connection/keep-alive pool limits.
+- [x] Separate read/write concurrency gates.
+- [x] Typed provider error taxonomy for rejection, rate limiting, and uncertain results.
+- [x] Increasing backoff with jitter; no zero-delay retry.
+- [~] Interactive retry budget separated from durable worker retries (durable worker pending).
+- [x] Circuit breaker that does not turn uncertain writes into definite failures.
+- [x] Sanitized provider error IDs and latency/concurrency metrics.
 
 ## 3. Durable provider operations
 
@@ -121,4 +121,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 | Date | Stage | Checks | Result |
 |---|---|---|---|
 | 2026-08-25 | CI repair | Payments `25 passed`; strict mypy; changed-file Ruff/format; OpenAPI generation; OpenAPI tests `4 passed` | Pass |
-
+| 2026-08-25 | Provider resilience | Payments `29 passed`; strict mypy; scoped Ruff/format | Pass |

@@ -45,6 +45,20 @@ PROVIDER_OPERATIONS = Counter(
     "External payment provider operations",
     labelnames=("operation", "result"),
 )
+PROVIDER_DURATION = Histogram(
+    "payments_provider_request_duration_seconds",
+    "External payment provider request duration",
+    labelnames=("operation",),
+)
+PROVIDER_IN_PROGRESS = Gauge(
+    "payments_provider_requests_in_progress",
+    "External payment provider requests currently in progress",
+    labelnames=("kind",),
+)
+PROVIDER_CIRCUIT_OPEN = Gauge(
+    "payments_provider_circuit_open",
+    "Whether the external payment provider circuit is open",
+)
 WEBHOOK_EVENTS = Counter(
     "payments_provider_webhooks_total",
     "Incoming payment provider notifications",
