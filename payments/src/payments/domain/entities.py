@@ -71,10 +71,11 @@ class RefundStatus(StrEnum):
 
 
 class ReceiptStatus(StrEnum):
-    """Local fiscal snapshot readiness while live receipts stay disabled."""
+    """Local lifecycle of immutable provider receipt input."""
 
     NEEDS_CONTACT = "NEEDS_CONTACT"
-    SIMULATED = "SIMULATED"
+    READY = "READY"
+    SUBMITTED = "SUBMITTED"
     INVALID = "INVALID"
 
 

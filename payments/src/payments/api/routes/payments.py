@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from payments.api.dependencies import AdminPrincipal, CurrentPrincipal, get_payment_service
 from payments.application.schemas import (
+    CheckoutRequest,
     CheckoutResponse,
     CreatePaymentRequest,
     PaymentListParams,
@@ -57,6 +58,7 @@ async def create_payment(
 async def start_checkout(
     order_id: UUID,
     principal: CurrentPrincipal,
+    data: CheckoutRequest | None = None,
     service: PaymentService = Depends(get_payment_service),
 ) -> CheckoutResponse | JSONResponse:
     """Create a provider payment from the authoritative PaymentRequested event."""
@@ -67,7 +69,10 @@ async def start_checkout(
             detail="Cannot pay another user's order",
         )
     try:
-        payment = await service.start_checkout(order_id)
+        payment = await service.start_checkout(
+            order_id,
+            receipt_email=data.receipt_email if data is not None else None,
+        )
     except PaymentProviderResultUnknown:
         payment = await service.get_payment_by_order_id(order_id)
         response = CheckoutResponse(

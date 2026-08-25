@@ -93,7 +93,7 @@ async def handle_payment_requested(
             payment_id=payment.id,
             snapshot=snapshot_json,
             snapshot_hash=snapshot.content_hash(),
-            status=(ReceiptStatus.SIMULATED if snapshot.customer else ReceiptStatus.NEEDS_CONTACT),
+            status=(ReceiptStatus.READY if snapshot.customer else ReceiptStatus.NEEDS_CONTACT),
             error_code=None if snapshot.customer else "customer_contact_missing",
         )
     )

@@ -118,6 +118,23 @@ class OrderService:
                     discount_amount=discount_amount,
                 )
 
+            receipt_snapshot: dict[str, object] = {
+                "currency": order.currency,
+                "total_amount": int(final_total),
+                "items": [
+                    {
+                        "description": order.product_name[:128],
+                        "quantity": "1",
+                        "unit_amount": int(final_total),
+                        "vat_code": 1,
+                        "payment_subject": "commodity",
+                        "payment_mode": "full_payment",
+                        "measure": "piece",
+                    }
+                ],
+            }
+            if data.receipt_email is not None:
+                receipt_snapshot["customer"] = {"email": data.receipt_email}
             payload = {
                 "order_id": str(order.id),
                 "reservation_id": str(order.reservation_id),
@@ -129,21 +146,7 @@ class OrderService:
                 "payment_expires_at": (
                     order.payment_expires_at.isoformat() if order.payment_expires_at else None
                 ),
-                "receipt_snapshot": {
-                    "currency": order.currency,
-                    "total_amount": int(final_total),
-                    "items": [
-                        {
-                            "description": order.product_name[:128],
-                            "quantity": "1",
-                            "unit_amount": int(final_total),
-                            "vat_code": 1,
-                            "payment_subject": "commodity",
-                            "payment_mode": "full_payment",
-                            "measure": "piece",
-                        }
-                    ],
-                },
+                "receipt_snapshot": receipt_snapshot,
             }
             await self._outbox_repo.add(
                 OrderEventType.ORDER_CREATED,
@@ -237,6 +240,24 @@ class OrderService:
                 payment_expires_at=line.payment_expires_at,
             )
             await self._order_repo.create(order)
+            receipt_email = data.receipt_email or line.receipt_email
+            receipt_snapshot: dict[str, object] = {
+                "currency": order.currency,
+                "total_amount": int(final),
+                "items": [
+                    {
+                        "description": order.product_name[:128],
+                        "quantity": "1",
+                        "unit_amount": int(final),
+                        "vat_code": 1,
+                        "payment_subject": "commodity",
+                        "payment_mode": "full_payment",
+                        "measure": "piece",
+                    }
+                ],
+            }
+            if receipt_email is not None:
+                receipt_snapshot["customer"] = {"email": receipt_email}
             payload = {
                 "order_id": str(order.id),
                 "checkout_id": str(checkout_id),
@@ -249,21 +270,7 @@ class OrderService:
                 "payment_expires_at": (
                     order.payment_expires_at.isoformat() if order.payment_expires_at else None
                 ),
-                "receipt_snapshot": {
-                    "currency": order.currency,
-                    "total_amount": int(final),
-                    "items": [
-                        {
-                            "description": order.product_name[:128],
-                            "quantity": "1",
-                            "unit_amount": int(final),
-                            "vat_code": 1,
-                            "payment_subject": "commodity",
-                            "payment_mode": "full_payment",
-                            "measure": "piece",
-                        }
-                    ],
-                },
+                "receipt_snapshot": receipt_snapshot,
             }
             await self._outbox_repo.add(
                 OrderEventType.ORDER_CREATED,

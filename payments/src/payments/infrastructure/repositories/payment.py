@@ -83,6 +83,18 @@ class PaymentReceiptRepository:
         )
         return result.first()
 
+    async def get_by_payment_id_for_update(
+        self,
+        payment_id: UUID,
+    ) -> PaymentReceiptModel | None:
+        result = await self._session.scalars(
+            select(PaymentReceiptModel)
+            .where(PaymentReceiptModel.payment_id == payment_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.first()
+
 
 class DailyReportRepository:
     """Persistence for idempotent, non-mutating daily report imports."""

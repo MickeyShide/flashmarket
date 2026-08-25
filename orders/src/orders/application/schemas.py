@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from orders.domain.entities import DiscountType, OrderStatus, PromocodeStatus
 
@@ -32,6 +33,17 @@ class CreateOrderRequest(BaseModel):
     variant_color: str | None = Field(default=None, max_length=50)
     drop_id: uuid.UUID | None = None
     payment_expires_at: datetime | None = None
+    receipt_email: str | None = Field(default=None, max_length=254)
+
+    @field_validator("receipt_email", mode="before")
+    @classmethod
+    def normalize_receipt_email(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        normalized = value.strip().lower()
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized):
+            raise ValueError("receipt_email is invalid")
+        return normalized
 
 
 class CreateOrderBatchRequest(BaseModel):
@@ -39,6 +51,17 @@ class CreateOrderBatchRequest(BaseModel):
 
     lines: list[CreateOrderRequest] = Field(min_length=1, max_length=100)
     promocode_code: str | None = Field(default=None, max_length=50)
+    receipt_email: str | None = Field(default=None, max_length=254)
+
+    @field_validator("receipt_email", mode="before")
+    @classmethod
+    def normalize_receipt_email(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        normalized = value.strip().lower()
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized):
+            raise ValueError("receipt_email is invalid")
+        return normalized
 
     @model_validator(mode="after")
     def validate_lines(self) -> CreateOrderBatchRequest:
@@ -51,6 +74,13 @@ class CreateOrderBatchRequest(BaseModel):
             raise ValueError("all lines must use the same currency")
         if len(users) != 1:
             raise ValueError("all lines must belong to the same user")
+        line_emails = {line.receipt_email for line in self.lines if line.receipt_email is not None}
+        if len(line_emails) > 1 or (
+            self.receipt_email is not None
+            and line_emails
+            and line_emails != {self.receipt_email}
+        ):
+            raise ValueError("all lines must use the same receipt email")
         return self
 
 

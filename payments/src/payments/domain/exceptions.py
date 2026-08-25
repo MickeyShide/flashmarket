@@ -80,3 +80,10 @@ class PaymentVerificationFailed(PaymentError):
 
     code = "payment_verification_failed"
     message = "Payment verification failed"
+
+
+class PaymentReceiptInvalid(PaymentError):
+    """Raised before provider I/O when fiscal input is incomplete or inconsistent."""
+
+    code = "payment_receipt_invalid"
+    message = "Payment receipt data is incomplete or invalid"

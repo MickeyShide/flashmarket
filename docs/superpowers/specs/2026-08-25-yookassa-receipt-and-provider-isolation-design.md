@@ -102,9 +102,11 @@ After verifying order ownership, Payments will lock the payment and its receipt:
 4. If a different contact was already frozen, reject the mutation instead of
    silently changing fiscal input.
 
-The snapshot becomes immutable once any provider create operation exists. Contact
-enrichment and operation creation occur under the same database lock/transaction,
-before network I/O.
+The snapshot becomes immutable once an operation may have succeeded remotely. A
+definitely `FAILED` legacy operation whose payload contained no receipt does not
+block one-time contact enrichment for a new attempt with a new idempotence key.
+Contact enrichment and new operation creation occur under the same database
+lock/transaction, before network I/O.
 
 ## Provider receipt contract
 

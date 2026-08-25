@@ -24,6 +24,7 @@ test('order payment UI uses hosted checkout without client-side confirmation', a
   assert.doesNotMatch(source, /\/api\/v1\/payments\/\$\{payment\.id\}\/confirm/);
   assert.doesNotMatch(source, /\/api\/v1\/orders\/\$\{orderId\}\/confirm/);
   assert.doesNotMatch(source, /amount:\s*payableAmountKopecks/);
+  assert.match(source, /receipt_email:\s*user\?\.email/);
   assert.match(source, /preparation_status/);
   assert.match(source, /waitForVisible/);
   assert.match(source, /current_attempt_status/);

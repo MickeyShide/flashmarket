@@ -136,12 +136,12 @@ worker request sent a historical `mock-*` ID to YooKassa after the provider swit
 - [x] Approve and commit the remediation design.
 - [x] Write the implementation plan.
 - [x] Implement provider-neutral receipt contracts and YooKassa serialization.
-- [ ] Propagate authenticated profile email into new order receipt snapshots.
-- [ ] Enrich and freeze legacy `NEEDS_CONTACT` snapshots at checkout.
-- [ ] Add payment and refund receipt payloads with exact-total validation.
+- [x] Propagate authenticated profile email into new order receipt snapshots.
+- [x] Enrich and freeze legacy `NEEDS_CONTACT` snapshots at checkout.
+- [x] Add payment and refund receipt payloads with exact-total validation.
 - [ ] Scope all financial worker claims and reconciliation by provider.
 - [x] Log bounded, sanitized YooKassa error details without public disclosure.
-- [ ] Add receipt, retry, concurrency, refund, and provider-switch regressions.
+- [~] Add receipt, retry, concurrency, refund, and provider-switch regressions.
 - [ ] Apply the receipt-state migration and regenerate OpenAPI artifacts.
 - [ ] Pass all affected service, frontend, deployment, migration, lint, and type checks.
 - [ ] Commit and push the implementation in reviewable units.

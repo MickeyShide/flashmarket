@@ -8,7 +8,13 @@ from decimal import Decimal
 from hashlib import sha256
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from payments.application.contracts import (
+    ProviderReceipt,
+    ProviderReceiptCustomer,
+    ProviderReceiptItem,
+)
 
 VATCode = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 PaymentSubject = Literal[
@@ -76,6 +82,13 @@ class ReceiptCustomer(BaseModel):
 
     email: str | None = Field(default=None, max_length=254)
     phone: str | None = Field(default=None, max_length=16)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
 
     @model_validator(mode="after")
     def validate_contact(self) -> ReceiptCustomer:
@@ -155,4 +168,58 @@ def snapshot_from_order_event(payload: dict[str, object]) -> ReceiptSnapshot:
                 measure="piece",
             )
         ],
+    )
+
+
+def provider_receipt_from_snapshot(
+    snapshot: ReceiptSnapshot,
+    *,
+    total_amount: int | None = None,
+) -> ProviderReceipt:
+    """Convert frozen fiscal input to an exact provider-neutral receipt."""
+    if snapshot.customer is None:
+        raise ValueError("receipt customer contact is required")
+    requested_total = snapshot.total_amount if total_amount is None else total_amount
+    if requested_total <= 0:
+        raise ValueError("receipt total must be positive")
+
+    if requested_total == snapshot.total_amount:
+        items = tuple(
+            ProviderReceiptItem(
+                description=item.description,
+                quantity=item.quantity,
+                amount=item.unit_amount,
+                vat_code=item.vat_code,
+                payment_subject=item.payment_subject,
+                payment_mode=item.payment_mode,
+                measure=item.measure,
+            )
+            for item in snapshot.items
+        )
+    else:
+        if len(snapshot.items) != 1:
+            raise ValueError("partial receipt allocation requires one original item")
+        source = snapshot.items[0]
+        items = (
+            ProviderReceiptItem(
+                description=source.description,
+                quantity=Decimal(1),
+                amount=requested_total,
+                vat_code=source.vat_code,
+                payment_subject=source.payment_subject,
+                payment_mode=source.payment_mode,
+                measure=source.measure,
+            ),
+        )
+
+    actual_total = sum(item.quantity * item.amount for item in items)
+    if actual_total != Decimal(requested_total):
+        raise ValueError("provider receipt items must exactly equal the requested total")
+    return ProviderReceipt(
+        customer=ProviderReceiptCustomer(
+            email=snapshot.customer.email,
+            phone=snapshot.customer.phone,
+        ),
+        currency=snapshot.currency,
+        items=items,
     )

@@ -12,13 +12,24 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from payments.application.contracts import PaymentProvider, ProviderPayment, ProviderRefund
+from payments.application.contracts import (
+    PaymentProvider,
+    ProviderPayment,
+    ProviderReceipt,
+    ProviderRefund,
+)
+from payments.application.receipts import (
+    ReceiptCustomer,
+    ReceiptSnapshot,
+    provider_receipt_from_snapshot,
+)
 from payments.application.schemas import CreatePaymentRequest, YooKassaWebhook
 from payments.domain.entities import (
     PaymentAttemptStatus,
     PaymentEventType,
     PaymentStatus,
     ProviderOperationStatus,
+    ReceiptStatus,
     RefundStatus,
     WebhookInboxStatus,
 )
@@ -30,6 +41,7 @@ from payments.domain.exceptions import (
     PaymentProviderRejected,
     PaymentProviderResultUnknown,
     PaymentProviderUnavailable,
+    PaymentReceiptInvalid,
     PaymentVerificationFailed,
 )
 from payments.infrastructure.database import utc_now
@@ -45,6 +57,7 @@ from payments.infrastructure.repositories.payment import (
     FinancialLedgerRepository,
     OutboxRepository,
     PaymentAttemptRepository,
+    PaymentReceiptRepository,
     PaymentRepository,
     ProviderOperationRepository,
     RefundRepository,
@@ -65,6 +78,7 @@ class PaymentService:
         webhook_repo: WebhookInboxRepository | None = None,
         refund_repo: RefundRepository | None = None,
         ledger_repo: FinancialLedgerRepository | None = None,
+        receipt_repo: PaymentReceiptRepository | None = None,
         provider: PaymentProvider | None = None,
         *,
         provider_name: str = "mock",
@@ -81,6 +95,7 @@ class PaymentService:
         self._webhook_repo = webhook_repo or WebhookInboxRepository(session)
         self._refund_repo = refund_repo or RefundRepository(session)
         self._ledger_repo = ledger_repo or FinancialLedgerRepository(session)
+        self._receipt_repo = receipt_repo or PaymentReceiptRepository(session)
         if provider is None:
             from payments.infrastructure.providers.mock import MockPaymentProvider
 
@@ -153,7 +168,12 @@ class PaymentService:
         if require_confirmation and not remote.confirmation_url:
             raise PaymentProviderRejected("Payment provider did not return a confirmation URL")
 
-    async def start_checkout(self, order_id: uuid.UUID) -> PaymentModel:
+    async def start_checkout(
+        self,
+        order_id: uuid.UUID,
+        *,
+        receipt_email: str | None = None,
+    ) -> PaymentModel:
         """Create or reuse a hosted provider payment for an authoritative order payment."""
         # The authorization lookup in the route may have opened an implicit transaction.
         # Release it before claiming the short write phase below.
@@ -166,6 +186,14 @@ class PaymentService:
         if payment.provider != self._provider_name:
             raise InvalidPaymentState("Payment provider configuration changed")
         self._ensure_not_expired(payment)
+        provider_receipt: ProviderReceipt | None = None
+        receipt_payload: dict[str, object] | None = None
+        if self._provider_name != "mock":
+            provider_receipt = await self._prepare_receipt(
+                payment,
+                receipt_email=receipt_email,
+            )
+            receipt_payload = self._receipt_operation_payload(provider_receipt)
         attempt = await self._attempt_repo.get_active_for_update(payment.id)
         if attempt is not None and self._attempt_expired(attempt):
             attempt.status = PaymentAttemptStatus.EXPIRED
@@ -191,7 +219,7 @@ class PaymentService:
                 await self._attempt_repo.create(attempt)
             except IntegrityError:
                 await self._session.rollback()
-                return await self.start_checkout(order_id)
+                return await self.start_checkout(order_id, receipt_email=receipt_email)
             payment.current_attempt_id = attempt.id
             payment.current_attempt_status = attempt.status
             payment.external_id = None
@@ -204,7 +232,11 @@ class PaymentService:
             await self._session.commit()
             return payment
 
-        request_payload = self._checkout_request_payload(payment, attempt)
+        request_payload = self._checkout_request_payload(
+            payment,
+            attempt,
+            receipt=receipt_payload,
+        )
         canonical_payload = json.dumps(
             request_payload,
             sort_keys=True,
@@ -279,6 +311,7 @@ class PaymentService:
                 description=description,
                 return_url=return_url,
                 idempotency_key=idempotency_key,
+                receipt=provider_receipt,
             )
         except PaymentProviderMalformedResponse as exc:
             await self._finish_provider_operation(
@@ -336,6 +369,9 @@ class PaymentService:
             locked_attempt.cancellation_reason = "provider_verification_failed"
             locked_attempt.next_reconcile_at = None
             locked.current_attempt_status = PaymentAttemptStatus.UNKNOWN
+            locked_receipt = await self._receipt_repo.get_by_payment_id_for_update(payment_id)
+            if locked_receipt is not None:
+                locked_receipt.status = ReceiptStatus.SUBMITTED
             await self._session.commit()
             raise PaymentProviderResultUnknown from exc
         locked_attempt.external_id = remote.id
@@ -353,6 +389,10 @@ class PaymentService:
         locked_operation.external_id = remote.id
         locked_operation.last_error_code = None
         locked_operation.response_payload = self._provider_payment_snapshot(remote)
+        locked_receipt = await self._receipt_repo.get_by_payment_id_for_update(payment_id)
+        if locked_receipt is not None:
+            locked_receipt.status = ReceiptStatus.SUBMITTED
+            locked_receipt.error_code = None
         await self._payment_repo.update(locked)
         await self._operation_repo.update(locked_operation)
         await self._session.commit()
@@ -363,12 +403,14 @@ class PaymentService:
         self,
         payment: PaymentModel,
         attempt: PaymentAttemptModel,
+        *,
+        receipt: dict[str, object] | None,
     ) -> dict[str, object]:
         return_url = (
             f"{self._return_url}{'&' if '?' in self._return_url else '?'}"
             f"order_id={payment.order_id}"
         )
-        return {
+        payload: dict[str, object] = {
             "payment_id": str(payment.id),
             "attempt_id": str(attempt.id),
             "order_id": str(payment.order_id),
@@ -377,6 +419,97 @@ class PaymentService:
             "description": f"FlashMarket order {payment.order_id}",
             "return_url": return_url,
         }
+        if receipt is not None:
+            payload["receipt"] = receipt
+        return payload
+
+    async def _prepare_receipt(
+        self,
+        payment: PaymentModel,
+        *,
+        receipt_email: str | None,
+    ) -> ProviderReceipt:
+        record = await self._receipt_repo.get_by_payment_id_for_update(payment.id)
+        if record is None:
+            raise PaymentReceiptInvalid("Payment receipt snapshot was not found")
+        try:
+            snapshot = ReceiptSnapshot.model_validate_json(record.snapshot)
+            supplied_customer = (
+                ReceiptCustomer(email=receipt_email) if receipt_email is not None else None
+            )
+        except (ValidationError, ValueError) as exc:
+            record.status = ReceiptStatus.INVALID
+            record.error_code = "invalid_receipt_snapshot"
+            await self._session.commit()
+            raise PaymentReceiptInvalid from exc
+
+        if snapshot.currency != payment.currency or snapshot.total_amount != payment.amount:
+            record.status = ReceiptStatus.INVALID
+            record.error_code = "receipt_payment_mismatch"
+            await self._session.commit()
+            raise PaymentReceiptInvalid("Receipt total or currency does not match the payment")
+
+        if snapshot.customer is None:
+            if supplied_customer is None:
+                raise PaymentReceiptInvalid("Receipt customer email is required")
+            snapshot = snapshot.model_copy(update={"customer": supplied_customer})
+            record.snapshot = snapshot.canonical_json()
+            record.snapshot_hash = snapshot.content_hash()
+            record.status = ReceiptStatus.READY
+            record.error_code = None
+        elif supplied_customer is not None and supplied_customer != snapshot.customer:
+            raise PaymentReceiptInvalid("Receipt customer contact is already frozen")
+
+        try:
+            provider_receipt = provider_receipt_from_snapshot(snapshot)
+        except ValueError as exc:
+            record.status = ReceiptStatus.INVALID
+            record.error_code = "invalid_provider_receipt"
+            await self._session.commit()
+            raise PaymentReceiptInvalid from exc
+        return provider_receipt
+
+    @staticmethod
+    def _receipt_operation_payload(receipt: ProviderReceipt) -> dict[str, object]:
+        return {
+            "customer": {
+                key: value
+                for key, value in {
+                    "email": receipt.customer.email,
+                    "phone": receipt.customer.phone,
+                }.items()
+                if value is not None
+            },
+            "currency": receipt.currency,
+            "items": [
+                {
+                    "description": item.description,
+                    "quantity": format(item.quantity, "f"),
+                    "amount": item.amount,
+                    "vat_code": item.vat_code,
+                    "payment_subject": item.payment_subject,
+                    "payment_mode": item.payment_mode,
+                    "measure": item.measure,
+                }
+                for item in receipt.items
+            ],
+        }
+
+    async def _refund_receipt(
+        self,
+        payment: PaymentModel,
+        amount: int,
+    ) -> ProviderReceipt:
+        record = await self._receipt_repo.get_by_payment_id(payment.id)
+        if record is None:
+            raise PaymentReceiptInvalid("Payment receipt snapshot was not found")
+        try:
+            snapshot = ReceiptSnapshot.model_validate_json(record.snapshot)
+            if snapshot.currency != payment.currency or snapshot.total_amount != payment.amount:
+                raise ValueError("receipt_payment_mismatch")
+            return provider_receipt_from_snapshot(snapshot, total_amount=amount)
+        except (ValidationError, ValueError) as exc:
+            raise PaymentReceiptInvalid("Refund receipt data is invalid") from exc
 
     @staticmethod
     def _attempt_expired(attempt: PaymentAttemptModel) -> bool:
@@ -1125,6 +1258,11 @@ class PaymentService:
         requested_amount = refundable if amount is None else amount
         if requested_amount <= 0 or requested_amount > refundable:
             raise InvalidPaymentState("Refund exceeds the available captured balance")
+        provider_receipt = (
+            None
+            if self._provider_name == "mock"
+            else await self._refund_receipt(payment, requested_amount)
+        )
         request_key = sha256(
             f"{payment.id}:{request_id or reason}:{requested_amount}".encode()
         ).hexdigest()
@@ -1153,6 +1291,11 @@ class PaymentService:
                 "amount": requested_amount,
                 "currency": payment.currency,
                 "reason": reason,
+                "receipt": (
+                    self._receipt_operation_payload(provider_receipt)
+                    if provider_receipt is not None
+                    else None
+                ),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -1186,6 +1329,11 @@ class PaymentService:
         external_id = payment_snapshot.external_id
         amount = refund_snapshot.amount
         reason = refund_snapshot.reason
+        provider_receipt = (
+            None
+            if self._provider_name == "mock"
+            else await self._refund_receipt(payment_snapshot, amount)
+        )
         if self._provider_name == "mock":
             remote_payment = ProviderPayment(
                 id=external_id,
@@ -1239,6 +1387,7 @@ class PaymentService:
                 amount=amount,
                 idempotency_key=locked_operation.idempotency_key,
                 reason=reason,
+                receipt=provider_receipt,
             )
         except PaymentProviderMalformedResponse as exc:
             await self._finish_provider_operation(

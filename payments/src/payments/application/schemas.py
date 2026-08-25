@@ -5,8 +5,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from payments.application.receipts import ReceiptCustomer
 from payments.domain.entities import PaymentStatus
 
 
@@ -70,6 +71,19 @@ class CheckoutResponse(BaseModel):
     confirmation_url: str | None = None
     preparation_status: str = "ready"
     retry_after_seconds: int | None = None
+
+
+class CheckoutRequest(BaseModel):
+    """Optional receipt contact used to make legacy orders payable."""
+
+    receipt_email: str | None = Field(default=None, max_length=254)
+
+    @field_validator("receipt_email")
+    @classmethod
+    def validate_receipt_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return ReceiptCustomer(email=value).email
 
 
 class YooKassaWebhook(BaseModel):

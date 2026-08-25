@@ -12,7 +12,11 @@ from payments.application.services.payment import PaymentService
 from payments.config import get_settings
 from payments.infrastructure.database import get_db
 from payments.infrastructure.providers import get_shared_payment_provider
-from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
+from payments.infrastructure.repositories.payment import (
+    OutboxRepository,
+    PaymentReceiptRepository,
+    PaymentRepository,
+)
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -52,6 +56,7 @@ def get_payment_service(
         session=db,
         payment_repo=PaymentRepository(db),
         outbox_repo=OutboxRepository(db),
+        receipt_repo=PaymentReceiptRepository(db),
         provider=provider,
         provider_name=settings.payment_provider,
         return_url=settings.yookassa_return_url or "http://localhost/payment/return",

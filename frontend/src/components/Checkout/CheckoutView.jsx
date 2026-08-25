@@ -156,7 +156,8 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
       });
 
       const batchPayload = {
-        lines: linesData
+        lines: linesData,
+        receipt_email: user.email
       };
       if (appliedPromo?.code || promoCodeInput) {
         batchPayload.promocode_code = (appliedPromo?.code || promoCodeInput).toUpperCase();

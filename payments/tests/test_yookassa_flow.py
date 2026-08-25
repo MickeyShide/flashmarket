@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from dataclasses import replace
 from datetime import datetime, timedelta
@@ -22,10 +23,12 @@ from payments.api.dependencies import get_payment_provider
 from payments.application.contracts import (
     ProviderPayment,
     ProviderPaymentPage,
+    ProviderReceipt,
     ProviderRefund,
     ProviderRefundPage,
 )
 from payments.application.services.payment import PaymentService
+from payments.config import get_settings
 from payments.domain.entities import (
     PaymentAttemptStatus,
     PaymentStatus,
@@ -43,6 +46,7 @@ from payments.infrastructure.database import Base, utc_now
 from payments.infrastructure.models import (
     OutboxEventModel,
     PaymentAttemptModel,
+    PaymentReceiptModel,
     ProviderOperationModel,
     RefundModel,
     WebhookInboxModel,
@@ -63,6 +67,8 @@ class FakeProvider:
         self.refund_amount_delta = 0
         self.refund_rejected = False
         self.refund_unknown_after_create = False
+        self.payment_receipts: list[ProviderReceipt | None] = []
+        self.refund_receipts: list[ProviderReceipt | None] = []
 
     async def create_payment(
         self,
@@ -75,9 +81,11 @@ class FakeProvider:
         description: str,
         return_url: str,
         idempotency_key: str,
+        receipt: ProviderReceipt | None = None,
     ) -> ProviderPayment:
         del description, idempotency_key
         self.create_calls += 1
+        self.payment_receipts.append(receipt)
         external_id = f"yk-{attempt_id}"
         payment = ProviderPayment(
             id=external_id,
@@ -116,9 +124,11 @@ class FakeProvider:
         amount: int,
         idempotency_key: str,
         reason: str,
+        receipt: ProviderReceipt | None = None,
     ) -> ProviderRefund:
         del reason
         self.refund_calls += 1
+        self.refund_receipts.append(receipt)
         if self.refund_rejected:
             raise PaymentProviderRejected
         refund = ProviderRefund(
@@ -176,10 +186,29 @@ class MismatchedPaymentProvider(FakeProvider):
 
 async def _authoritative_payment(
     session_factory: async_sessionmaker[AsyncSession],
+    *,
+    contact: bool = True,
 ) -> tuple[uuid.UUID, uuid.UUID]:
     order_id = uuid.uuid4()
     user_id = uuid.uuid4()
     async with session_factory() as session, session.begin():
+        receipt_snapshot: dict[str, object] = {
+            "currency": "RUB",
+            "total_amount": 12_990,
+            "items": [
+                {
+                    "description": "Test product",
+                    "quantity": "1",
+                    "unit_amount": 12_990,
+                    "vat_code": 1,
+                    "payment_subject": "commodity",
+                    "payment_mode": "full_payment",
+                    "measure": "piece",
+                }
+            ],
+        }
+        if contact:
+            receipt_snapshot["customer"] = {"email": "buyer@example.test"}
         await handle_payment_requested(
             session,
             {
@@ -187,6 +216,7 @@ async def _authoritative_payment(
                 "user_id": str(user_id),
                 "amount": 12_990,
                 "currency": "RUB",
+                "receipt_snapshot": receipt_snapshot,
             },
         )
     return order_id, user_id
@@ -274,6 +304,45 @@ async def test_checkout_is_idempotent_and_webhook_is_verified(
             select(OutboxEventModel).where(OutboxEventModel.event_type == "PaymentSucceeded")
         )
         assert len(events.all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_checkout_enriches_legacy_receipt_once_before_provider_write(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = FakeProvider()
+    app.dependency_overrides[get_payment_provider] = lambda: provider
+    settings = get_settings()
+    previous_provider = settings.payment_provider
+    settings.payment_provider = "yookassa"
+    try:
+        order_id, _ = await _authoritative_payment(session_factory, contact=False)
+
+        missing = await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+        assert missing.status_code == 422
+        assert missing.json()["error"]["code"] == "payment_receipt_invalid"
+        assert provider.create_calls == 0
+
+        checkout = await client.post(
+            f"/api/v1/payments/orders/{order_id}/checkout",
+            json={"receipt_email": " Buyer@Example.Test "},
+        )
+        assert checkout.status_code == 200
+        assert provider.create_calls == 1
+        assert provider.payment_receipts[0] is not None
+        assert provider.payment_receipts[0].customer.email == "buyer@example.test"
+
+        async with session_factory() as session:
+            receipt = (await session.scalars(select(PaymentReceiptModel))).one()
+            operation = (await session.scalars(select(ProviderOperationModel))).one()
+            assert receipt.status == "SUBMITTED"
+            assert json.loads(receipt.snapshot)["customer"]["email"] == "buyer@example.test"
+            assert json.loads(operation.request_payload)["receipt"]["customer"]["email"] == (
+                "buyer@example.test"
+            )
+    finally:
+        settings.payment_provider = previous_provider
 
 
 @pytest.mark.asyncio
@@ -659,6 +728,8 @@ async def test_full_refund_changes_state_only_after_provider_success(
         assert refunded.status == PaymentStatus.REFUNDED
         assert refunded.refund_status == "succeeded"
         assert provider.refund_calls == 1
+        assert provider.refund_receipts[0] is not None
+        assert provider.refund_receipts[0].items[0].amount == 12_990
 
 
 @pytest.mark.asyncio
@@ -683,6 +754,8 @@ async def test_partial_refunds_never_exceed_captured_amount(
             request_id="partial-1",
         )
         assert partially_refunded.status == PaymentStatus.SUCCESS
+        assert provider.refund_receipts[0] is not None
+        assert provider.refund_receipts[0].items[0].amount == 4_000
         with pytest.raises(InvalidPaymentState):
             await service.refund_payment(
                 payment_id,
