@@ -1,6 +1,6 @@
 # YooKassa production-readiness tracker
 
-Updated: 2026-08-25
+Updated: 2026-08-26
 
 This is the living implementation tracker for the test-only, production-grade YooKassa architecture described in [the approved design](superpowers/specs/2026-08-25-yookassa-production-hardening-design.md).
 
@@ -145,9 +145,11 @@ worker request sent a historical `mock-*` ID to YooKassa after the provider swit
 - [x] Add receipt, retry, concurrency, refund, and provider-switch regressions.
 - [x] Apply the receipt-state migration and regenerate OpenAPI artifacts.
 - [x] Pass all affected service, frontend, deployment, migration, lint, and type checks.
-- [x] Commit and push the implementation to `origin/main` through `51983ca`.
-- [ ] Verify a new test-shop payment reaches the hosted confirmation page.
-- [ ] Verify YooKassa receives no further `mock-*` identifiers.
+- [x] Commit and push the implementation and rollout hardening to `origin/main`.
+- [!] Verify a new test-shop payment reaches the hosted confirmation page;
+  requires an authenticated customer checkout after deployment.
+- [!] Verify YooKassa receives no further `mock-*` identifiers; requires checking
+  the merchant event log after that checkout.
 
 ## Verification log
 
@@ -166,3 +168,4 @@ worker request sent a historical `mock-*` ID to YooKassa after the provider swit
 | 2026-08-25 | Approved security fixes | Payments `52 passed`; full Ruff/format; strict mypy; empty migration upgrade and seeded reservation backfill through `20260825_0014`; OpenAPI/gateway `16 passed`; frontend `25 passed` and production build | Pass |
 | 2026-08-25 | Test-shop deployment wiring | Payments deployment and gateway/OpenAPI contracts `20 passed`; workflow YAML parsed; production Compose rendered; official webhook IP list re-verified; GitHub Payments, Gateway, and Reliability runs succeeded; main-domain Payments readiness and return page returned `200`, foreign-source webhook request returned `403` | Pass |
 | 2026-08-25 | Receipt delivery and provider isolation | Payments `57 passed`, including YooKassa flow `24 passed` and Alembic `0014 -> 0015 -> 0014` receipt-state regression; Orders `37 passed`; frontend `38 passed` and production build; OpenAPI generation and contracts `17 passed`; deployment/OpenAPI/gateway contracts `20 passed`; affected Ruff/format and strict mypy checks | Pass |
+| 2026-08-26 | Receipt rollout | Payments deploy, Orders deploy, Gateway deploy, and Reliability Integration succeeded; public gateway, Payments readiness, and Orders readiness returned `200`; public OpenAPI exposes both authoritative order contact and checkout fallback contact. Orders deployment diagnostics now distinguish pull, migration, container, API, consumer, outbox, Nginx, and RabbitMQ TCP failures. Purchase Saga remains a pre-existing unrelated failure present continuously since 2026-08-19. | Pass with two merchant-side checks pending |
