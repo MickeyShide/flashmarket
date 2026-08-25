@@ -1,3 +1,4 @@
+import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,13 +21,16 @@ class JWTVerifier:
         algorithm: str = "EdDSA",
         issuer: str = "flashmarket-auth",
         audience: str = "flashmarket-api",
+        min_reload_interval_seconds: float = 10.0,
     ) -> None:
         self.public_key_dir = Path(public_key_dir)
         self.algorithm = algorithm
         self.issuer = issuer
         self.audience = audience
+        self.min_reload_interval_seconds = min_reload_interval_seconds
         self._keys_cache: dict[str, Ed25519PublicKey] = {}
         self._loaded = False
+        self._last_loaded_at: float = 0.0
 
     def validate_startup(self) -> None:
         """Validate public key directory at service startup."""
@@ -34,6 +38,7 @@ class JWTVerifier:
 
     def _load_keys(self) -> None:
         """Scan directory and load all *.pem Ed25519 public keys into memory cache."""
+        self._last_loaded_at = time.monotonic()
         if not self.public_key_dir.exists() or not self.public_key_dir.is_dir():
             raise KeyStoreError(
                 f"Public key directory {self.public_key_dir} does not exist"
@@ -71,18 +76,19 @@ class JWTVerifier:
         self._loaded = True
 
     def get_public_key(self, kid: str) -> Ed25519PublicKey:
-        """Get public key by kid, reloading directory once if kid is unknown."""
+        """Get public key by kid, throttling directory reload if kid is unknown."""
         if not self._loaded:
             self._load_keys()
 
         if kid in self._keys_cache:
             return self._keys_cache[kid]
 
-        # Unknown kid: rescan directory once
-        self._load_keys()
-
-        if kid in self._keys_cache:
-            return self._keys_cache[kid]
+        # Throttled reload on unknown kid to prevent disk I/O DoS
+        now = time.monotonic()
+        if now - self._last_loaded_at >= self.min_reload_interval_seconds:
+            self._load_keys()
+            if kid in self._keys_cache:
+                return self._keys_cache[kid]
 
         raise InvalidTokenError(f"Unknown JWT signing key kid: {kid}")
 
