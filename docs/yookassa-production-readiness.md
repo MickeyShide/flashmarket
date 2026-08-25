@@ -111,10 +111,10 @@ Live payments must remain disabled. An item is marked complete only after its re
 - [x] Migration upgrade verification from an empty database through revision `20260825_0013`.
 - [x] Payments unit/integration/concurrency suite.
 - [x] Ruff for changed code and strict mypy.
-- [ ] Repository OpenAPI generation and tests.
-- [ ] Frontend tests and production build.
-- [ ] Final security and failure-mode audit.
-- [ ] Final commits pushed to `origin/main`.
+- [x] Repository OpenAPI generation and tests.
+- [x] Frontend tests and production build.
+- [~] Final security and failure-mode audit found two high-severity fail-safe accounting defects; reviewed patch approval is pending in `docs/yookassa-security-review-2026-08-25.md`.
+- [~] Implementation commits through `c36909e` pushed to `origin/main`; audit report/fixes remain pending.
 
 ## Verification log
 
@@ -129,3 +129,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 | 2026-08-25 | Frontend payment flow | Frontend `25 passed`; Vite production build; Payments `42 passed`; strict mypy; scoped Ruff/format | Pass |
 | 2026-08-25 | Ledger, receipts, and reports | Payments `47 passed`; full Payments Ruff; strict mypy; deterministic Moscow-time CSV reconciliation | Pass |
 | 2026-08-25 | Attempt reconciliation and observability | Payments `48 passed`; full Payments Ruff; strict mypy; Alembic empty SQLite upgrade through `20260825_0013`; Prometheus alert rules added | Pass |
+| 2026-08-25 | Final verification before security fixes | OpenAPI generation; OpenAPI/gateway contracts `16 passed`; frontend `25 passed` and production build; dependency audits found 0 known vulnerabilities; secrets scan found 0 exposed credentials | Pass with two security-review fixes pending |
