@@ -18,7 +18,12 @@ def resolve_url_ipv4(url_str: str) -> str:
             )
             if infos:
                 ip = infos[0][4][0]
-                netloc = parsed.netloc.replace(parsed.hostname, str(ip), 1)
+                userinfo = ""
+                if parsed.username or parsed.password:
+                    username = parsed.username or ""
+                    password = f":{parsed.password}" if parsed.password else ""
+                    userinfo = f"{username}{password}@"
+                netloc = f"{userinfo}{ip}:{port}"
                 return urlunsplit(parsed._replace(netloc=netloc))
     except Exception:
         pass
