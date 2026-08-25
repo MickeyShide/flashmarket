@@ -125,6 +125,7 @@ async def test_provider_classifies_uncertain_financial_write() -> None:
     with pytest.raises(PaymentProviderResultUnknown):
         await provider.create_payment(
             payment_id=uuid.UUID(int=1),
+            attempt_id=uuid.UUID(int=3),
             order_id=uuid.UUID(int=2),
             amount=100,
             currency="RUB",

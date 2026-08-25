@@ -15,10 +15,12 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
 from payments.domain.entities import (
+    PaymentAttemptStatus,
     PaymentStatus,
     ProviderOperationStatus,
     WebhookInboxStatus,
@@ -54,6 +56,7 @@ class PaymentModel(Base):
     provider_test: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     refund_external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     refund_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    current_attempt_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
@@ -108,6 +111,50 @@ class ProviderOperationModel(Base):
     claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error_code: Mapped[str | None] = mapped_column(String(64))
     response_payload: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class PaymentAttemptModel(Base):
+    """One provider checkout attempt for an order-level payment aggregate."""
+
+    __tablename__ = "payment_attempts"
+    __table_args__ = (
+        UniqueConstraint("payment_id", "attempt_number", name="uq_payment_attempts_number"),
+        Index(
+            "uq_payment_attempts_active",
+            "payment_id",
+            unique=True,
+            postgresql_where=text("status IN ('NEW','PREPARING','UNKNOWN','PENDING')"),
+            sqlite_where=text("status IN ('NEW','PREPARING','UNKNOWN','PENDING')"),
+        ),
+        CheckConstraint("amount > 0", name="ck_payment_attempts_amount_positive"),
+        CheckConstraint("attempt_number > 0", name="ck_payment_attempts_number_positive"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
+    payment_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[PaymentAttemptStatus] = mapped_column(
+        String(20),
+        nullable=False,
+        default=PaymentAttemptStatus.NEW,
+        server_default="NEW",
+    )
+    external_id: Mapped[str | None] = mapped_column(String(255), index=True)
+    external_status: Mapped[str | None] = mapped_column(String(64))
+    confirmation_url: Mapped[str | None] = mapped_column(String(2048))
+    cancellation_party: Mapped[str | None] = mapped_column(String(64))
+    cancellation_reason: Mapped[str | None] = mapped_column(String(255))
+    provider_test: Mapped[bool | None] = mapped_column(Boolean)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

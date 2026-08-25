@@ -64,12 +64,12 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 ## 6. Multiple payment attempts
 
-- [ ] Additive `payment_attempts` migration and repository.
-- [ ] At most one active attempt per order-level payment.
-- [ ] Concurrent checkout calls converge on one attempt and operation.
-- [ ] Expired/canceled attempt creates a new attempt and idempotence key.
-- [ ] Existing payment API remains compatible through the aggregate/read model.
-- [ ] HTTP 202 preparation response exposes stable attempt state and retry hint.
+- [x] Additive `payment_attempts` migration and repository.
+- [x] At most one active attempt per order-level payment.
+- [x] Concurrent checkout calls converge on one attempt and operation.
+- [x] Expired/canceled attempt creates a new attempt and idempotence key.
+- [x] Existing payment API remains compatible through the aggregate/read model.
+- [x] HTTP 202 preparation response exposes stable attempt state and retry hint.
 
 ## 7. Normalized refunds
 
@@ -124,3 +124,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 | 2026-08-25 | Provider resilience | Payments `29 passed`; strict mypy; scoped Ruff/format | Pass |
 | 2026-08-25 | Durable provider operations | Payments `31 passed`; strict mypy; scoped Ruff/format | Pass |
 | 2026-08-25 | Durable webhook inbox | Payments `33 passed`; strict mypy; scoped Ruff/format; gateway syntax not runnable because local Docker daemon is unavailable | Pass with noted local-tool limitation |
+| 2026-08-25 | Multiple payment attempts | Payments `36 passed`; strict mypy; scoped Ruff/format; concurrent file-backed SQLite test | Pass |

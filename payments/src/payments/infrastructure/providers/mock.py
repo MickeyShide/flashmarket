@@ -15,6 +15,7 @@ class MockPaymentProvider:
         self,
         *,
         payment_id: uuid.UUID,
+        attempt_id: uuid.UUID,
         order_id: uuid.UUID,
         amount: int,
         currency: str,
@@ -23,14 +24,18 @@ class MockPaymentProvider:
         idempotency_key: str,
     ) -> ProviderPayment:
         del description, return_url, idempotency_key
-        external_id = f"mock-{payment_id}"
+        external_id = f"mock-{attempt_id}"
         return ProviderPayment(
             id=external_id,
             status="pending",
             amount=amount,
             currency=currency,
             test=True,
-            metadata={"payment_id": str(payment_id), "order_id": str(order_id)},
+            metadata={
+                "payment_id": str(payment_id),
+                "attempt_id": str(attempt_id),
+                "order_id": str(order_id),
+            },
             confirmation_url=f"https://example.test/payments/{external_id}",
         )
 

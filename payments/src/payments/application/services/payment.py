@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from payments.application.contracts import PaymentProvider, ProviderPayment, ProviderRefund
 from payments.application.schemas import CreatePaymentRequest, YooKassaWebhook
 from payments.domain.entities import (
+    PaymentAttemptStatus,
     PaymentEventType,
     PaymentStatus,
     ProviderOperationStatus,
@@ -31,12 +32,14 @@ from payments.domain.exceptions import (
 )
 from payments.infrastructure.database import utc_now
 from payments.infrastructure.models import (
+    PaymentAttemptModel,
     PaymentModel,
     ProviderOperationModel,
     WebhookInboxModel,
 )
 from payments.infrastructure.repositories.payment import (
     OutboxRepository,
+    PaymentAttemptRepository,
     PaymentRepository,
     ProviderOperationRepository,
     WebhookInboxRepository,
@@ -52,6 +55,7 @@ class PaymentService:
         payment_repo: PaymentRepository,
         outbox_repo: OutboxRepository,
         operation_repo: ProviderOperationRepository | None = None,
+        attempt_repo: PaymentAttemptRepository | None = None,
         webhook_repo: WebhookInboxRepository | None = None,
         provider: PaymentProvider | None = None,
         *,
@@ -59,11 +63,13 @@ class PaymentService:
         return_url: str = "http://localhost/payment/return",
         test_mode_required: bool = True,
         webhook_max_attempts: int = 12,
+        attempt_ttl_seconds: int = 1800,
     ) -> None:
         self._session = session
         self._payment_repo = payment_repo
         self._outbox_repo = outbox_repo
         self._operation_repo = operation_repo or ProviderOperationRepository(session)
+        self._attempt_repo = attempt_repo or PaymentAttemptRepository(session)
         self._webhook_repo = webhook_repo or WebhookInboxRepository(session)
         if provider is None:
             from payments.infrastructure.providers.mock import MockPaymentProvider
@@ -74,6 +80,7 @@ class PaymentService:
         self._return_url = return_url
         self._test_mode_required = test_mode_required
         self._webhook_max_attempts = webhook_max_attempts
+        self._attempt_ttl_seconds = attempt_ttl_seconds
 
     async def create_payment(self, data: CreatePaymentRequest) -> PaymentModel:
         """Create a pending payment for administrative/mock workflows."""
@@ -117,6 +124,7 @@ class PaymentService:
         local: PaymentModel,
         remote: ProviderPayment,
         *,
+        attempt: PaymentAttemptModel | None = None,
         require_confirmation: bool = False,
     ) -> None:
         if self._test_mode_required and not remote.test:
@@ -127,7 +135,10 @@ class PaymentService:
             raise PaymentVerificationFailed("Payment metadata does not match")
         if remote.metadata.get("order_id") != str(local.order_id):
             raise PaymentVerificationFailed("Order metadata does not match")
-        if local.external_id is not None and local.external_id != remote.id:
+        if attempt is not None and remote.metadata.get("attempt_id") != str(attempt.id):
+            raise PaymentVerificationFailed("Payment attempt metadata does not match")
+        expected_external_id = attempt.external_id if attempt is not None else local.external_id
+        if expected_external_id is not None and expected_external_id != remote.id:
             raise PaymentVerificationFailed("Provider payment identifier does not match")
         if require_confirmation and not remote.confirmation_url:
             raise PaymentProviderRejected("Payment provider did not return a confirmation URL")
@@ -145,11 +156,44 @@ class PaymentService:
         if payment.provider != self._provider_name:
             raise InvalidPaymentState("Payment provider configuration changed")
         self._ensure_not_expired(payment)
-        if payment.confirmation_url:
+        attempt = await self._attempt_repo.get_active_for_update(payment.id)
+        if attempt is not None and self._attempt_expired(attempt):
+            attempt.status = PaymentAttemptStatus.EXPIRED
+            attempt = None
+        if attempt is None:
+            attempt_number = await self._attempt_repo.next_attempt_number(payment.id)
+            attempt_expires_at = utc_now() + timedelta(seconds=self._attempt_ttl_seconds)
+            if payment.expires_at is not None:
+                payment_deadline = payment.expires_at
+                if payment_deadline.tzinfo is None:
+                    payment_deadline = payment_deadline.replace(tzinfo=UTC)
+                attempt_expires_at = min(attempt_expires_at, payment_deadline)
+            attempt = PaymentAttemptModel(
+                payment_id=payment.id,
+                attempt_number=attempt_number,
+                amount=payment.amount,
+                currency=payment.currency,
+                provider=payment.provider,
+                status=PaymentAttemptStatus.NEW,
+                expires_at=attempt_expires_at,
+            )
+            try:
+                await self._attempt_repo.create(attempt)
+            except IntegrityError:
+                await self._session.rollback()
+                return await self.start_checkout(order_id)
+            payment.current_attempt_id = attempt.id
+            payment.external_id = None
+            payment.external_status = None
+            payment.confirmation_url = None
+            payment.cancellation_reason = None
+            payment.provider_test = None
+        elif attempt.confirmation_url:
+            self._sync_attempt_summary(payment, attempt)
             await self._session.commit()
             return payment
 
-        request_payload = self._checkout_request_payload(payment)
+        request_payload = self._checkout_request_payload(payment, attempt)
         canonical_payload = json.dumps(
             request_payload,
             sort_keys=True,
@@ -159,15 +203,15 @@ class PaymentService:
         request_hash = sha256(canonical_payload.encode()).hexdigest()
         operation = await self._operation_repo.get_by_type_and_entity(
             "create_payment",
-            payment.id,
+            attempt.id,
             for_update=True,
         )
         if operation is None:
             operation = ProviderOperationModel(
                 operation_type="create_payment",
-                entity_id=payment.id,
+                entity_id=attempt.id,
                 payment_id=payment.id,
-                idempotency_key=f"payment-{payment.id}",
+                idempotency_key=f"payment-{payment.id}-a{attempt.attempt_number}",
                 request_payload=canonical_payload,
                 request_hash=request_hash,
             )
@@ -177,29 +221,35 @@ class PaymentService:
             operation.last_error_code = "idempotency_payload_mismatch"
             await self._session.commit()
             raise PaymentVerificationFailed("Provider operation payload changed")
-        elif operation.status in {
-            ProviderOperationStatus.IN_FLIGHT,
-            ProviderOperationStatus.UNKNOWN,
-        }:
+        elif operation.status == ProviderOperationStatus.IN_FLIGHT:
+            await self._session.commit()
+            raise PaymentProviderResultUnknown
+        elif operation.status == ProviderOperationStatus.UNKNOWN:
             operation.status = ProviderOperationStatus.UNKNOWN
             operation.last_error_code = "previous_result_unknown"
+            attempt.status = PaymentAttemptStatus.UNKNOWN
             await self._session.commit()
             raise PaymentProviderResultUnknown
         elif operation.status == ProviderOperationStatus.QUARANTINED:
+            attempt.status = PaymentAttemptStatus.UNKNOWN
             await self._session.commit()
             raise PaymentProviderResultUnknown
         elif operation.status == ProviderOperationStatus.FAILED:
+            attempt.status = PaymentAttemptStatus.FAILED
             await self._session.commit()
             raise PaymentProviderRejected("Payment creation was rejected")
 
         now = utc_now()
+        attempt.status = PaymentAttemptStatus.PREPARING
         operation.status = ProviderOperationStatus.IN_FLIGHT
         operation.attempt_count += 1
         operation.first_requested_at = operation.first_requested_at or now
         operation.last_attempt_at = now
         operation.next_attempt_at = None
+        operation.claimed_until = now + timedelta(seconds=60)
         operation_id = operation.id
         payment_id = payment.id
+        attempt_id = attempt.id
         amount = payment.amount
         currency = payment.currency
         description = f"FlashMarket order {payment.order_id}"
@@ -210,6 +260,7 @@ class PaymentService:
         try:
             remote = await self._provider.create_payment(
                 payment_id=payment_id,
+                attempt_id=attempt_id,
                 order_id=order_id,
                 amount=amount,
                 currency=currency,
@@ -223,6 +274,7 @@ class PaymentService:
                 status=ProviderOperationStatus.UNKNOWN,
                 error_code=exc.code,
             )
+            await self._mark_attempt_status(attempt_id, PaymentAttemptStatus.UNKNOWN)
             raise PaymentProviderResultUnknown from exc
         except PaymentProviderRejected as exc:
             await self._finish_provider_operation(
@@ -230,31 +282,44 @@ class PaymentService:
                 status=ProviderOperationStatus.FAILED,
                 error_code=exc.code,
             )
+            await self._mark_attempt_status(attempt_id, PaymentAttemptStatus.FAILED)
             raise
 
         locked = await self._payment_repo.get_by_id_for_update(payment_id)
         if locked is None:
             raise PaymentNotFound
-        if locked.confirmation_url:
+        locked_attempt = await self._attempt_repo.get_by_id_for_update(attempt_id)
+        if locked_attempt is None:
+            raise PaymentVerificationFailed("Payment attempt was not found")
+        if locked_attempt.confirmation_url:
+            self._sync_attempt_summary(locked, locked_attempt)
             await self._session.commit()
             return locked
         locked_operation = await self._operation_repo.get_by_id_for_update(operation_id)
         if locked_operation is None:
             raise PaymentVerificationFailed("Provider operation was not found")
         try:
-            self._verify_provider_payment(locked, remote, require_confirmation=True)
+            self._verify_provider_payment(
+                locked,
+                remote,
+                attempt=locked_attempt,
+                require_confirmation=True,
+            )
         except PaymentVerificationFailed, PaymentProviderRejected:
             locked_operation.status = ProviderOperationStatus.QUARANTINED
             locked_operation.external_id = remote.id
             locked_operation.last_error_code = "provider_verification_failed"
             locked_operation.response_payload = self._provider_payment_snapshot(remote)
+            locked_attempt.status = PaymentAttemptStatus.FAILED
             await self._session.commit()
             raise
-        locked.external_id = remote.id
-        locked.external_status = remote.status
-        locked.confirmation_url = remote.confirmation_url
-        locked.provider_test = remote.test
-        locked.cancellation_reason = remote.cancellation_reason
+        locked_attempt.external_id = remote.id
+        locked_attempt.external_status = remote.status
+        locked_attempt.confirmation_url = remote.confirmation_url
+        locked_attempt.provider_test = remote.test
+        locked_attempt.cancellation_reason = remote.cancellation_reason
+        locked_attempt.status = PaymentAttemptStatus.PENDING
+        self._sync_attempt_summary(locked, locked_attempt)
         locked_operation.status = ProviderOperationStatus.SUCCEEDED
         locked_operation.external_id = remote.id
         locked_operation.last_error_code = None
@@ -265,19 +330,57 @@ class PaymentService:
         await self._session.refresh(locked)
         return locked
 
-    def _checkout_request_payload(self, payment: PaymentModel) -> dict[str, object]:
+    def _checkout_request_payload(
+        self,
+        payment: PaymentModel,
+        attempt: PaymentAttemptModel,
+    ) -> dict[str, object]:
         return_url = (
             f"{self._return_url}{'&' if '?' in self._return_url else '?'}"
             f"order_id={payment.order_id}"
         )
         return {
             "payment_id": str(payment.id),
+            "attempt_id": str(attempt.id),
             "order_id": str(payment.order_id),
             "amount": payment.amount,
             "currency": payment.currency,
             "description": f"FlashMarket order {payment.order_id}",
             "return_url": return_url,
         }
+
+    @staticmethod
+    def _attempt_expired(attempt: PaymentAttemptModel) -> bool:
+        if attempt.status == PaymentAttemptStatus.UNKNOWN or attempt.expires_at is None:
+            return False
+        expires_at = attempt.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        return utc_now() >= expires_at
+
+    @staticmethod
+    def _sync_attempt_summary(
+        payment: PaymentModel,
+        attempt: PaymentAttemptModel,
+    ) -> None:
+        payment.current_attempt_id = attempt.id
+        payment.external_id = attempt.external_id
+        payment.external_status = attempt.external_status
+        payment.confirmation_url = attempt.confirmation_url
+        payment.provider_test = attempt.provider_test
+        payment.cancellation_reason = attempt.cancellation_reason
+
+    async def _mark_attempt_status(
+        self,
+        attempt_id: uuid.UUID,
+        status: PaymentAttemptStatus,
+    ) -> None:
+        attempt = await self._attempt_repo.get_by_id_for_update(attempt_id)
+        if attempt is None:
+            await self._session.rollback()
+            return
+        attempt.status = status
+        await self._session.commit()
 
     @staticmethod
     def _provider_payment_snapshot(remote: ProviderPayment) -> str:
@@ -309,6 +412,8 @@ class PaymentService:
             return
         operation.status = status
         operation.last_error_code = error_code
+        operation.claim_token = None
+        operation.claimed_until = None
         await self._operation_repo.update(operation)
         await self._session.commit()
 
@@ -334,6 +439,7 @@ class PaymentService:
             await self._quarantine_operation(operation, "unsupported_recovery_operation")
             return
         payment_id = operation.payment_id
+        attempt_id = operation.entity_id
         external_id = operation.external_id
         first_requested_at = operation.first_requested_at or operation.created_at
         if first_requested_at.tzinfo is None:
@@ -347,6 +453,7 @@ class PaymentService:
             else:
                 remote = await self._find_created_payment(
                     payment_id,
+                    attempt_id=attempt_id,
                     first_requested_at=first_requested_at,
                 )
         except PaymentProviderUnavailable as exc:
@@ -396,6 +503,7 @@ class PaymentService:
         self,
         payment_id: uuid.UUID,
         *,
+        attempt_id: uuid.UUID,
         first_requested_at: datetime,
     ) -> ProviderPayment | None:
         requested_at = first_requested_at
@@ -412,6 +520,7 @@ class PaymentService:
                 candidate
                 for candidate in page.items
                 if candidate.metadata.get("payment_id") == str(payment_id)
+                and candidate.metadata.get("attempt_id") == str(attempt_id)
             )
             if len(matches) > 1 or page.next_cursor is None:
                 break
@@ -449,12 +558,19 @@ class PaymentService:
         operation: ProviderOperationModel,
         error_code: str,
     ) -> None:
+        entity_id = operation.entity_id
+        operation_type = operation.operation_type
         operation.status = ProviderOperationStatus.QUARANTINED
         operation.last_error_code = error_code
         operation.next_attempt_at = None
         operation.claim_token = None
         operation.claimed_until = None
         await self._session.commit()
+        if operation_type == "create_payment":
+            attempt = await self._attempt_repo.get_by_id_for_update(entity_id)
+            if attempt is not None and attempt.status == PaymentAttemptStatus.UNKNOWN:
+                attempt.status = PaymentAttemptStatus.EXPIRED
+            await self._session.commit()
 
     async def _emit_succeeded(self, payment: PaymentModel) -> None:
         payload = {
@@ -517,9 +633,7 @@ class PaymentService:
                 last_error = "unsupported_event"
         except (ValidationError, ValueError) as exc:
             status = WebhookInboxStatus.QUARANTINED
-            last_error = (
-                "malformed_notification" if isinstance(exc, ValidationError) else str(exc)
-            )
+            last_error = "malformed_notification" if isinstance(exc, ValidationError) else str(exc)
 
         semantic = {
             "provider": self._provider_name,
@@ -670,24 +784,62 @@ class PaymentService:
         payment = await self._payment_repo.get_by_id_for_update(local_id)
         if payment is None:
             raise PaymentVerificationFailed("Local payment was not found")
-        self._verify_provider_payment(payment, remote)
+        attempt: PaymentAttemptModel | None = None
+        attempt_id_raw = remote.metadata.get("attempt_id")
+        if attempt_id_raw:
+            try:
+                attempt_id = uuid.UUID(attempt_id_raw)
+            except ValueError as exc:
+                raise PaymentVerificationFailed("Payment attempt metadata is invalid") from exc
+            attempt = await self._attempt_repo.get_by_id_for_update(attempt_id)
+            if attempt is None or attempt.payment_id != payment.id:
+                raise PaymentVerificationFailed("Local payment attempt was not found")
+        elif payment.current_attempt_id is not None:
+            attempt = await self._attempt_repo.get_by_id_for_update(payment.current_attempt_id)
+        self._verify_provider_payment(payment, remote, attempt=attempt)
 
-        payment.external_id = remote.id
-        payment.external_status = remote.status
-        payment.provider_test = remote.test
-        payment.cancellation_reason = remote.cancellation_reason
+        if attempt is not None:
+            attempt.external_id = remote.id
+            attempt.external_status = remote.status
+            attempt.provider_test = remote.test
+            attempt.cancellation_reason = remote.cancellation_reason
+            if remote.confirmation_url:
+                attempt.confirmation_url = remote.confirmation_url
+        else:
+            payment.external_id = remote.id
+            payment.external_status = remote.status
+            payment.provider_test = remote.test
+            payment.cancellation_reason = remote.cancellation_reason
 
         if remote.status == "succeeded":
+            if attempt is not None:
+                attempt.status = PaymentAttemptStatus.SUCCEEDED
+                self._sync_attempt_summary(payment, attempt)
             if payment.status not in (PaymentStatus.SUCCESS, PaymentStatus.REFUNDED):
                 payment.status = PaymentStatus.SUCCESS
                 await self._emit_succeeded(payment)
         elif remote.status == "canceled":
-            if payment.status == PaymentStatus.PENDING:
+            if attempt is not None:
+                attempt.status = PaymentAttemptStatus.CANCELED
+                if payment.current_attempt_id == attempt.id:
+                    self._sync_attempt_summary(payment, attempt)
+            expires_at = payment.expires_at
+            if expires_at is not None and expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if (
+                payment.status == PaymentStatus.PENDING
+                and expires_at is not None
+                and utc_now() >= expires_at
+            ):
                 payment.status = PaymentStatus.FAILED
                 await self._emit_failed(
                     payment,
                     remote.cancellation_reason or "provider_cancelled",
                 )
+        elif attempt is not None:
+            attempt.status = PaymentAttemptStatus.PENDING
+            if payment.current_attempt_id == attempt.id:
+                self._sync_attempt_summary(payment, attempt)
 
         await self._payment_repo.update(payment)
         await self._session.commit()

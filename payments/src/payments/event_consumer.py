@@ -205,6 +205,7 @@ async def run_reconciliation_loop() -> None:
                     return_url=(settings.yookassa_return_url or "http://localhost/payment/return"),
                     test_mode_required=settings.yookassa_test_mode_required,
                     webhook_max_attempts=settings.webhook_max_attempts,
+                    attempt_ttl_seconds=settings.payment_attempt_ttl_seconds,
                 )
                 operations_processed = await service.reconcile_unknown_operations(
                     limit=settings.reconciliation_batch_size

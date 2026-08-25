@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import replace
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
 from jwt_verifier.testing import TestKeyStore as JWTTestKeyStore
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from payments.api.dependencies import get_payment_provider
 from payments.application.contracts import ProviderPayment, ProviderPaymentPage, ProviderRefund
@@ -18,9 +24,10 @@ from payments.application.services.payment import PaymentService
 from payments.domain.entities import PaymentStatus, ProviderOperationStatus
 from payments.domain.exceptions import PaymentProviderResultUnknown
 from payments.event_consumer import handle_payment_requested
-from payments.infrastructure.database import utc_now
+from payments.infrastructure.database import Base, utc_now
 from payments.infrastructure.models import (
     OutboxEventModel,
+    PaymentAttemptModel,
     ProviderOperationModel,
     WebhookInboxModel,
 )
@@ -41,6 +48,7 @@ class FakeProvider:
         self,
         *,
         payment_id: uuid.UUID,
+        attempt_id: uuid.UUID,
         order_id: uuid.UUID,
         amount: int,
         currency: str,
@@ -50,14 +58,18 @@ class FakeProvider:
     ) -> ProviderPayment:
         del description, idempotency_key
         self.create_calls += 1
-        external_id = f"yk-{payment_id}"
+        external_id = f"yk-{attempt_id}"
         payment = ProviderPayment(
             id=external_id,
             status="pending",
             amount=amount,
             currency=currency,
             test=True,
-            metadata={"payment_id": str(payment_id), "order_id": str(order_id)},
+            metadata={
+                "payment_id": str(payment_id),
+                "attempt_id": str(attempt_id),
+                "order_id": str(order_id),
+            },
             confirmation_url=f"https://yoomoney.test/confirm/{external_id}?back={return_url}",
         )
         self.payments[external_id] = payment
@@ -190,6 +202,113 @@ async def test_checkout_is_idempotent_and_webhook_is_verified(
             select(OutboxEventModel).where(OutboxEventModel.event_type == "PaymentSucceeded")
         )
         assert len(events.all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_checkout_converges_on_one_active_attempt(
+    tmp_path: Path,
+) -> None:
+    engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'payments.db').as_posix()}")
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    provider = FakeProvider()
+    order_id, _ = await _authoritative_payment(session_factory)
+
+    async def checkout() -> uuid.UUID | None:
+        async with session_factory() as session:
+            service = PaymentService(
+                session=session,
+                payment_repo=PaymentRepository(session),
+                outbox_repo=OutboxRepository(session),
+                provider=provider,
+                provider_name="mock",
+            )
+            try:
+                payment = await service.start_checkout(order_id)
+            except PaymentProviderResultUnknown:
+                payment = await service.get_payment_by_order_id(order_id)
+            return payment.current_attempt_id
+
+    first_attempt_id, second_attempt_id = await asyncio.gather(checkout(), checkout())
+    assert first_attempt_id == second_attempt_id
+    assert provider.create_calls == 1
+    async with session_factory() as session:
+        attempts = (await session.scalars(select(PaymentAttemptModel))).all()
+        operations = (await session.scalars(select(ProviderOperationModel))).all()
+        assert len(attempts) == len(operations) == 1
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_expired_attempt_creates_a_new_attempt_for_same_order(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = FakeProvider()
+    app.dependency_overrides[get_payment_provider] = lambda: provider
+    order_id, _ = await _authoritative_payment(session_factory)
+    first = await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+    first_attempt_id = first.json()["attempt_id"]
+
+    async with session_factory() as session, session.begin():
+        attempt = await session.get(PaymentAttemptModel, uuid.UUID(first_attempt_id))
+        assert attempt is not None
+        attempt.expires_at = utc_now() - timedelta(seconds=1)
+
+    second = await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+    assert second.status_code == 200
+    assert second.json()["attempt_id"] != first_attempt_id
+    assert provider.create_calls == 2
+    async with session_factory() as session:
+        attempts = (
+            await session.scalars(
+                select(PaymentAttemptModel).order_by(PaymentAttemptModel.attempt_number)
+            )
+        ).all()
+        assert [attempt.status for attempt in attempts] == ["EXPIRED", "PENDING"]
+
+
+@pytest.mark.asyncio
+async def test_canceled_attempt_can_be_retried_without_new_order(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = FakeProvider()
+    app.dependency_overrides[get_payment_provider] = lambda: provider
+    order_id, _ = await _authoritative_payment(session_factory)
+    first = await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+    first_attempt_id = first.json()["attempt_id"]
+    external_id = next(iter(provider.payments))
+    provider.payments[external_id] = replace(
+        provider.payments[external_id],
+        status="canceled",
+        cancellation_reason="payment_method_restricted",
+    )
+    await client.post(
+        "/api/v1/payments/webhooks/yookassa",
+        json={
+            "type": "notification",
+            "event": "payment.canceled",
+            "object": {"id": external_id, "status": "canceled"},
+        },
+    )
+    assert await _process_webhooks(session_factory, provider) == 1
+
+    second = await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+    assert second.status_code == 200
+    assert second.json()["attempt_id"] != first_attempt_id
+    assert provider.create_calls == 2
+    async with session_factory() as session:
+        payment = await PaymentRepository(session).get_by_order_id(order_id)
+        attempts = (
+            await session.scalars(
+                select(PaymentAttemptModel).order_by(PaymentAttemptModel.attempt_number)
+            )
+        ).all()
+        assert payment is not None
+        assert payment.status == PaymentStatus.PENDING
+        assert [attempt.status for attempt in attempts] == ["CANCELED", "PENDING"]
 
 
 @pytest.mark.asyncio

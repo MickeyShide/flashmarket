@@ -43,3 +43,16 @@ class WebhookInboxStatus(StrEnum):
     RETRY = "RETRY"
     PROCESSED = "PROCESSED"
     QUARANTINED = "QUARANTINED"
+
+
+class PaymentAttemptStatus(StrEnum):
+    """Lifecycle of one concrete attempt to pay an order."""
+
+    NEW = "NEW"
+    PREPARING = "PREPARING"
+    UNKNOWN = "UNKNOWN"
+    PENDING = "PENDING"
+    SUCCEEDED = "SUCCEEDED"
+    CANCELED = "CANCELED"
+    EXPIRED = "EXPIRED"
+    FAILED = "FAILED"

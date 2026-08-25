@@ -44,6 +44,7 @@ class PaymentResponse(BaseModel):
     external_status: str | None = None
     cancellation_reason: str | None = None
     provider_test: bool | None = None
+    current_attempt_id: uuid.UUID | None = None
     expires_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -62,6 +63,7 @@ class CheckoutResponse(BaseModel):
     """Browser-safe data needed to continue a hosted payment."""
 
     payment_id: uuid.UUID
+    attempt_id: uuid.UUID | None = None
     status: PaymentStatus
     confirmation_url: str | None = None
     preparation_status: str = "ready"

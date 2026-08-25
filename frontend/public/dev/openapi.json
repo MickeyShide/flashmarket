@@ -4270,6 +4270,18 @@
       "PaymentsCheckoutResponse": {
         "description": "Browser-safe data needed to continue a hosted payment.",
         "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
           "confirmation_url": {
             "anyOf": [
               {
@@ -4438,6 +4450,18 @@
           "currency": {
             "title": "Currency",
             "type": "string"
+          },
+          "current_attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Attempt Id"
           },
           "expires_at": {
             "anyOf": [

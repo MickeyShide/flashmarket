@@ -69,8 +69,10 @@ async def start_checkout(
     try:
         payment = await service.start_checkout(order_id)
     except PaymentProviderResultUnknown:
+        payment = await service.get_payment_by_order_id(order_id)
         response = CheckoutResponse(
             payment_id=payment.id,
+            attempt_id=payment.current_attempt_id,
             status=payment.status,
             preparation_status="pending",
             retry_after_seconds=2,
@@ -87,6 +89,7 @@ async def start_checkout(
         )
     return CheckoutResponse(
         payment_id=payment.id,
+        attempt_id=payment.current_attempt_id,
         status=payment.status,
         confirmation_url=payment.confirmation_url,
     )

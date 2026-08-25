@@ -49,6 +49,7 @@ class PaymentProvider(Protocol):
         self,
         *,
         payment_id: uuid.UUID,
+        attempt_id: uuid.UUID,
         order_id: uuid.UUID,
         amount: int,
         currency: str,

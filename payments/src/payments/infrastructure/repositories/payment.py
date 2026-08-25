@@ -7,13 +7,18 @@ from collections.abc import Sequence
 from datetime import timedelta
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from payments.domain.entities import ProviderOperationStatus, WebhookInboxStatus
+from payments.domain.entities import (
+    PaymentAttemptStatus,
+    ProviderOperationStatus,
+    WebhookInboxStatus,
+)
 from payments.infrastructure.database import utc_now
 from payments.infrastructure.models import (
     OutboxEventModel,
+    PaymentAttemptModel,
     PaymentModel,
     ProviderOperationModel,
     WebhookInboxModel,
@@ -112,6 +117,64 @@ class PaymentRepository:
         return payment
 
 
+class PaymentAttemptRepository:
+    """Persistence for concrete provider checkout attempts."""
+
+    ACTIVE_STATUSES = (
+        PaymentAttemptStatus.NEW,
+        PaymentAttemptStatus.PREPARING,
+        PaymentAttemptStatus.UNKNOWN,
+        PaymentAttemptStatus.PENDING,
+    )
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(self, attempt: PaymentAttemptModel) -> PaymentAttemptModel:
+        self._session.add(attempt)
+        await self._session.flush()
+        return attempt
+
+    async def get_by_id_for_update(self, attempt_id: UUID) -> PaymentAttemptModel | None:
+        result = await self._session.scalars(
+            select(PaymentAttemptModel)
+            .where(PaymentAttemptModel.id == attempt_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.first()
+
+    async def get_active_for_update(self, payment_id: UUID) -> PaymentAttemptModel | None:
+        result = await self._session.scalars(
+            select(PaymentAttemptModel)
+            .where(
+                PaymentAttemptModel.payment_id == payment_id,
+                PaymentAttemptModel.status.in_(self.ACTIVE_STATUSES),
+            )
+            .order_by(PaymentAttemptModel.attempt_number.desc())
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.first()
+
+    async def get_by_external_id_for_update(self, external_id: str) -> PaymentAttemptModel | None:
+        result = await self._session.scalars(
+            select(PaymentAttemptModel)
+            .where(PaymentAttemptModel.external_id == external_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.first()
+
+    async def next_attempt_number(self, payment_id: UUID) -> int:
+        current = await self._session.scalar(
+            select(func.max(PaymentAttemptModel.attempt_number)).where(
+                PaymentAttemptModel.payment_id == payment_id
+            )
+        )
+        return int(current or 0) + 1
+
+
 class ProviderOperationRepository:
     """Persistence for idempotent provider write operations."""
 
@@ -159,10 +222,16 @@ class ProviderOperationRepository:
         result = await self._session.scalars(
             select(ProviderOperationModel)
             .where(
-                ProviderOperationModel.status == ProviderOperationStatus.UNKNOWN,
-                (
-                    (ProviderOperationModel.next_attempt_at.is_(None))
-                    | (ProviderOperationModel.next_attempt_at <= now)
+                or_(
+                    ProviderOperationModel.status == ProviderOperationStatus.UNKNOWN,
+                    and_(
+                        ProviderOperationModel.status == ProviderOperationStatus.IN_FLIGHT,
+                        ProviderOperationModel.claimed_until <= now,
+                    ),
+                ),
+                or_(
+                    ProviderOperationModel.next_attempt_at.is_(None),
+                    ProviderOperationModel.next_attempt_at <= now,
                 ),
                 (
                     (ProviderOperationModel.claimed_until.is_(None))
