@@ -43,7 +43,7 @@ def verify_password(password: str, password_hash: str) -> bool:
     """Verify a password against its Argon2 hash."""
     try:
         return password_hasher.verify(password_hash, password)
-    except InvalidHashError, VerificationError, VerifyMismatchError:
+    except (InvalidHashError, VerificationError, VerifyMismatchError):
         return False
 
 

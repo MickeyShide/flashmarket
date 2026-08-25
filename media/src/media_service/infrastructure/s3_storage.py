@@ -134,7 +134,7 @@ class S3ObjectStorage(ObjectStorage):
             result = await asyncio.to_thread(read)
             S3_OPERATIONS.labels("get_object", "success").inc()
             return result
-        except StorageObjectNotFound, StorageUnavailable:
+        except (StorageObjectNotFound, StorageUnavailable):
             S3_OPERATIONS.labels("get_object", "error").inc()
             raise
         finally:

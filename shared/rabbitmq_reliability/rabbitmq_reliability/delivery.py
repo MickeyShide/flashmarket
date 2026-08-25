@@ -47,7 +47,7 @@ def retry_attempt(message: AbstractIncomingMessage) -> int:
         return 0
     try:
         return max(0, min(3, int(raw)))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0
 
 

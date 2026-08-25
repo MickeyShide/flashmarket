@@ -35,7 +35,7 @@ def heartbeat_is_fresh(path: str | Path, max_age_seconds: float) -> bool:
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
         age = time.time() - float(payload["timestamp"])
-    except OSError, KeyError, TypeError, ValueError, json.JSONDecodeError:
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
         return False
     return -5 <= age <= max_age_seconds
 

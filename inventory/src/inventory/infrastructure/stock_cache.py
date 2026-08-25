@@ -64,7 +64,7 @@ class RedisStockCache:
             stock = StockResponse.model_validate_json(cached["payload"])
             if stock.product_id != product_id or stock.variant_id != variant_id:
                 raise ValueError("stock cache key does not match payload")
-        except KeyError, TypeError, ValueError, ValidationError:
+        except (KeyError, TypeError, ValueError, ValidationError):
             STOCK_CACHE_OPERATIONS.labels(operation="read", result="error").inc()
             _logger.warning(
                 "Malformed stock cache value ignored",

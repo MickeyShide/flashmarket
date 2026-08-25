@@ -1095,7 +1095,7 @@ class PaymentService:
                 await self.reconcile_payment(remote)
             except PaymentProviderUnavailable as exc:
                 await self._reschedule_attempt(attempt_id, claim_token, exc.code)
-            except PaymentProviderRejected, PaymentVerificationFailed:
+            except (PaymentProviderRejected, PaymentVerificationFailed):
                 await self._quarantine_attempt(attempt_id, claim_token)
         return len(snapshots)
 

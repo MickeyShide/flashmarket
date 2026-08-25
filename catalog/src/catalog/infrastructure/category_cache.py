@@ -45,7 +45,7 @@ class RedisCategoryTreeCache:
 
         try:
             tree = _category_tree_adapter.validate_json(cached)
-        except ValidationError, ValueError, TypeError:
+        except (ValidationError, ValueError, TypeError):
             CATEGORY_CACHE_OPERATIONS.labels(operation="read", result="error").inc()
             _logger.warning(
                 "Malformed category cache value ignored",
