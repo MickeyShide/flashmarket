@@ -42,6 +42,14 @@ class ProviderPaymentPage:
     next_cursor: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderRefundPage:
+    """Bounded page returned by the provider refund collection."""
+
+    items: tuple[ProviderRefund, ...]
+    next_cursor: str | None = None
+
+
 class PaymentProvider(Protocol):
     """Operations needed by the payment lifecycle."""
 
@@ -73,8 +81,19 @@ class PaymentProvider(Protocol):
         self,
         *,
         payment: ProviderPayment,
+        amount: int,
         idempotency_key: str,
         reason: str,
     ) -> ProviderRefund: ...
 
     async def get_refund(self, external_id: str) -> ProviderRefund: ...
+
+    async def list_refunds(
+        self,
+        *,
+        created_gte: datetime,
+        created_lte: datetime,
+        payment_id: str,
+        limit: int,
+        cursor: str | None = None,
+    ) -> ProviderRefundPage: ...

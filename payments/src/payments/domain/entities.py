@@ -56,3 +56,15 @@ class PaymentAttemptStatus(StrEnum):
     CANCELED = "CANCELED"
     EXPIRED = "EXPIRED"
     FAILED = "FAILED"
+
+
+class RefundStatus(StrEnum):
+    """Lifecycle of one provider refund request."""
+
+    NEW = "NEW"
+    PREPARING = "PREPARING"
+    UNKNOWN = "UNKNOWN"
+    PENDING = "PENDING"
+    SUCCEEDED = "SUCCEEDED"
+    CANCELED = "CANCELED"
+    QUARANTINED = "QUARANTINED"

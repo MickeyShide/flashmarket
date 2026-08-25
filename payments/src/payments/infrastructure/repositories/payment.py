@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from payments.domain.entities import (
     PaymentAttemptStatus,
     ProviderOperationStatus,
+    RefundStatus,
     WebhookInboxStatus,
 )
 from payments.infrastructure.database import utc_now
@@ -21,6 +22,7 @@ from payments.infrastructure.models import (
     PaymentAttemptModel,
     PaymentModel,
     ProviderOperationModel,
+    RefundModel,
     WebhookInboxModel,
 )
 
@@ -175,6 +177,126 @@ class PaymentAttemptRepository:
         return int(current or 0) + 1
 
 
+class RefundRepository:
+    """Persistence and balance queries for normalized refunds."""
+
+    RESERVED_STATUSES = (
+        RefundStatus.NEW,
+        RefundStatus.PREPARING,
+        RefundStatus.UNKNOWN,
+        RefundStatus.PENDING,
+        RefundStatus.SUCCEEDED,
+    )
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(self, refund: RefundModel) -> RefundModel:
+        self._session.add(refund)
+        await self._session.flush()
+        return refund
+
+    async def get_by_id(self, refund_id: UUID) -> RefundModel | None:
+        return await self._session.get(RefundModel, refund_id)
+
+    async def get_by_request_key(self, request_key: str) -> RefundModel | None:
+        result = await self._session.scalars(
+            select(RefundModel).where(RefundModel.request_key == request_key)
+        )
+        return result.first()
+
+    async def get_latest_by_reason(
+        self,
+        payment_id: UUID,
+        reason: str,
+    ) -> RefundModel | None:
+        result = await self._session.scalars(
+            select(RefundModel)
+            .where(RefundModel.payment_id == payment_id, RefundModel.reason == reason)
+            .order_by(RefundModel.created_at.desc())
+        )
+        return result.first()
+
+    async def count_by_reason(self, payment_id: UUID, reason: str) -> int:
+        value = await self._session.scalar(
+            select(func.count(RefundModel.id)).where(
+                RefundModel.payment_id == payment_id,
+                RefundModel.reason == reason,
+            )
+        )
+        return int(value or 0)
+
+    async def get_by_id_for_update(self, refund_id: UUID) -> RefundModel | None:
+        result = await self._session.scalars(
+            select(RefundModel)
+            .where(RefundModel.id == refund_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.first()
+
+    async def get_by_external_id_for_update(self, external_id: str) -> RefundModel | None:
+        result = await self._session.scalars(
+            select(RefundModel)
+            .where(RefundModel.external_id == external_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.first()
+
+    async def reserved_amount(self, payment_id: UUID) -> int:
+        value = await self._session.scalar(
+            select(func.coalesce(func.sum(RefundModel.amount), 0)).where(
+                RefundModel.payment_id == payment_id,
+                RefundModel.status.in_(self.RESERVED_STATUSES),
+            )
+        )
+        return int(value or 0)
+
+    async def succeeded_amount(self, payment_id: UUID) -> int:
+        value = await self._session.scalar(
+            select(func.coalesce(func.sum(RefundModel.amount), 0)).where(
+                RefundModel.payment_id == payment_id,
+                RefundModel.status == RefundStatus.SUCCEEDED,
+            )
+        )
+        return int(value or 0)
+
+    async def claim_due(
+        self,
+        *,
+        limit: int,
+        lease_seconds: int = 60,
+    ) -> tuple[UUID, Sequence[RefundModel]]:
+        now = utc_now()
+        token = uuid.uuid4()
+        result = await self._session.scalars(
+            select(RefundModel)
+            .where(
+                or_(
+                    RefundModel.status.in_(
+                        [RefundStatus.NEW, RefundStatus.UNKNOWN, RefundStatus.PENDING]
+                    ),
+                    and_(
+                        RefundModel.status == RefundStatus.CANCELED,
+                        RefundModel.cancellation_reason == "rejected_by_timeout",
+                    ),
+                ),
+                or_(RefundModel.next_attempt_at.is_(None), RefundModel.next_attempt_at <= now),
+                or_(RefundModel.claimed_until.is_(None), RefundModel.claimed_until <= now),
+            )
+            .order_by(RefundModel.created_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        refunds = result.all()
+        for refund in refunds:
+            refund.claim_token = token
+            refund.claimed_until = now + timedelta(seconds=lease_seconds)
+        await self._session.flush()
+        return token, refunds
+
+
 class ProviderOperationRepository:
     """Persistence for idempotent provider write operations."""
 
@@ -222,6 +344,7 @@ class ProviderOperationRepository:
         result = await self._session.scalars(
             select(ProviderOperationModel)
             .where(
+                ProviderOperationModel.operation_type == "create_payment",
                 or_(
                     ProviderOperationModel.status == ProviderOperationStatus.UNKNOWN,
                     and_(

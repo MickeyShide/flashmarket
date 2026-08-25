@@ -18,6 +18,7 @@ from payments.application.contracts import (
     ProviderPayment,
     ProviderPaymentPage,
     ProviderRefund,
+    ProviderRefundPage,
 )
 from payments.domain.exceptions import (
     PaymentProviderAuthenticationFailed,
@@ -386,6 +387,7 @@ class YooKassaPaymentProvider:
         self,
         *,
         payment: ProviderPayment,
+        amount: int,
         idempotency_key: str,
         reason: str,
     ) -> ProviderRefund:
@@ -397,7 +399,7 @@ class YooKassaPaymentProvider:
             json_body={
                 "payment_id": payment.id,
                 "amount": {
-                    "value": kopecks_to_value(payment.amount),
+                    "value": kopecks_to_value(amount),
                     "currency": payment.currency,
                 },
             },
@@ -406,3 +408,32 @@ class YooKassaPaymentProvider:
 
     async def get_refund(self, external_id: str) -> ProviderRefund:
         return self._refund(await self._request("GET", f"refunds/{external_id}"))
+
+    async def list_refunds(
+        self,
+        *,
+        created_gte: datetime,
+        created_lte: datetime,
+        payment_id: str,
+        limit: int,
+        cursor: str | None = None,
+    ) -> ProviderRefundPage:
+        params: dict[str, str | int] = {
+            "created_at.gte": created_gte.isoformat(),
+            "created_at.lte": created_lte.isoformat(),
+            "payment_id": payment_id,
+            "limit": min(max(limit, 1), 100),
+        }
+        if cursor is not None:
+            params["cursor"] = cursor
+        payload = await self._request("GET", "refunds", params=params)
+        raw_items = payload.get("items")
+        if not isinstance(raw_items, list):
+            raise PaymentProviderMalformedResponse
+        items = tuple(self._refund(item) for item in raw_items if isinstance(item, dict))
+        if len(items) != len(raw_items):
+            raise PaymentProviderMalformedResponse
+        next_cursor = payload.get("next_cursor")
+        if next_cursor is not None and not isinstance(next_cursor, str):
+            raise PaymentProviderMalformedResponse
+        return ProviderRefundPage(items=items, next_cursor=next_cursor)

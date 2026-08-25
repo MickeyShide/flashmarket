@@ -19,16 +19,22 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from payments.api.dependencies import get_payment_provider
-from payments.application.contracts import ProviderPayment, ProviderPaymentPage, ProviderRefund
+from payments.application.contracts import (
+    ProviderPayment,
+    ProviderPaymentPage,
+    ProviderRefund,
+    ProviderRefundPage,
+)
 from payments.application.services.payment import PaymentService
-from payments.domain.entities import PaymentStatus, ProviderOperationStatus
-from payments.domain.exceptions import PaymentProviderResultUnknown
+from payments.domain.entities import PaymentStatus, ProviderOperationStatus, RefundStatus
+from payments.domain.exceptions import InvalidPaymentState, PaymentProviderResultUnknown
 from payments.event_consumer import handle_payment_requested
 from payments.infrastructure.database import Base, utc_now
 from payments.infrastructure.models import (
     OutboxEventModel,
     PaymentAttemptModel,
     ProviderOperationModel,
+    RefundModel,
     WebhookInboxModel,
 )
 from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
@@ -43,6 +49,8 @@ class FakeProvider:
         self.refunds: dict[str, ProviderRefund] = {}
         self.create_calls = 0
         self.refund_calls = 0
+        self.refund_cancellation_reason: str | None = None
+        self.refund_unknown_after_create = False
 
     async def create_payment(
         self,
@@ -93,23 +101,40 @@ class FakeProvider:
         self,
         *,
         payment: ProviderPayment,
+        amount: int,
         idempotency_key: str,
         reason: str,
     ) -> ProviderRefund:
-        del idempotency_key, reason
+        del reason
         self.refund_calls += 1
         refund = ProviderRefund(
-            id=f"refund-{payment.id}",
+            id=f"refund-{idempotency_key}",
             payment_id=payment.id,
-            status="succeeded",
-            amount=payment.amount,
+            status="canceled" if self.refund_cancellation_reason else "succeeded",
+            amount=amount,
             currency=payment.currency,
+            cancellation_reason=self.refund_cancellation_reason,
         )
         self.refunds[refund.id] = refund
+        if self.refund_unknown_after_create:
+            raise PaymentProviderResultUnknown
         return refund
 
     async def get_refund(self, external_id: str) -> ProviderRefund:
         return self.refunds[external_id]
+
+    async def list_refunds(
+        self,
+        *,
+        created_gte: datetime,
+        created_lte: datetime,
+        payment_id: str,
+        limit: int,
+        cursor: str | None = None,
+    ) -> ProviderRefundPage:
+        del created_gte, created_lte, cursor
+        items = tuple(refund for refund in self.refunds.values() if refund.payment_id == payment_id)
+        return ProviderRefundPage(items=items[:limit])
 
 
 class UnknownAfterCreateProvider(FakeProvider):
@@ -160,6 +185,31 @@ async def _process_webhooks(
             test_mode_required=True,
         )
         return await service.process_webhook_inbox(limit=50)
+
+
+async def _mark_payment_succeeded(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    provider: FakeProvider,
+) -> uuid.UUID:
+    app.dependency_overrides[get_payment_provider] = lambda: provider
+    order_id, _ = await _authoritative_payment(session_factory)
+    await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+    external_id = next(reversed(provider.payments))
+    provider.payments[external_id] = replace(provider.payments[external_id], status="succeeded")
+    await client.post(
+        "/api/v1/payments/webhooks/yookassa",
+        json={
+            "type": "notification",
+            "event": "payment.succeeded",
+            "object": {"id": external_id, "status": "succeeded"},
+        },
+    )
+    await _process_webhooks(session_factory, provider)
+    async with session_factory() as session:
+        payment = await PaymentRepository(session).get_by_order_id(order_id)
+        assert payment is not None
+        return payment.id
 
 
 @pytest.mark.asyncio
@@ -529,6 +579,149 @@ async def test_full_refund_changes_state_only_after_provider_success(
         assert refunded.status == PaymentStatus.REFUNDED
         assert refunded.refund_status == "succeeded"
         assert provider.refund_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_partial_refunds_never_exceed_captured_amount(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = FakeProvider()
+    payment_id = await _mark_payment_succeeded(client, session_factory, provider)
+
+    async with session_factory() as session:
+        service = PaymentService(
+            session=session,
+            payment_repo=PaymentRepository(session),
+            outbox_repo=OutboxRepository(session),
+            provider=provider,
+            provider_name="yookassa",
+        )
+        partially_refunded = await service.refund_payment(
+            payment_id,
+            amount=4_000,
+            request_id="partial-1",
+        )
+        assert partially_refunded.status == PaymentStatus.SUCCESS
+        with pytest.raises(InvalidPaymentState):
+            await service.refund_payment(
+                payment_id,
+                amount=10_000,
+                request_id="too-much",
+            )
+        fully_refunded = await service.refund_payment(
+            payment_id,
+            amount=8_990,
+            request_id="partial-2",
+        )
+        assert fully_refunded.status == PaymentStatus.REFUNDED
+
+    async with session_factory() as session:
+        refunds = (await session.scalars(select(RefundModel))).all()
+        assert len(refunds) == 2
+        assert sum(refund.amount for refund in refunds) == 12_990
+        assert all(refund.status == RefundStatus.SUCCEEDED for refund in refunds)
+
+
+@pytest.mark.asyncio
+async def test_unknown_refund_is_recovered_by_bounded_list_without_second_post(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = FakeProvider()
+    payment_id = await _mark_payment_succeeded(client, session_factory, provider)
+    provider.refund_unknown_after_create = True
+    async with session_factory() as session:
+        service = PaymentService(
+            session=session,
+            payment_repo=PaymentRepository(session),
+            outbox_repo=OutboxRepository(session),
+            provider=provider,
+            provider_name="yookassa",
+        )
+        with pytest.raises(PaymentProviderResultUnknown):
+            await service.refund_payment(payment_id, request_id="uncertain-refund")
+    provider.refund_unknown_after_create = False
+    async with session_factory() as session:
+        service = PaymentService(
+            session=session,
+            payment_repo=PaymentRepository(session),
+            outbox_repo=OutboxRepository(session),
+            provider=provider,
+            provider_name="yookassa",
+        )
+        assert await service.reconcile_refunds(limit=10) == 1
+    async with session_factory() as session:
+        refund = await session.scalar(select(RefundModel))
+        payment = await PaymentRepository(session).get_by_id(payment_id)
+        assert refund is not None
+        assert refund.status == RefundStatus.SUCCEEDED
+        assert payment is not None
+        assert payment.status == PaymentStatus.REFUNDED
+        assert provider.refund_calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reason", "expected_status"),
+    [
+        ("rejected_by_timeout", RefundStatus.CANCELED),
+        ("insufficient_funds", RefundStatus.QUARANTINED),
+        ("rejected_by_payee", RefundStatus.QUARANTINED),
+        ("general_decline", RefundStatus.QUARANTINED),
+    ],
+)
+async def test_refund_cancellation_policy_stops_blind_retries(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    reason: str,
+    expected_status: RefundStatus,
+) -> None:
+    provider = FakeProvider()
+    payment_id = await _mark_payment_succeeded(client, session_factory, provider)
+    provider.refund_cancellation_reason = reason
+    async with session_factory() as session:
+        service = PaymentService(
+            session=session,
+            payment_repo=PaymentRepository(session),
+            outbox_repo=OutboxRepository(session),
+            provider=provider,
+            provider_name="yookassa",
+        )
+        payment = await service.refund_payment(payment_id, request_id=f"policy-{reason}")
+        assert payment.status == PaymentStatus.SUCCESS
+    async with session_factory() as session:
+        refund = await session.scalar(select(RefundModel))
+        assert refund is not None
+        assert refund.status == expected_status
+        assert (refund.next_attempt_at is not None) == (reason == "rejected_by_timeout")
+        assert provider.refund_calls == 1
+
+    if reason == "rejected_by_timeout":
+        async with session_factory() as session, session.begin():
+            refund = await session.scalar(select(RefundModel))
+            assert refund is not None
+            refund.next_attempt_at = utc_now() - timedelta(seconds=1)
+        provider.refund_cancellation_reason = None
+        async with session_factory() as session:
+            service = PaymentService(
+                session=session,
+                payment_repo=PaymentRepository(session),
+                outbox_repo=OutboxRepository(session),
+                provider=provider,
+                provider_name="yookassa",
+            )
+            assert await service.reconcile_refunds(limit=10) == 1
+        async with session_factory() as session:
+            refunds = (
+                await session.scalars(select(RefundModel).order_by(RefundModel.created_at))
+            ).all()
+            payment = await PaymentRepository(session).get_by_id(payment_id)
+            assert len(refunds) == 2
+            assert refunds[1].status == RefundStatus.SUCCEEDED
+            assert payment is not None
+            assert payment.status == PaymentStatus.REFUNDED
+            assert provider.refund_calls == 2
 
 
 @pytest.mark.asyncio

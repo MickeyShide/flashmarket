@@ -125,7 +125,7 @@ async def test_pay_008_consumer_handle_payment_requested(
 
 @pytest.mark.asyncio
 async def test_pay_010_outbox_worker_retries(
-    session_factory: async_sessionmaker[AsyncSession]
+    session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """PAY-010: Outbox worker retries failed payment events."""
     async with session_factory() as session, session.begin():

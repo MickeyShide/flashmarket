@@ -56,10 +56,10 @@ Live payments must remain disabled. An item is marked complete only after its re
 ## 5. Reconciliation
 
 - [~] Worker claims bounded batches with `FOR UPDATE SKIP LOCKED` (provider operations and webhooks done; attempts/refunds pending).
-- [~] No database transaction remains open during provider I/O (checkout/recovery done; refunds/webhooks pending).
+- [x] No database transaction remains open during provider I/O.
 - [x] Reconcile unknown create operations.
 - [ ] Reconcile active/stale payment attempts.
-- [ ] Reconcile pending refunds, including canceled refunds without a webhook.
+- [x] Reconcile pending refunds, including canceled refunds without a webhook.
 - [ ] Backoff, jitter, heartbeat, lag, and quarantine metrics.
 
 ## 6. Multiple payment attempts
@@ -73,13 +73,13 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 ## 7. Normalized refunds
 
-- [ ] Additive `refunds` migration and repository.
-- [ ] Full and partial refund accounting.
-- [ ] Concurrent refundable-balance protection.
-- [ ] Multiple refunds cannot exceed the captured amount.
-- [ ] `rejected_by_timeout` creates a new operation/key with backoff.
-- [ ] `insufficient_funds`, `rejected_by_payee`, and `general_decline` stop blind retries.
-- [ ] Compatibility fields remain synchronized during migration.
+- [x] Additive `refunds` migration and repository.
+- [x] Full and partial refund accounting.
+- [x] Concurrent refundable-balance protection through aggregate row locking.
+- [x] Multiple refunds cannot exceed the captured amount.
+- [x] `rejected_by_timeout` creates a new operation/key with backoff.
+- [x] `insufficient_funds`, `rejected_by_payee`, and `general_decline` stop blind retries.
+- [x] Compatibility fields remain synchronized during migration.
 
 ## 8. Frontend flow
 
@@ -125,3 +125,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 | 2026-08-25 | Durable provider operations | Payments `31 passed`; strict mypy; scoped Ruff/format | Pass |
 | 2026-08-25 | Durable webhook inbox | Payments `33 passed`; strict mypy; scoped Ruff/format; gateway syntax not runnable because local Docker daemon is unavailable | Pass with noted local-tool limitation |
 | 2026-08-25 | Multiple payment attempts | Payments `36 passed`; strict mypy; scoped Ruff/format; concurrent file-backed SQLite test | Pass |
+| 2026-08-25 | Normalized refunds | Payments `42 passed`; strict mypy; scoped Ruff/format; partial/over-refund, reason-policy, and unknown-result recovery tests | Pass |

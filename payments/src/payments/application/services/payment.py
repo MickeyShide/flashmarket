@@ -19,6 +19,7 @@ from payments.domain.entities import (
     PaymentEventType,
     PaymentStatus,
     ProviderOperationStatus,
+    RefundStatus,
     WebhookInboxStatus,
 )
 from payments.domain.exceptions import (
@@ -35,6 +36,7 @@ from payments.infrastructure.models import (
     PaymentAttemptModel,
     PaymentModel,
     ProviderOperationModel,
+    RefundModel,
     WebhookInboxModel,
 )
 from payments.infrastructure.repositories.payment import (
@@ -42,6 +44,7 @@ from payments.infrastructure.repositories.payment import (
     PaymentAttemptRepository,
     PaymentRepository,
     ProviderOperationRepository,
+    RefundRepository,
     WebhookInboxRepository,
 )
 
@@ -57,6 +60,7 @@ class PaymentService:
         operation_repo: ProviderOperationRepository | None = None,
         attempt_repo: PaymentAttemptRepository | None = None,
         webhook_repo: WebhookInboxRepository | None = None,
+        refund_repo: RefundRepository | None = None,
         provider: PaymentProvider | None = None,
         *,
         provider_name: str = "mock",
@@ -71,6 +75,7 @@ class PaymentService:
         self._operation_repo = operation_repo or ProviderOperationRepository(session)
         self._attempt_repo = attempt_repo or PaymentAttemptRepository(session)
         self._webhook_repo = webhook_repo or WebhookInboxRepository(session)
+        self._refund_repo = refund_repo or RefundRepository(session)
         if provider is None:
             from payments.infrastructure.providers.mock import MockPaymentProvider
 
@@ -854,31 +859,57 @@ class PaymentService:
         return await self.reconcile_payment(remote)
 
     @staticmethod
-    def _verify_refund(payment: PaymentModel, refund: ProviderRefund) -> None:
+    def _verify_refund(
+        payment: PaymentModel,
+        refund: ProviderRefund,
+        *,
+        expected_amount: int,
+    ) -> None:
         if payment.external_id != refund.payment_id:
             raise PaymentVerificationFailed("Refund payment identifier does not match")
-        if payment.amount != refund.amount or payment.currency != refund.currency:
+        if expected_amount != refund.amount or payment.currency != refund.currency:
             raise PaymentVerificationFailed("Refund amount or currency does not match")
 
     async def _finish_refund(
         self,
         payment: PaymentModel,
-        refund: ProviderRefund,
-        *,
-        reason: str,
+        local_refund: RefundModel,
+        remote_refund: ProviderRefund,
     ) -> None:
-        payment.refund_external_id = refund.id
-        payment.refund_status = refund.status
-        if refund.status != "succeeded" or payment.status == PaymentStatus.REFUNDED:
+        local_refund.external_id = remote_refund.id
+        local_refund.external_status = remote_refund.status
+        local_refund.cancellation_reason = remote_refund.cancellation_reason
+        local_refund.claim_token = None
+        local_refund.claimed_until = None
+        payment.refund_external_id = remote_refund.id
+        payment.refund_status = remote_refund.status
+        if remote_refund.status == "canceled":
+            reason = remote_refund.cancellation_reason or "provider_cancelled"
+            local_refund.status = (
+                RefundStatus.CANCELED
+                if reason == "rejected_by_timeout"
+                else RefundStatus.QUARANTINED
+            )
+            if reason == "rejected_by_timeout":
+                local_refund.next_attempt_at = utc_now() + timedelta(seconds=30)
             return
-        payment.status = PaymentStatus.REFUNDED
+        if remote_refund.status != "succeeded":
+            local_refund.status = RefundStatus.PENDING
+            return
+        if local_refund.status == RefundStatus.SUCCEEDED:
+            return
+        local_refund.status = RefundStatus.SUCCEEDED
+        total_refunded = await self._refund_repo.succeeded_amount(payment.id)
+        if total_refunded >= payment.amount:
+            payment.status = PaymentStatus.REFUNDED
         payload = {
             "payment_id": str(payment.id),
+            "refund_id": str(local_refund.id),
             "order_id": str(payment.order_id),
             "user_id": str(payment.user_id),
-            "amount": payment.amount,
-            "currency": payment.currency,
-            "reason": reason,
+            "amount": local_refund.amount,
+            "currency": local_refund.currency,
+            "reason": local_refund.reason,
         }
         await self._outbox_repo.add(
             PaymentEventType.PAYMENT_REFUNDED,
@@ -911,9 +942,12 @@ class PaymentService:
         payment_id: uuid.UUID,
         reason: str = "order_cancelled_compensation",
         *,
+        amount: int | None = None,
+        request_id: str | None = None,
         commit: bool = True,
     ) -> PaymentModel:
-        """Create an idempotent full provider refund and emit PaymentRefunded on success."""
+        """Reserve and create an idempotent full or partial provider refund."""
+        del commit  # The split transaction flow always owns its safe commit boundaries.
         payment = await self._payment_repo.get_by_id_for_update(payment_id)
         if payment is None:
             raise PaymentNotFound
@@ -921,24 +955,360 @@ class PaymentService:
             return payment
         if payment.status != PaymentStatus.SUCCESS:
             raise InvalidPaymentState(f"Cannot refund payment in status {payment.status}")
-
-        remote = await self._remote_for_refund(payment)
-        refund = await self._provider.create_refund(
-            payment=remote,
-            idempotency_key=f"refund-{payment.id}",
-            reason=reason,
-        )
-        self._verify_refund(payment, refund)
-        if refund.status == "canceled":
-            raise PaymentProviderRejected(
-                refund.cancellation_reason or "Payment provider canceled the refund"
-            )
-        await self._finish_refund(payment, refund, reason=reason)
-        await self._payment_repo.update(payment)
-        if commit:
+        if request_id is None:
+            prior = await self._refund_repo.get_latest_by_reason(payment.id, reason)
+            if prior is not None and prior.status in RefundRepository.RESERVED_STATUSES:
+                payment.refund_external_id = prior.external_id
+                payment.refund_status = prior.external_status or prior.status
+                await self._session.commit()
+                return payment
+        reserved = await self._refund_repo.reserved_amount(payment.id)
+        refundable = payment.amount - reserved
+        requested_amount = refundable if amount is None else amount
+        if requested_amount <= 0 or requested_amount > refundable:
+            raise InvalidPaymentState("Refund exceeds the available captured balance")
+        request_key = sha256(
+            f"{payment.id}:{request_id or reason}:{requested_amount}".encode()
+        ).hexdigest()
+        existing = await self._refund_repo.get_by_request_key(request_key)
+        if existing is not None:
+            payment.refund_external_id = existing.external_id
+            payment.refund_status = existing.external_status or existing.status
             await self._session.commit()
-            await self._session.refresh(payment)
+            return payment
+
+        local_refund = RefundModel(
+            payment_id=payment.id,
+            request_key=request_key,
+            amount=requested_amount,
+            currency=payment.currency,
+            reason=reason,
+            status=RefundStatus.NEW,
+            claimed_until=utc_now() + timedelta(seconds=60),
+        )
+        await self._refund_repo.create(local_refund)
+        canonical_payload = json.dumps(
+            {
+                "payment_id": str(payment.id),
+                "provider_payment_id": payment.external_id,
+                "amount": requested_amount,
+                "currency": payment.currency,
+                "reason": reason,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        operation = ProviderOperationModel(
+            operation_type="create_refund",
+            entity_id=local_refund.id,
+            payment_id=payment.id,
+            idempotency_key=f"refund-{local_refund.id}",
+            request_payload=canonical_payload,
+            request_hash=sha256(canonical_payload.encode()).hexdigest(),
+        )
+        await self._operation_repo.create(operation)
+        refund_id = local_refund.id
+        operation_id = operation.id
+        await self._session.commit()
+        return await self._submit_refund(refund_id, operation_id)
+
+    async def _submit_refund(
+        self,
+        refund_id: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> PaymentModel:
+        refund_snapshot = await self._refund_repo.get_by_id(refund_id)
+        if refund_snapshot is None:
+            raise PaymentVerificationFailed("Refund was not found")
+        payment_snapshot = await self._payment_repo.get_by_id(refund_snapshot.payment_id)
+        if payment_snapshot is None or payment_snapshot.external_id is None:
+            raise PaymentVerificationFailed("Refund payment was not found")
+        payment_id = payment_snapshot.id
+        external_id = payment_snapshot.external_id
+        amount = refund_snapshot.amount
+        reason = refund_snapshot.reason
+        if self._provider_name == "mock":
+            remote_payment = ProviderPayment(
+                id=external_id,
+                status="succeeded",
+                amount=payment_snapshot.amount,
+                currency=payment_snapshot.currency,
+                test=True,
+                metadata={
+                    "payment_id": str(payment_snapshot.id),
+                    "order_id": str(payment_snapshot.order_id),
+                },
+            )
+            await self._session.rollback()
+        else:
+            await self._session.rollback()
+            try:
+                remote_payment = await self._provider.get_payment(external_id)
+            except PaymentProviderUnavailable as exc:
+                retry_refund = await self._refund_repo.get_by_id_for_update(refund_id)
+                if retry_refund is not None:
+                    retry_refund.status = RefundStatus.NEW
+                    retry_refund.next_attempt_at = utc_now() + timedelta(seconds=30)
+                    retry_refund.claim_token = None
+                    retry_refund.claimed_until = None
+                    await self._session.commit()
+                raise exc
+
+        payment_check = await self._payment_repo.get_by_id_for_update(payment_id)
+        if payment_check is None:
+            raise PaymentVerificationFailed("Refund payment was not found")
+        self._verify_provider_payment(payment_check, remote_payment)
+        if remote_payment.status != "succeeded":
+            raise InvalidPaymentState("Provider payment is not refundable")
+        locked_operation = await self._operation_repo.get_by_id_for_update(operation_id)
+        locked_refund = await self._refund_repo.get_by_id_for_update(refund_id)
+        if locked_operation is None or locked_refund is None:
+            raise PaymentVerificationFailed("Refund operation was not found")
+        now = utc_now()
+        locked_operation.status = ProviderOperationStatus.IN_FLIGHT
+        locked_operation.attempt_count += 1
+        locked_operation.first_requested_at = locked_operation.first_requested_at or now
+        locked_operation.last_attempt_at = now
+        locked_operation.claimed_until = now + timedelta(seconds=60)
+        locked_refund.status = RefundStatus.PREPARING
+        locked_refund.attempt_count += 1
+        await self._session.commit()
+        try:
+            remote_refund = await self._provider.create_refund(
+                payment=remote_payment,
+                amount=amount,
+                idempotency_key=locked_operation.idempotency_key,
+                reason=reason,
+            )
+        except PaymentProviderUnavailable as exc:
+            await self._finish_provider_operation(
+                operation_id,
+                status=ProviderOperationStatus.UNKNOWN,
+                error_code=exc.code,
+            )
+            uncertain_refund = await self._refund_repo.get_by_id_for_update(refund_id)
+            if uncertain_refund is not None:
+                uncertain_refund.status = RefundStatus.UNKNOWN
+                uncertain_refund.claim_token = None
+                uncertain_refund.claimed_until = None
+                await self._session.commit()
+            raise PaymentProviderResultUnknown from exc
+        except PaymentProviderRejected as exc:
+            await self._finish_provider_operation(
+                operation_id,
+                status=ProviderOperationStatus.FAILED,
+                error_code=exc.code,
+            )
+            rejected_refund = await self._refund_repo.get_by_id_for_update(refund_id)
+            if rejected_refund is not None:
+                rejected_refund.status = RefundStatus.QUARANTINED
+                rejected_refund.cancellation_reason = exc.code
+                rejected_refund.claim_token = None
+                rejected_refund.claimed_until = None
+                await self._session.commit()
+            raise
+
+        payment = await self._payment_repo.get_by_id_for_update(payment_id)
+        result_refund = await self._refund_repo.get_by_id_for_update(refund_id)
+        result_operation = await self._operation_repo.get_by_id_for_update(operation_id)
+        if payment is None or result_refund is None or result_operation is None:
+            raise PaymentVerificationFailed("Refund result target was not found")
+        self._verify_refund(payment, remote_refund, expected_amount=result_refund.amount)
+        await self._finish_refund(payment, result_refund, remote_refund)
+        result_operation.status = ProviderOperationStatus.SUCCEEDED
+        result_operation.external_id = remote_refund.id
+        result_operation.response_payload = json.dumps(
+            {
+                "id": remote_refund.id,
+                "payment_id": remote_refund.payment_id,
+                "status": remote_refund.status,
+                "amount": remote_refund.amount,
+                "currency": remote_refund.currency,
+                "cancellation_reason": remote_refund.cancellation_reason,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        result_operation.claimed_until = None
+        await self._session.commit()
+        await self._session.refresh(payment)
         return payment
+
+    async def reconcile_refunds(self, *, limit: int = 20) -> int:
+        """Recover a bounded batch of new, unknown, pending, or retryable refunds."""
+        claim_token, claimed = await self._refund_repo.claim_due(limit=limit)
+        refund_ids = [refund.id for refund in claimed]
+        await self._session.commit()
+        for refund_id in refund_ids:
+            await self._reconcile_refund_item(refund_id, claim_token)
+        return len(refund_ids)
+
+    async def _reconcile_refund_item(
+        self,
+        refund_id: uuid.UUID,
+        claim_token: uuid.UUID,
+    ) -> None:
+        refund = await self._refund_repo.get_by_id_for_update(refund_id)
+        if refund is None or refund.claim_token != claim_token:
+            await self._session.rollback()
+            return
+        status = refund.status
+        payment_id = refund.payment_id
+        amount = refund.amount
+        reason = refund.reason
+        cancellation_reason = refund.cancellation_reason
+        external_id = refund.external_id
+        operation = await self._operation_repo.get_by_type_and_entity(
+            "create_refund", refund.id, for_update=True
+        )
+        operation_id = operation.id if operation is not None else None
+        first_requested_at = (
+            operation.first_requested_at or operation.created_at
+            if operation is not None
+            else refund.created_at
+        )
+        if first_requested_at.tzinfo is None:
+            first_requested_at = first_requested_at.replace(tzinfo=UTC)
+        await self._session.commit()
+
+        if status == RefundStatus.CANCELED and cancellation_reason == "rejected_by_timeout":
+            attempts = await self._refund_repo.count_by_reason(payment_id, reason)
+            if attempts >= 3:
+                refund = await self._refund_repo.get_by_id_for_update(refund_id)
+                if refund is not None:
+                    refund.status = RefundStatus.QUARANTINED
+                    refund.next_attempt_at = None
+                    refund.claim_token = None
+                    refund.claimed_until = None
+                    await self._session.commit()
+                return
+            original = await self._refund_repo.get_by_id_for_update(refund_id)
+            if original is not None:
+                original.cancellation_reason = "rejected_by_timeout_retried"
+                original.next_attempt_at = None
+                original.claim_token = None
+                original.claimed_until = None
+                await self._session.commit()
+            try:
+                await self.refund_payment(
+                    payment_id,
+                    reason=reason,
+                    amount=amount,
+                    request_id=f"retry-{refund_id}-{attempts + 1}",
+                )
+            except PaymentProviderUnavailable:
+                return
+            return
+
+        if operation_id is None:
+            refund = await self._refund_repo.get_by_id_for_update(refund_id)
+            if refund is not None:
+                refund.status = RefundStatus.QUARANTINED
+                refund.cancellation_reason = "provider_operation_missing"
+                refund.claim_token = None
+                refund.claimed_until = None
+                await self._session.commit()
+            return
+
+        if status == RefundStatus.NEW:
+            try:
+                await self._submit_refund(refund_id, operation_id)
+            except PaymentProviderUnavailable:
+                return
+            return
+
+        if status == RefundStatus.PENDING and external_id is not None:
+            try:
+                await self.reconcile_refund(external_id)
+            except PaymentProviderUnavailable as exc:
+                await self._reschedule_refund(refund_id, claim_token, exc.code)
+            return
+
+        if status == RefundStatus.UNKNOWN:
+            try:
+                matched = (
+                    await self._provider.get_refund(external_id)
+                    if external_id is not None
+                    else await self._find_provider_refund(
+                        payment_id,
+                        amount=amount,
+                        first_requested_at=first_requested_at,
+                    )
+                )
+            except PaymentProviderUnavailable as exc:
+                await self._reschedule_refund(refund_id, claim_token, exc.code)
+                return
+            if matched is not None:
+                local = await self._refund_repo.get_by_id_for_update(refund_id)
+                if local is not None:
+                    local.external_id = matched.id
+                    local.external_status = matched.status
+                    await self._session.commit()
+                await self.reconcile_refund(matched.id)
+                return
+            if utc_now() - first_requested_at >= timedelta(hours=24):
+                local = await self._refund_repo.get_by_id_for_update(refund_id)
+                if local is not None:
+                    local.status = RefundStatus.QUARANTINED
+                    local.cancellation_reason = "idempotency_expired:refund_not_found"
+                    local.claim_token = None
+                    local.claimed_until = None
+                    await self._session.commit()
+                return
+            await self._reschedule_refund(refund_id, claim_token, "provider_refund_not_found")
+
+    async def _find_provider_refund(
+        self,
+        payment_id: uuid.UUID,
+        *,
+        amount: int,
+        first_requested_at: datetime,
+    ) -> ProviderRefund | None:
+        payment = await self._payment_repo.get_by_id(payment_id)
+        if payment is None or payment.external_id is None:
+            raise PaymentVerificationFailed("Refund payment was not found")
+        provider_payment_id = payment.external_id
+        await self._session.rollback()
+        cursor: str | None = None
+        matches: list[ProviderRefund] = []
+        for _ in range(5):
+            page = await self._provider.list_refunds(
+                created_gte=first_requested_at - timedelta(minutes=5),
+                created_lte=first_requested_at + timedelta(minutes=5),
+                payment_id=provider_payment_id,
+                limit=100,
+                cursor=cursor,
+            )
+            matches.extend(
+                item
+                for item in page.items
+                if item.payment_id == provider_payment_id and item.amount == amount
+            )
+            if len(matches) > 1 or page.next_cursor is None:
+                break
+            cursor = page.next_cursor
+        if len(matches) > 1:
+            raise PaymentVerificationFailed("Multiple provider refunds matched one operation")
+        return matches[0] if matches else None
+
+    async def _reschedule_refund(
+        self,
+        refund_id: uuid.UUID,
+        claim_token: uuid.UUID,
+        error_code: str,
+    ) -> None:
+        refund = await self._refund_repo.get_by_id_for_update(refund_id)
+        if refund is None or refund.claim_token != claim_token:
+            await self._session.rollback()
+            return
+        ceiling = min(30 * (2 ** min(refund.attempt_count, 5)), 900)
+        refund.next_attempt_at = utc_now() + timedelta(
+            seconds=random.uniform(ceiling / 2, ceiling)  # noqa: S311
+        )
+        refund.cancellation_reason = error_code
+        refund.claim_token = None
+        refund.claimed_until = None
+        await self._session.commit()
 
     async def reconcile_refund(self, external_id: str) -> PaymentModel:
         """Apply a verified asynchronous refund status."""
@@ -948,8 +1318,11 @@ class PaymentService:
         payment = await self._payment_repo.get_by_external_id_for_update(refund.payment_id)
         if payment is None:
             raise PaymentVerificationFailed("Refunded payment was not found")
-        self._verify_refund(payment, refund)
-        await self._finish_refund(payment, refund, reason="provider_refund_succeeded")
+        local_refund = await self._refund_repo.get_by_external_id_for_update(refund.id)
+        if local_refund is None:
+            raise PaymentVerificationFailed("Local refund was not found")
+        self._verify_refund(payment, refund, expected_amount=local_refund.amount)
+        await self._finish_refund(payment, local_refund, refund)
         await self._payment_repo.update(payment)
         await self._session.commit()
         await self._session.refresh(payment)

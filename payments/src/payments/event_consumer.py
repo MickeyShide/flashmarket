@@ -135,7 +135,7 @@ async def process_message(
     if handler is None:
         raise PermanentMessageError(f"unsupported routing key: {routing_key}")
     try:
-        async with session_factory() as session, session.begin():
+        async with session_factory() as session:
             if not await begin_event_once(
                 session,
                 ProcessedEventModel,
@@ -145,6 +145,8 @@ async def process_message(
                 logger.info("Skipping duplicate event %s", delivery_identity(message, routing_key))
                 return
             await handler(session, body)
+            if session.in_transaction():
+                await session.commit()
     except (KeyError, TypeError, ValueError) as exc:
         raise PermanentMessageError("invalid payments event payload") from exc
 
@@ -166,7 +168,7 @@ async def run_consumer() -> None:
             channel,
             queue_name="payments.events",
             topic_exchange=exchange,
-            routing_keys=("orders.PaymentRequested",),
+            routing_keys=("orders.PaymentRequested", "orders.PaymentRefundRequested"),
             config=reliability,
         )
         async with periodic_heartbeat(
@@ -213,11 +215,15 @@ async def run_reconciliation_loop() -> None:
                 webhooks_processed = await service.process_webhook_inbox(
                     limit=settings.webhook_batch_size
                 )
-                if operations_processed or webhooks_processed:
+                refunds_processed = await service.reconcile_refunds(
+                    limit=settings.reconciliation_batch_size
+                )
+                if operations_processed or webhooks_processed or refunds_processed:
                     logger.info(
-                        "Reconciliation batch completed: operations=%s webhooks=%s",
+                        "Reconciliation batch completed: operations=%s webhooks=%s refunds=%s",
                         operations_processed,
                         webhooks_processed,
+                        refunds_processed,
                     )
         except asyncio.CancelledError:
             raise

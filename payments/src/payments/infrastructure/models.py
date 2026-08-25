@@ -23,6 +23,7 @@ from payments.domain.entities import (
     PaymentAttemptStatus,
     PaymentStatus,
     ProviderOperationStatus,
+    RefundStatus,
     WebhookInboxStatus,
 )
 from payments.infrastructure.database import Base, utc_now
@@ -155,6 +156,42 @@ class PaymentAttemptModel(Base):
     cancellation_reason: Mapped[str | None] = mapped_column(String(255))
     provider_test: Mapped[bool | None] = mapped_column(Boolean)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class RefundModel(Base):
+    """One full or partial refund against a captured payment."""
+
+    __tablename__ = "refunds"
+    __table_args__ = (
+        UniqueConstraint("request_key", name="uq_refunds_request_key"),
+        CheckConstraint("amount > 0", name="ck_refunds_amount_positive"),
+        Index("ix_refunds_reconcile", "status", "next_attempt_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
+    payment_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    parent_refund_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
+    request_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[RefundStatus] = mapped_column(
+        String(20), nullable=False, default=RefundStatus.NEW, server_default="NEW"
+    )
+    external_id: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    external_status: Mapped[str | None] = mapped_column(String(64))
+    cancellation_party: Mapped[str | None] = mapped_column(String(64))
+    cancellation_reason: Mapped[str | None] = mapped_column(String(255))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    claim_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
