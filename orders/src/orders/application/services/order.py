@@ -87,6 +87,7 @@ class OrderService:
             promocode_id = promo_res.promocode_id
 
         final_total = original_total - discount_amount
+        status = OrderStatus.CONFIRMED if final_total == 0 else OrderStatus.AWAITING_PAYMENT
         order = OrderModel(
             user_id=data.user_id,
             product_id=data.product_id,
@@ -94,7 +95,7 @@ class OrderService:
             price=price,
             currency=currency,
             quantity=data.quantity,
-            status=OrderStatus.AWAITING_PAYMENT,
+            status=status,
             reservation_id=data.reservation_id,
             original_price=original_total,
             discount_amount=discount_amount,
@@ -152,10 +153,21 @@ class OrderService:
                 OrderEventType.ORDER_CREATED,
                 json.dumps(payload, separators=(",", ":")),
             )
-            await self._outbox_repo.add(
-                OrderEventType.PAYMENT_REQUESTED,
-                json.dumps(payload, separators=(",", ":")),
-            )
+            if final_total == 0:
+                confirmed_payload = {
+                    "order_id": str(order.id),
+                    "reservation_id": str(order.reservation_id),
+                    "user_id": str(order.user_id),
+                }
+                await self._outbox_repo.add(
+                    OrderEventType.ORDER_CONFIRMED,
+                    json.dumps(confirmed_payload, separators=(",", ":")),
+                )
+            else:
+                await self._outbox_repo.add(
+                    OrderEventType.PAYMENT_REQUESTED,
+                    json.dumps(payload, separators=(",", ":")),
+                )
 
             await self._session.commit()
         except IntegrityError as exc:
@@ -218,6 +230,7 @@ class OrderService:
         for line, original, allocated in zip(data.lines, line_totals, allocations, strict=True):
             discount = Decimal(allocated)
             final = original - discount
+            status = OrderStatus.CONFIRMED if final == 0 else OrderStatus.AWAITING_PAYMENT
             order = OrderModel(
                 checkout_id=checkout_id,
                 user_id=line.user_id,
@@ -226,12 +239,12 @@ class OrderService:
                 price=line.price,
                 currency=line.currency,
                 quantity=line.quantity,
-                status=OrderStatus.AWAITING_PAYMENT,
+                status=status,
                 reservation_id=line.reservation_id,
                 original_price=original,
                 discount_amount=discount,
                 final_price=final,
-                promocode_id=promocode_id,
+                promocode_id=promocode_id if discount > 0 else None,
                 variant_id=line.variant_id,
                 variant_sku=line.variant_sku,
                 variant_size=line.variant_size,
@@ -276,20 +289,36 @@ class OrderService:
                 OrderEventType.ORDER_CREATED,
                 json.dumps(payload, separators=(",", ":")),
             )
-            await self._outbox_repo.add(
-                OrderEventType.PAYMENT_REQUESTED,
-                json.dumps(payload, separators=(",", ":")),
-            )
+            if final == 0:
+                confirmed_payload = {
+                    "order_id": str(order.id),
+                    "reservation_id": str(order.reservation_id),
+                    "user_id": str(order.user_id),
+                }
+                await self._outbox_repo.add(
+                    OrderEventType.ORDER_CONFIRMED,
+                    json.dumps(confirmed_payload, separators=(",", ":")),
+                )
+            else:
+                await self._outbox_repo.add(
+                    OrderEventType.PAYMENT_REQUESTED,
+                    json.dumps(payload, separators=(",", ":")),
+                )
             orders.append(order)
 
         try:
             if promocode_id and self._promocode_service:
-                await self._promocode_service.record_usage(
-                    promo_id=promocode_id,
-                    user_id=data.lines[0].user_id,
-                    order_id=orders[0].id,
-                    discount_amount=Decimal(discount_units),
-                )
+                first_usage = True
+                for ord_item, alloc in zip(orders, allocations, strict=True):
+                    if alloc > 0:
+                        await self._promocode_service.record_usage(
+                            promo_id=promocode_id,
+                            user_id=ord_item.user_id,
+                            order_id=ord_item.id,
+                            discount_amount=Decimal(alloc),
+                            increment_uses=first_usage,
+                        )
+                        first_usage = False
 
             await self._session.commit()
         except IntegrityError as exc:
