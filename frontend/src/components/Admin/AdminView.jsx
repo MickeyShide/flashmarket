@@ -16,8 +16,12 @@ const AuditTab = lazyNamed(() => import('./Audit/AuditTab'), 'AuditTab');
 const NotificationsAdminTab = lazyNamed(() => import('./Notifications/NotificationsAdminTab'), 'NotificationsAdminTab');
 
 export const AdminView = ({ onBack }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('catalog');
+
+  if (loading) {
+    return <PageSkeleton />;
+  }
 
   // Guard access for non-admin users
   if (!user || user.role !== 'ADMIN') {

@@ -34,6 +34,7 @@ from payments.domain.entities import (
     PaymentStatus,
     ProviderOperationStatus,
     RefundStatus,
+    WebhookInboxStatus,
 )
 from payments.domain.exceptions import (
     InvalidPaymentState,
@@ -46,13 +47,35 @@ from payments.infrastructure.database import Base, utc_now
 from payments.infrastructure.models import (
     OutboxEventModel,
     PaymentAttemptModel,
+    PaymentModel,
     PaymentReceiptModel,
     ProviderOperationModel,
     RefundModel,
     WebhookInboxModel,
 )
-from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
+from payments.infrastructure.repositories.payment import (
+    OutboxRepository,
+    PaymentAttemptRepository,
+    PaymentRepository,
+    ProviderOperationRepository,
+    RefundRepository,
+    WebhookInboxRepository,
+)
 from payments.main import app
+
+
+@pytest.fixture(autouse=True)
+def yookassa_provider_setting() -> object:
+    """Run this module with the provider identity its scenarios exercise."""
+    settings = get_settings()
+    previous_provider = settings.payment_provider
+    settings.payment_provider = "yookassa"
+    app.dependency_overrides[get_payment_provider] = FakeProvider
+    try:
+        yield
+    finally:
+        settings.payment_provider = previous_provider
+        app.dependency_overrides.pop(get_payment_provider, None)
 
 
 class FakeProvider:
@@ -363,7 +386,7 @@ async def test_concurrent_checkout_converges_on_one_active_attempt(
                 payment_repo=PaymentRepository(session),
                 outbox_repo=OutboxRepository(session),
                 provider=provider,
-                provider_name="mock",
+                provider_name="yookassa",
             )
             try:
                 payment = await service.start_checkout(order_id)
@@ -379,6 +402,134 @@ async def test_concurrent_checkout_converges_on_one_active_attempt(
         operations = (await session.scalars(select(ProviderOperationModel))).all()
         assert len(attempts) == len(operations) == 1
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_worker_claims_are_isolated_from_historical_mock_provider(
+    db_session: AsyncSession,
+) -> None:
+    mock_payment = PaymentModel(
+        order_id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        amount=100,
+        currency="RUB",
+        provider="mock",
+        status=PaymentStatus.PENDING,
+    )
+    yookassa_payment = PaymentModel(
+        order_id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        amount=100,
+        currency="RUB",
+        provider="yookassa",
+        status=PaymentStatus.PENDING,
+    )
+    db_session.add_all([mock_payment, yookassa_payment])
+    await db_session.flush()
+
+    mock_attempt = PaymentAttemptModel(
+        payment_id=mock_payment.id,
+        attempt_number=1,
+        amount=100,
+        currency="RUB",
+        provider="mock",
+        status=PaymentAttemptStatus.PENDING,
+        external_id="mock-payment-id",
+    )
+    yookassa_attempt = PaymentAttemptModel(
+        payment_id=yookassa_payment.id,
+        attempt_number=1,
+        amount=100,
+        currency="RUB",
+        provider="yookassa",
+        status=PaymentAttemptStatus.PENDING,
+        external_id="yookassa-payment-id",
+    )
+    db_session.add_all([mock_attempt, yookassa_attempt])
+    await db_session.flush()
+
+    mock_operation = ProviderOperationModel(
+        operation_type="create_payment",
+        entity_id=mock_attempt.id,
+        payment_id=mock_payment.id,
+        idempotency_key="mock-operation",
+        request_payload="{}",
+        request_hash="a" * 64,
+        status=ProviderOperationStatus.UNKNOWN,
+    )
+    yookassa_operation = ProviderOperationModel(
+        operation_type="create_payment",
+        entity_id=yookassa_attempt.id,
+        payment_id=yookassa_payment.id,
+        idempotency_key="yookassa-operation",
+        request_payload="{}",
+        request_hash="b" * 64,
+        status=ProviderOperationStatus.UNKNOWN,
+    )
+    mock_refund = RefundModel(
+        payment_id=mock_payment.id,
+        request_key="c" * 64,
+        amount=50,
+        currency="RUB",
+        reason="test",
+        status=RefundStatus.NEW,
+    )
+    yookassa_refund = RefundModel(
+        payment_id=yookassa_payment.id,
+        request_key="d" * 64,
+        amount=50,
+        currency="RUB",
+        reason="test",
+        status=RefundStatus.NEW,
+    )
+    mock_webhook = WebhookInboxModel(
+        provider="mock",
+        object_type="payment",
+        external_id="mock-payment-id",
+        event="payment.succeeded",
+        target_status="succeeded",
+        dedupe_hash="e" * 64,
+        raw_body="{}",
+        status=WebhookInboxStatus.PENDING,
+    )
+    yookassa_webhook = WebhookInboxModel(
+        provider="yookassa",
+        object_type="payment",
+        external_id="yookassa-payment-id",
+        event="payment.succeeded",
+        target_status="succeeded",
+        dedupe_hash="f" * 64,
+        raw_body="{}",
+        status=WebhookInboxStatus.PENDING,
+    )
+    db_session.add_all(
+        [
+            mock_operation,
+            yookassa_operation,
+            mock_refund,
+            yookassa_refund,
+            mock_webhook,
+            yookassa_webhook,
+        ]
+    )
+    await db_session.commit()
+
+    _, attempts = await PaymentAttemptRepository(db_session).claim_due(
+        provider="yookassa", limit=20
+    )
+    _, operations = await ProviderOperationRepository(db_session).claim_due_unknown(
+        provider="yookassa", limit=20
+    )
+    _, refunds = await RefundRepository(db_session).claim_due(provider="yookassa", limit=20)
+    _, webhooks = await WebhookInboxRepository(db_session).claim_due(
+        provider="yookassa", limit=20
+    )
+
+    assert [item.external_id for item in attempts] == ["yookassa-payment-id"]
+    assert [item.id for item in operations] == [yookassa_operation.id]
+    assert [item.id for item in refunds] == [yookassa_refund.id]
+    assert [item.id for item in webhooks] == [yookassa_webhook.id]
+    assert all(item.external_id != "mock-payment-id" for item in attempts)
 
 
 @pytest.mark.asyncio

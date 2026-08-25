@@ -31,6 +31,7 @@ export const CatalogControls = ({
       <div className="flex flex-wrap items-center gap-2 md:gap-3">
         {/* Brand Dropdown Select */}
         <select
+          aria-label="Фильтр по бренду"
           className="font-mono text-[11px] font-extrabold tracking-wide uppercase px-3 py-[7px] bg-[#111111] text-white border border-[#333333] rounded cursor-pointer outline-none hover:border-black hover:bg-[#1A1A1A] transition-colors"
           value={activeBrandId || ''}
           onChange={(e) => onSelectBrandSelect(e.target.value || null)}
@@ -46,6 +47,7 @@ export const CatalogControls = ({
         <input
           type="number"
           min="0"
+          aria-label="Минимальная цена"
           placeholder="Цена от"
           className="w-24 font-mono text-[11px] px-3 py-[7px] bg-white border border-border-color rounded outline-none focus:border-black"
           value={priceFrom}
@@ -54,6 +56,7 @@ export const CatalogControls = ({
         <input
           type="number"
           min="0"
+          aria-label="Максимальная цена"
           placeholder="Цена до"
           className="w-24 font-mono text-[11px] px-3 py-[7px] bg-white border border-border-color rounded outline-none focus:border-black"
           value={priceTo}
@@ -62,6 +65,7 @@ export const CatalogControls = ({
 
         {/* Size Filter Dropdown */}
         <select
+          aria-label="Фильтр по размеру"
           className="font-mono text-[11px] font-extrabold tracking-wide uppercase px-3 py-[7px] bg-white text-black border border-border-color rounded cursor-pointer outline-none hover:border-black transition-colors"
           value={activeSize || ''}
           onChange={(e) => onSelectSize(e.target.value || null)}
@@ -76,6 +80,7 @@ export const CatalogControls = ({
 
         {/* Sort Dropdown */}
         <select
+          aria-label="Сортировка товаров"
           className="font-mono text-[11px] font-extrabold tracking-wide uppercase px-3 py-[7px] bg-white text-black border border-border-color rounded cursor-pointer outline-none hover:border-black transition-colors"
           value={activeSort || 'created_at'}
           onChange={(e) => onSelectSort(e.target.value)}
@@ -91,6 +96,7 @@ export const CatalogControls = ({
       <div className="flex items-center bg-[#F9F9F9] border border-border-color rounded-full px-3.5 py-[7px] w-full md:w-[240px]">
         <input
           type="text"
+          aria-label="Поиск по названию товаров"
           placeholder="Поиск по названию..."
           className="border-none outline-none bg-transparent w-full text-[11.5px] font-sans"
           value={searchValue}

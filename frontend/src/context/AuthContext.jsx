@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const { triggerToast } = useToast();
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem(ACCESS_TOKEN_KEY));
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(() => typeof window !== 'undefined' && !!localStorage.getItem(ACCESS_TOKEN_KEY));
   const [userAvatar, setUserAvatar] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -46,7 +47,11 @@ export const AuthProvider = ({ children }) => {
 
   const loadProfile = useCallback(async () => {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-    if (!token) return;
+    if (!token) {
+      setAuthLoading(false);
+      return;
+    }
+    setAuthLoading(true);
     try {
       const userData = await apiJson('/users/me');
       setUser(userData);
@@ -55,6 +60,8 @@ export const AuthProvider = ({ children }) => {
       setSessions(sessionData || []);
     } catch (err) {
       console.error('profile load failed', err);
+    } finally {
+      setAuthLoading(false);
     }
   }, [loadAvatar]);
 
@@ -173,6 +180,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       accessToken,
       user,
+      loading: authLoading,
       userAvatar,
       sessions,
       notifications,

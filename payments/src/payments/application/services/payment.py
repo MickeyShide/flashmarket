@@ -152,6 +152,10 @@ class PaymentService:
         attempt: PaymentAttemptModel | None = None,
         require_confirmation: bool = False,
     ) -> None:
+        if local.provider != self._provider_name:
+            raise PaymentVerificationFailed("Payment provider does not match runtime provider")
+        if attempt is not None and attempt.provider != self._provider_name:
+            raise PaymentVerificationFailed("Payment attempt provider does not match")
         if self._test_mode_required and not remote.test:
             raise PaymentVerificationFailed("Only YooKassa test payments are allowed")
         if remote.amount != local.amount or remote.currency != local.currency:
@@ -587,7 +591,10 @@ class PaymentService:
 
     async def reconcile_unknown_operations(self, *, limit: int = 20) -> int:
         """Recover a bounded batch of uncertain creates without repeating their POST."""
-        claim_token, claimed = await self._operation_repo.claim_due_unknown(limit=limit)
+        claim_token, claimed = await self._operation_repo.claim_due_unknown(
+            provider=self._provider_name,
+            limit=limit,
+        )
         operation_ids = [operation.id for operation in claimed]
         await self._session.commit()
         for operation_id in operation_ids:
@@ -867,7 +874,10 @@ class PaymentService:
 
     async def process_webhook_inbox(self, *, limit: int = 50) -> int:
         """Verify and apply a bounded batch of durably accepted notifications."""
-        claim_token, claimed = await self._webhook_repo.claim_due(limit=limit)
+        claim_token, claimed = await self._webhook_repo.claim_due(
+            provider=self._provider_name,
+            limit=limit,
+        )
         item_ids = [item.id for item in claimed]
         await self._session.commit()
         for item_id in item_ids:
@@ -882,6 +892,14 @@ class PaymentService:
         item = await self._webhook_repo.get_by_id_for_update(item_id)
         if item is None or item.claim_token != claim_token:
             await self._session.rollback()
+            return
+        if item.provider != self._provider_name:
+            await self._finish_webhook_item(
+                item_id,
+                claim_token,
+                status=WebhookInboxStatus.QUARANTINED,
+                error_code="provider_mismatch",
+            )
             return
         object_type = item.object_type
         external_id = item.external_id
@@ -1061,7 +1079,10 @@ class PaymentService:
 
     async def reconcile_active_attempts(self, *, limit: int = 20) -> int:
         """Poll a leased, bounded batch of active provider payments."""
-        claim_token, claimed = await self._attempt_repo.claim_due(limit=limit)
+        claim_token, claimed = await self._attempt_repo.claim_due(
+            provider=self._provider_name,
+            limit=limit,
+        )
         snapshots = [(attempt.id, attempt.external_id) for attempt in claimed]
         await self._session.commit()
         for attempt_id, external_id in snapshots:
@@ -1118,13 +1139,15 @@ class PaymentService:
             self._sync_attempt_summary(payment, attempt)
         await self._session.commit()
 
-    @staticmethod
     def _verify_refund(
+        self,
         payment: PaymentModel,
         refund: ProviderRefund,
         *,
         expected_amount: int,
     ) -> None:
+        if payment.provider != self._provider_name:
+            raise PaymentVerificationFailed("Refund payment provider does not match")
         if payment.external_id != refund.payment_id:
             raise PaymentVerificationFailed("Refund payment identifier does not match")
         if expected_amount != refund.amount or payment.currency != refund.currency:
@@ -1246,6 +1269,8 @@ class PaymentService:
             return payment
         if payment.status != PaymentStatus.SUCCESS:
             raise InvalidPaymentState(f"Cannot refund payment in status {payment.status}")
+        if payment.provider != self._provider_name:
+            raise InvalidPaymentState("Payment provider configuration changed")
         if request_id is None:
             prior = await self._refund_repo.get_latest_by_reason(payment.id, reason)
             if prior is not None and prior.funds_reserved:
@@ -1470,7 +1495,10 @@ class PaymentService:
 
     async def reconcile_refunds(self, *, limit: int = 20) -> int:
         """Recover a bounded batch of new, unknown, pending, or retryable refunds."""
-        claim_token, claimed = await self._refund_repo.claim_due(limit=limit)
+        claim_token, claimed = await self._refund_repo.claim_due(
+            provider=self._provider_name,
+            limit=limit,
+        )
         refund_ids = [refund.id for refund in claimed]
         await self._session.commit()
         for refund_id in refund_ids:

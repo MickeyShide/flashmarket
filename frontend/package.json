@@ -6,9 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test tests/devhub.test.js tests/media.test.js tests/product-gallery.test.js tests/lazy-loading.test.js tests/docs-routing.test.js tests/router.test.js tests/architecture-layout.test.js tests/payments.test.js tests/prefetch.test.js",
+    "test": "node --test tests/devhub.test.js tests/media.test.js tests/product-gallery.test.js tests/lazy-loading.test.js tests/docs-routing.test.js tests/router.test.js tests/architecture-layout.test.js tests/payments.test.js tests/prefetch.test.js tests/cart-invariants.test.js tests/search-filtering.test.js",
     "test:devhub": "node --test tests/devhub.test.js",
     "test:media": "node --test tests/media.test.js",
+    "test:e2e": "playwright test",
+    "test:e2e:critical": "playwright test e2e/critical-path.spec.js",
+    "test:e2e:a11y": "playwright test e2e/accessibility.spec.js",
+    "test:e2e:visual": "playwright test e2e/visual-regression.spec.js",
+    "test:percy": "percy exec -- playwright test e2e/visual-regression.spec.js",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -16,6 +21,10 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@percy/cli": "^1.32.7",
+    "@percy/playwright": "^1.1.2",
+    "@playwright/test": "^1.62.1",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",

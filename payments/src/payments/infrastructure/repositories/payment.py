@@ -273,6 +273,7 @@ class PaymentAttemptRepository:
     async def claim_due(
         self,
         *,
+        provider: str,
         limit: int,
         lease_seconds: int = 60,
     ) -> tuple[UUID, Sequence[PaymentAttemptModel]]:
@@ -282,6 +283,7 @@ class PaymentAttemptRepository:
         result = await self._session.scalars(
             select(PaymentAttemptModel)
             .where(
+                PaymentAttemptModel.provider == provider,
                 PaymentAttemptModel.status.in_(
                     [
                         PaymentAttemptStatus.PREPARING,
@@ -392,6 +394,7 @@ class RefundRepository:
     async def claim_due(
         self,
         *,
+        provider: str,
         limit: int,
         lease_seconds: int = 60,
     ) -> tuple[UUID, Sequence[RefundModel]]:
@@ -399,7 +402,9 @@ class RefundRepository:
         token = uuid.uuid4()
         result = await self._session.scalars(
             select(RefundModel)
+            .join(PaymentModel, PaymentModel.id == RefundModel.payment_id)
             .where(
+                PaymentModel.provider == provider,
                 or_(
                     RefundModel.status.in_(
                         [RefundStatus.NEW, RefundStatus.UNKNOWN, RefundStatus.PENDING]
@@ -463,6 +468,7 @@ class ProviderOperationRepository:
     async def claim_due_unknown(
         self,
         *,
+        provider: str,
         limit: int,
         lease_seconds: int = 60,
     ) -> tuple[UUID, Sequence[ProviderOperationModel]]:
@@ -470,7 +476,9 @@ class ProviderOperationRepository:
         claim_token = uuid.uuid4()
         result = await self._session.scalars(
             select(ProviderOperationModel)
+            .join(PaymentModel, PaymentModel.id == ProviderOperationModel.payment_id)
             .where(
+                PaymentModel.provider == provider,
                 ProviderOperationModel.operation_type == "create_payment",
                 or_(
                     ProviderOperationModel.status == ProviderOperationStatus.UNKNOWN,
@@ -533,6 +541,7 @@ class WebhookInboxRepository:
     async def claim_due(
         self,
         *,
+        provider: str,
         limit: int,
         lease_seconds: int = 60,
     ) -> tuple[UUID, Sequence[WebhookInboxModel]]:
@@ -541,6 +550,7 @@ class WebhookInboxRepository:
         result = await self._session.scalars(
             select(WebhookInboxModel)
             .where(
+                WebhookInboxModel.provider == provider,
                 or_(
                     WebhookInboxModel.status.in_(
                         [WebhookInboxStatus.PENDING, WebhookInboxStatus.RETRY]

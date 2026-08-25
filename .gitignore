@@ -20,6 +20,8 @@ venv/
 .mypy_cache/
 .coverage
 htmlcov/
+test-results/
+playwright-report/
 
 # IDEs
 .vscode/
