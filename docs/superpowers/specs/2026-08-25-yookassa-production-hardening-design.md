@@ -1,7 +1,8 @@
 # YooKassa Production Hardening Design
 
 **Date:** 2026-08-25  
-**Status:** Approved in conversation; awaiting written-spec review  
+**Status:** Approved and implemented in mandatory test-only mode
+
 **Scope:** Make the existing YooKassa Smart Payment integration operationally safe under load while preserving a mandatory test-only mode.
 
 ## Context

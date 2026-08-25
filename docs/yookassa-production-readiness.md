@@ -75,6 +75,7 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 - [x] Additive `refunds` migration and repository.
 - [x] Full and partial refund accounting.
+- [x] Persisted refund balance ownership independent of workflow status.
 - [x] Concurrent refundable-balance protection through aggregate row locking.
 - [x] Multiple refunds cannot exceed the captured amount.
 - [x] `rejected_by_timeout` creates a new operation/key with backoff.
@@ -108,13 +109,13 @@ Live payments must remain disabled. An item is marked complete only after its re
 - [x] Webhook inbox depth, lag, retries, and quarantine metrics.
 - [x] Attempt/refund/reconciliation age and drift metrics.
 - [x] No high-cardinality financial identifiers in metric labels.
-- [x] Migration upgrade verification from an empty database through revision `20260825_0013`.
+- [x] Migration upgrade verification from an empty database through revision `20260825_0014`.
 - [x] Payments unit/integration/concurrency suite.
 - [x] Ruff for changed code and strict mypy.
 - [x] Repository OpenAPI generation and tests.
 - [x] Frontend tests and production build.
-- [~] Final security and failure-mode audit found two high-severity fail-safe accounting defects; reviewed patch approval is pending in `docs/yookassa-security-review-2026-08-25.md`.
-- [~] Implementation commits through `c36909e` pushed to `origin/main`; audit report/fixes remain pending.
+- [x] Final security and failure-mode audit completed; both high-severity fail-safe accounting defects are resolved in `9b335a7` and re-verified in `docs/yookassa-security-review-2026-08-25.md`.
+- [x] Implementation, audit, and approved security fixes are committed and pushed to `origin/main`.
 
 ## Verification log
 
@@ -130,3 +131,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 | 2026-08-25 | Ledger, receipts, and reports | Payments `47 passed`; full Payments Ruff; strict mypy; deterministic Moscow-time CSV reconciliation | Pass |
 | 2026-08-25 | Attempt reconciliation and observability | Payments `48 passed`; full Payments Ruff; strict mypy; Alembic empty SQLite upgrade through `20260825_0013`; Prometheus alert rules added | Pass |
 | 2026-08-25 | Final verification before security fixes | OpenAPI generation; OpenAPI/gateway contracts `16 passed`; frontend `25 passed` and production build; dependency audits found 0 known vulnerabilities; secrets scan found 0 exposed credentials | Pass with two security-review fixes pending |
+| 2026-08-25 | Approved security fixes | Payments `52 passed`; full Ruff/format; strict mypy; empty migration upgrade and seeded reservation backfill through `20260825_0014`; OpenAPI/gateway `16 passed`; frontend `25 passed` and production build | Pass |

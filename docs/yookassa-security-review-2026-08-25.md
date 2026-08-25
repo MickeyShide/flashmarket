@@ -7,23 +7,23 @@ Languages/frameworks: Python/FastAPI/SQLAlchemy, JavaScript/React/Vite, Nginx, D
 
 ## Findings summary
 
-| Severity | Count |
-|---|---:|
-| Critical | 0 |
-| High | 2 |
-| Medium | 3 |
-| Low | 2 |
-| Info | 1 |
-| **Total** | **8** |
+| Severity | Open | Resolved |
+|---|---:|---:|
+| Critical | 0 | 0 |
+| High | 0 | 2 |
+| Medium | 3 | 0 |
+| Low | 2 | 0 |
+| Info | 1 | 0 |
+| **Total** | **6** | **2** |
 
 Dependency audit: 0 known vulnerable third-party packages found.  
 Secrets scan: 0 exposed production credentials found.
 
-The two high-severity findings are fail-safe accounting defects. They require review before patches are applied under the security-review workflow. Live payments remain disabled and no production YooKassa credentials are configured, so neither issue is currently reachable with real money in this repository's declared configuration.
+Both high-severity fail-safe accounting defects were reviewed, approved, and resolved in commit `9b335a7`. Live payments remain disabled and no production YooKassa credentials are configured. The remaining medium, low, and informational findings are documented hardening work and do not reopen either duplicate-financial-operation path.
 
 ## Financial business logic
 
-### HIGH — An unresolved payment can be retried as a second provider payment
+### RESOLVED HIGH — An unresolved payment could be retried as a second provider payment
 
 Confidence: High  
 Locations: `payments/src/payments/application/services/payment.py:333`, `:602`, `:610`
@@ -34,7 +34,9 @@ The bounded search examines at most 500 recent objects and a not-found result is
 
 Recommended fix: successful-POST verification failures and aged unresolved operations must remain `UNKNOWN`/manual-review and continue to occupy the active-attempt slot. Only a provider-confirmed terminal `canceled` payment may permit a new attempt.
 
-### HIGH — An unresolved refund releases its balance reservation
+Resolution: implemented in `9b335a7`. Provider-response mismatches and aged unresolved operations now keep the attempt `UNKNOWN`, clear automatic reconciliation scheduling after quarantine, and preserve the active-attempt constraint. Regression tests prove repeated checkout calls return the same preparation state without a second provider POST.
+
+### RESOLVED HIGH — An unresolved refund released its balance reservation
 
 Confidence: High  
 Locations: `payments/src/payments/application/services/payment.py:1394`, `payments/src/payments/infrastructure/repositories/payment.py:306`, `:374`
@@ -42,6 +44,8 @@ Locations: `payments/src/payments/application/services/payment.py:1394`, `paymen
 After 24 hours without a unique provider match, an `UNKNOWN` refund becomes `QUARANTINED`. `RefundRepository.RESERVED_STATUSES` excludes every quarantined refund, so the same captured balance becomes available for a second refund even though the first provider POST may have succeeded.
 
 Recommended fix: persist reservation ownership independently of workflow status (for example, `funds_reserved`). Keep it set for successful, pending, unknown, and ambiguous/manual-review refunds; release it only after a definite provider rejection or cancellation. Provider-response verification failures must also be converted to an uncertain reserved state instead of leaving `PREPARING` work stranded.
+
+Resolution: implemented in `9b335a7` with migration `20260825_0014`. Refund balance ownership is now persisted in `funds_reserved`; ambiguous and verification-failed results remain reserved, while provider-confirmed cancellation and definite POST rejection release the reservation. Migration backfill and regression tests cover both classes.
 
 ## Test-mode isolation
 
@@ -113,9 +117,9 @@ Location: `.gitignore:14`
 - Matches were limited to deployment expressions sourcing GitHub secrets/environment variables, documented examples, and test-only constants.
 - No live YooKassa key, private key, cloud token, or production credential was found.
 
-## Patch proposals
+## Applied patches
 
-Review each patch before applying. Nothing in this section has been changed yet.
+Both security patches were explicitly approved and applied in `9b335a7`.
 
 ### Patch 1 — Keep ambiguous payments active
 
@@ -137,7 +141,7 @@ attempt.status = PaymentAttemptStatus.UNKNOWN
 attempt.next_reconcile_at = None  # manual-review quarantine
 ```
 
-Add regression tests proving that a 24-hour aged unknown operation and a malformed successful response never permit another provider POST.
+Regression tests prove that a 24-hour aged unknown operation and a mismatched successful response never permit another provider POST.
 
 ### Patch 2 — Separate refund reservation from workflow status
 
@@ -154,7 +158,16 @@ After:
 funds_reserved: bool
 ```
 
-Set `funds_reserved=True` before the first POST and retain it for ambiguous/manual-review outcomes. Set it to `False` only for a definite rejected or canceled provider result. Add concurrency tests proving an aged unknown refund cannot free balance for a second refund.
+`funds_reserved=True` is set before the first POST and retained for ambiguous/manual-review outcomes. It becomes `False` only for a definite rejected or canceled provider result. Regression tests prove an aged unknown refund cannot free balance for a second refund, while an explicit retry works after a definite rejection.
+
+## Post-patch verification
+
+- Payments: 52 tests passed, including new ambiguous payment/refund and definite-rejection cases.
+- Migration: empty SQLite upgrade reached `20260825_0014`; seeded `0013` rows backfilled to the expected reservation values and the balance index was present.
+- Quality: Ruff check and format passed; strict mypy passed for all 32 Payments source files.
+- Contracts: OpenAPI regenerated without a diff; OpenAPI/gateway tests passed 16/16.
+- Client: frontend tests passed 25/25 and the Vite production build completed.
+- Security self-verification: no remaining path converts an unresolved provider payment into an inactive attempt or releases an unresolved refund reservation.
 
 ## Coverage
 
