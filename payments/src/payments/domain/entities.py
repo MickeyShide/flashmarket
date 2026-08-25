@@ -33,3 +33,13 @@ class ProviderOperationStatus(StrEnum):
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     QUARANTINED = "QUARANTINED"
+
+
+class WebhookInboxStatus(StrEnum):
+    """Durable lifecycle of an accepted provider notification."""
+
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    RETRY = "RETRY"
+    PROCESSED = "PROCESSED"
+    QUARANTINED = "QUARANTINED"

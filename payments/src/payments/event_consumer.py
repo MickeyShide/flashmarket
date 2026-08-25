@@ -204,16 +204,24 @@ async def run_reconciliation_loop() -> None:
                     provider_name=settings.payment_provider,
                     return_url=(settings.yookassa_return_url or "http://localhost/payment/return"),
                     test_mode_required=settings.yookassa_test_mode_required,
+                    webhook_max_attempts=settings.webhook_max_attempts,
                 )
-                processed = await service.reconcile_unknown_operations(
+                operations_processed = await service.reconcile_unknown_operations(
                     limit=settings.reconciliation_batch_size
                 )
-                if processed:
-                    logger.info("Reconciled %s uncertain provider operations", processed)
+                webhooks_processed = await service.process_webhook_inbox(
+                    limit=settings.webhook_batch_size
+                )
+                if operations_processed or webhooks_processed:
+                    logger.info(
+                        "Reconciliation batch completed: operations=%s webhooks=%s",
+                        operations_processed,
+                        webhooks_processed,
+                    )
         except asyncio.CancelledError:
             raise
         except Exception:
-            logger.exception("Provider operation reconciliation batch failed")
+            logger.exception("Payments reconciliation batch failed")
         await asyncio.sleep(settings.reconciliation_poll_interval_seconds)
 
 

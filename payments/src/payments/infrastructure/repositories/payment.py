@@ -7,15 +7,16 @@ from collections.abc import Sequence
 from datetime import timedelta
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from payments.domain.entities import ProviderOperationStatus
+from payments.domain.entities import ProviderOperationStatus, WebhookInboxStatus
 from payments.infrastructure.database import utc_now
 from payments.infrastructure.models import (
     OutboxEventModel,
     PaymentModel,
     ProviderOperationModel,
+    WebhookInboxModel,
 )
 
 
@@ -182,6 +183,71 @@ class ProviderOperationRepository:
     async def update(self, operation: ProviderOperationModel) -> ProviderOperationModel:
         await self._session.flush()
         return operation
+
+
+class WebhookInboxRepository:
+    """Persistence and leased batch claims for provider notifications."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(self, item: WebhookInboxModel) -> WebhookInboxModel:
+        self._session.add(item)
+        await self._session.flush()
+        return item
+
+    async def get_by_dedupe_hash(self, dedupe_hash: str) -> WebhookInboxModel | None:
+        result = await self._session.scalars(
+            select(WebhookInboxModel).where(WebhookInboxModel.dedupe_hash == dedupe_hash)
+        )
+        return result.first()
+
+    async def get_by_id_for_update(self, item_id: UUID) -> WebhookInboxModel | None:
+        result = await self._session.scalars(
+            select(WebhookInboxModel)
+            .where(WebhookInboxModel.id == item_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.first()
+
+    async def claim_due(
+        self,
+        *,
+        limit: int,
+        lease_seconds: int = 60,
+    ) -> tuple[UUID, Sequence[WebhookInboxModel]]:
+        now = utc_now()
+        token = uuid.uuid4()
+        result = await self._session.scalars(
+            select(WebhookInboxModel)
+            .where(
+                or_(
+                    WebhookInboxModel.status.in_(
+                        [WebhookInboxStatus.PENDING, WebhookInboxStatus.RETRY]
+                    ),
+                    (
+                        (WebhookInboxModel.status == WebhookInboxStatus.PROCESSING)
+                        & (WebhookInboxModel.claimed_until <= now)
+                    ),
+                ),
+                or_(
+                    WebhookInboxModel.next_attempt_at.is_(None),
+                    WebhookInboxModel.next_attempt_at <= now,
+                ),
+            )
+            .order_by(WebhookInboxModel.received_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        items = result.all()
+        for item in items:
+            item.status = WebhookInboxStatus.PROCESSING
+            item.claim_token = token
+            item.claimed_until = now + timedelta(seconds=lease_seconds)
+            item.attempt_count += 1
+        await self._session.flush()
+        return token, items
 
 
 class OutboxRepository:

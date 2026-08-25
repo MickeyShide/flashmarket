@@ -4580,31 +4580,6 @@
         "title": "ValidationError",
         "type": "object"
       },
-      "PaymentsYooKassaWebhook": {
-        "description": "Minimal incoming YooKassa notification envelope.",
-        "properties": {
-          "event": {
-            "title": "Event",
-            "type": "string"
-          },
-          "object": {
-            "additionalProperties": true,
-            "title": "Object",
-            "type": "object"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "event",
-          "object"
-        ],
-        "title": "YooKassaWebhook",
-        "type": "object"
-      },
       "WishlistAddToWishlistRequest": {
         "description": "Payload for adding a product to wishlist.",
         "properties": {
@@ -8300,13 +8275,30 @@
     },
     "/api/v1/payments/webhooks/yookassa": {
       "post": {
-        "description": "Treat the notification as a hint and verify current state through YooKassa API.",
+        "description": "Durably accept a bounded notification without provider network I/O.",
         "operationId": "yookassa_webhook_api_v1_payments_webhooks_yookassa_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PaymentsYooKassaWebhook"
+                "properties": {
+                  "event": {
+                    "type": "string"
+                  },
+                  "object": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "event",
+                  "object"
+                ],
+                "type": "object"
               }
             }
           },
@@ -8326,16 +8318,6 @@
               }
             },
             "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaymentsHTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "security": [],

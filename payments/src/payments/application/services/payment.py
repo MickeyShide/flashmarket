@@ -3,19 +3,22 @@
 from __future__ import annotations
 
 import json
+import random
 import uuid
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 
+from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from payments.application.contracts import PaymentProvider, ProviderPayment, ProviderRefund
-from payments.application.schemas import CreatePaymentRequest
+from payments.application.schemas import CreatePaymentRequest, YooKassaWebhook
 from payments.domain.entities import (
     PaymentEventType,
     PaymentStatus,
     ProviderOperationStatus,
+    WebhookInboxStatus,
 )
 from payments.domain.exceptions import (
     InvalidPaymentState,
@@ -27,11 +30,16 @@ from payments.domain.exceptions import (
     PaymentVerificationFailed,
 )
 from payments.infrastructure.database import utc_now
-from payments.infrastructure.models import PaymentModel, ProviderOperationModel
+from payments.infrastructure.models import (
+    PaymentModel,
+    ProviderOperationModel,
+    WebhookInboxModel,
+)
 from payments.infrastructure.repositories.payment import (
     OutboxRepository,
     PaymentRepository,
     ProviderOperationRepository,
+    WebhookInboxRepository,
 )
 
 
@@ -44,16 +52,19 @@ class PaymentService:
         payment_repo: PaymentRepository,
         outbox_repo: OutboxRepository,
         operation_repo: ProviderOperationRepository | None = None,
+        webhook_repo: WebhookInboxRepository | None = None,
         provider: PaymentProvider | None = None,
         *,
         provider_name: str = "mock",
         return_url: str = "http://localhost/payment/return",
         test_mode_required: bool = True,
+        webhook_max_attempts: int = 12,
     ) -> None:
         self._session = session
         self._payment_repo = payment_repo
         self._outbox_repo = outbox_repo
         self._operation_repo = operation_repo or ProviderOperationRepository(session)
+        self._webhook_repo = webhook_repo or WebhookInboxRepository(session)
         if provider is None:
             from payments.infrastructure.providers.mock import MockPaymentProvider
 
@@ -62,6 +73,7 @@ class PaymentService:
         self._provider_name = provider_name
         self._return_url = return_url
         self._test_mode_required = test_mode_required
+        self._webhook_max_attempts = webhook_max_attempts
 
     async def create_payment(self, data: CreatePaymentRequest) -> PaymentModel:
         """Create a pending payment for administrative/mock workflows."""
@@ -471,6 +483,181 @@ class PaymentService:
             PaymentEventType.PAYMENT_FAILED,
             json.dumps(payload, separators=(",", ":")),
         )
+
+    async def ingest_webhook(self, raw_body: bytes, *, source_ip: str | None) -> str:
+        """Persist a notification before acknowledging it to the provider."""
+        raw_text = raw_body.decode("utf-8", errors="replace")
+        status = WebhookInboxStatus.PENDING
+        last_error: str | None = None
+        object_type: str | None = None
+        external_id: str | None = None
+        event: str | None = None
+        target_status: str | None = None
+        try:
+            notification = YooKassaWebhook.model_validate_json(raw_body)
+            event = notification.event
+            external_raw = notification.object.get("id")
+            status_raw = notification.object.get("status")
+            if notification.type != "notification":
+                raise ValueError("invalid_notification_type")
+            if not isinstance(external_raw, str) or not external_raw:
+                raise ValueError("missing_object_id")
+            object_type, separator, event_status = event.partition(".")
+            if not separator or object_type not in {"payment", "refund"}:
+                raise ValueError("unsupported_event")
+            external_id = external_raw
+            target_status = str(status_raw) if status_raw is not None else event_status
+            supported = event in {
+                "payment.succeeded",
+                "payment.canceled",
+                "refund.succeeded",
+            }
+            if not supported:
+                status = WebhookInboxStatus.PROCESSED
+                last_error = "unsupported_event"
+        except (ValidationError, ValueError) as exc:
+            status = WebhookInboxStatus.QUARANTINED
+            last_error = (
+                "malformed_notification" if isinstance(exc, ValidationError) else str(exc)
+            )
+
+        semantic = {
+            "provider": self._provider_name,
+            "object_type": object_type,
+            "external_id": external_id,
+            "event": event,
+            "target_status": target_status,
+        }
+        if external_id is None:
+            semantic["raw_hash"] = sha256(raw_body).hexdigest()
+        dedupe_hash = sha256(
+            json.dumps(semantic, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        item = WebhookInboxModel(
+            provider=self._provider_name,
+            object_type=object_type,
+            external_id=external_id,
+            event=event,
+            target_status=target_status,
+            dedupe_hash=dedupe_hash,
+            raw_body=raw_text,
+            source_ip=source_ip,
+            status=status,
+            last_error_code=last_error,
+            processed_at=utc_now() if status == WebhookInboxStatus.PROCESSED else None,
+        )
+        try:
+            await self._webhook_repo.create(item)
+            await self._session.commit()
+            return "accepted" if status == WebhookInboxStatus.PENDING else "acknowledged"
+        except IntegrityError:
+            await self._session.rollback()
+            existing = await self._webhook_repo.get_by_dedupe_hash(dedupe_hash)
+            if existing is None:
+                raise
+            return "duplicate"
+
+    async def process_webhook_inbox(self, *, limit: int = 50) -> int:
+        """Verify and apply a bounded batch of durably accepted notifications."""
+        claim_token, claimed = await self._webhook_repo.claim_due(limit=limit)
+        item_ids = [item.id for item in claimed]
+        await self._session.commit()
+        for item_id in item_ids:
+            await self._process_webhook_item(item_id, claim_token)
+        return len(item_ids)
+
+    async def _process_webhook_item(
+        self,
+        item_id: uuid.UUID,
+        claim_token: uuid.UUID,
+    ) -> None:
+        item = await self._webhook_repo.get_by_id_for_update(item_id)
+        if item is None or item.claim_token != claim_token:
+            await self._session.rollback()
+            return
+        object_type = item.object_type
+        external_id = item.external_id
+        await self._session.commit()
+        if external_id is None:
+            await self._finish_webhook_item(
+                item_id,
+                claim_token,
+                status=WebhookInboxStatus.QUARANTINED,
+                error_code="missing_object_id",
+            )
+            return
+        try:
+            if object_type == "payment":
+                await self.reconcile_external_payment(external_id)
+            elif object_type == "refund":
+                await self.reconcile_refund(external_id)
+            else:
+                raise PaymentVerificationFailed("Unsupported webhook object")
+        except PaymentProviderUnavailable as exc:
+            await self._retry_webhook_item(item_id, claim_token, error_code=exc.code)
+            return
+        except (PaymentVerificationFailed, PaymentProviderRejected) as exc:
+            await self._finish_webhook_item(
+                item_id,
+                claim_token,
+                status=WebhookInboxStatus.QUARANTINED,
+                error_code=exc.code,
+            )
+            return
+        await self._finish_webhook_item(
+            item_id,
+            claim_token,
+            status=WebhookInboxStatus.PROCESSED,
+            error_code=None,
+        )
+
+    async def _retry_webhook_item(
+        self,
+        item_id: uuid.UUID,
+        claim_token: uuid.UUID,
+        *,
+        error_code: str,
+    ) -> None:
+        item = await self._webhook_repo.get_by_id_for_update(item_id)
+        if item is None or item.claim_token != claim_token:
+            await self._session.rollback()
+            return
+        if item.attempt_count >= self._webhook_max_attempts:
+            await self._finish_webhook_item(
+                item_id,
+                claim_token,
+                status=WebhookInboxStatus.QUARANTINED,
+                error_code=f"retry_exhausted:{error_code}",
+            )
+            return
+        ceiling = min(5 * (2 ** min(item.attempt_count, 7)), 900)
+        delay = random.uniform(ceiling / 2, ceiling)  # noqa: S311
+        item.status = WebhookInboxStatus.RETRY
+        item.next_attempt_at = utc_now() + timedelta(seconds=delay)
+        item.last_error_code = error_code
+        item.claim_token = None
+        item.claimed_until = None
+        await self._session.commit()
+
+    async def _finish_webhook_item(
+        self,
+        item_id: uuid.UUID,
+        claim_token: uuid.UUID,
+        *,
+        status: WebhookInboxStatus,
+        error_code: str | None,
+    ) -> None:
+        item = await self._webhook_repo.get_by_id_for_update(item_id)
+        if item is None or item.claim_token != claim_token:
+            await self._session.rollback()
+            return
+        item.status = status
+        item.last_error_code = error_code
+        item.next_attempt_at = None
+        item.claim_token = None
+        item.claimed_until = None
+        item.processed_at = utc_now()
+        await self._session.commit()
 
     async def reconcile_payment(self, remote: ProviderPayment) -> PaymentModel:
         """Apply a provider's current status after full server-side verification."""

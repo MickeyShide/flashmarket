@@ -18,7 +18,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from payments.domain.entities import PaymentStatus, ProviderOperationStatus
+from payments.domain.entities import (
+    PaymentStatus,
+    ProviderOperationStatus,
+    WebhookInboxStatus,
+)
 from payments.infrastructure.database import Base, utc_now
 
 
@@ -110,6 +114,42 @@ class ProviderOperationModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
     )
+
+
+class WebhookInboxModel(Base):
+    """Durably accepted provider notification awaiting verified processing."""
+
+    __tablename__ = "webhook_inbox"
+    __table_args__ = (
+        UniqueConstraint("dedupe_hash", name="uq_webhook_inbox_dedupe_hash"),
+        Index("ix_webhook_inbox_due", "status", "next_attempt_at", "received_at"),
+        CheckConstraint("attempt_count >= 0", name="ck_webhook_inbox_attempts"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    object_type: Mapped[str | None] = mapped_column(String(32))
+    external_id: Mapped[str | None] = mapped_column(String(255), index=True)
+    event: Mapped[str | None] = mapped_column(String(64))
+    target_status: Mapped[str | None] = mapped_column(String(64))
+    dedupe_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    raw_body: Mapped[str] = mapped_column(Text, nullable=False)
+    source_ip: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[WebhookInboxStatus] = mapped_column(
+        String(20),
+        nullable=False,
+        default=WebhookInboxStatus.PENDING,
+        server_default="PENDING",
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    claim_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_code: Mapped[str | None] = mapped_column(String(128))
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class OutboxEventModel(Base):

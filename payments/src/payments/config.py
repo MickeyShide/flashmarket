@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     yookassa_circuit_recovery_seconds: float = Field(default=15.0, ge=1, le=300)
     reconciliation_batch_size: int = Field(default=20, ge=1, le=100)
     reconciliation_poll_interval_seconds: float = Field(default=5.0, ge=0.5, le=300)
+    webhook_max_body_bytes: int = Field(default=32_768, ge=1024, le=1_048_576)
+    webhook_batch_size: int = Field(default=50, ge=1, le=500)
+    webhook_max_attempts: int = Field(default=12, ge=1, le=100)
+    yookassa_webhook_require_https: bool = False
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
     rabbitmq_publish_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
@@ -156,6 +160,8 @@ class Settings(BaseSettings):
             errors.append("PAYMENTS_YOOKASSA_RETURN_URL must be an absolute HTTP(S) URL")
         if not self.yookassa_api_url.startswith("https://"):
             errors.append("PAYMENTS_YOOKASSA_API_URL must use HTTPS")
+        if self.environment == "production" and not self.yookassa_webhook_require_https:
+            errors.append("PAYMENTS_YOOKASSA_WEBHOOK_REQUIRE_HTTPS must be true in production")
         if errors:
             raise ValueError("Invalid YooKassa configuration: " + "; ".join(errors))
         return self

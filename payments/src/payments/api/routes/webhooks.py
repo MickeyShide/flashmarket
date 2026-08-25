@@ -1,11 +1,10 @@
 """Public callbacks from payment providers."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from payments.api.dependencies import get_payment_service
-from payments.application.schemas import YooKassaWebhook
 from payments.application.services.payment import PaymentService
-from payments.domain.exceptions import PaymentVerificationFailed
+from payments.config import get_settings
 from payments.observability import WEBHOOK_EVENTS
 
 router = APIRouter(prefix="/api/v1/payments/webhooks", tags=["payment-webhooks"])
@@ -15,25 +14,48 @@ router = APIRouter(prefix="/api/v1/payments/webhooks", tags=["payment-webhooks"]
     "/yookassa",
     status_code=200,
     summary="Receive a YooKassa notification",
-    openapi_extra={"x-flashmarket-access": "anonymous"},
+    openapi_extra={
+        "x-flashmarket-access": "anonymous",
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "required": ["type", "event", "object"],
+                        "properties": {
+                            "type": {"type": "string"},
+                            "event": {"type": "string"},
+                            "object": {"type": "object", "additionalProperties": True},
+                        },
+                    }
+                }
+            },
+        },
+    },
 )
 async def yookassa_webhook(
-    notification: YooKassaWebhook,
+    request: Request,
     service: PaymentService = Depends(get_payment_service),
 ) -> dict[str, str]:
-    """Treat the notification as a hint and verify current state through YooKassa API."""
-    if notification.type != "notification":
-        raise PaymentVerificationFailed("Invalid notification type")
-    external_id = notification.object.get("id")
-    if not isinstance(external_id, str) or not external_id:
-        raise PaymentVerificationFailed("Notification object identifier is missing")
-
-    if notification.event in {"payment.succeeded", "payment.canceled"}:
-        await service.reconcile_external_payment(external_id)
-    elif notification.event == "refund.succeeded":
-        await service.reconcile_refund(external_id)
-    else:
-        WEBHOOK_EVENTS.labels(event=notification.event, result="ignored").inc()
-        return {"status": "ignored"}
-    WEBHOOK_EVENTS.labels(event=notification.event, result="processed").inc()
-    return {"status": "ok"}
+    """Durably accept a bounded notification without provider network I/O."""
+    settings = get_settings()
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    if settings.yookassa_webhook_require_https and not (
+        request.url.scheme == "https" or forwarded_proto == "https"
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="HTTPS required")
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > settings.webhook_max_body_bytes:
+                raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from exc
+    raw_body = await request.body()
+    if len(raw_body) > settings.webhook_max_body_bytes:
+        raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE)
+    source_ip = request.client.host if request.client is not None else None
+    result = await service.ingest_webhook(raw_body, source_ip=source_ip)
+    WEBHOOK_EVENTS.labels(event="notification", result=result).inc()
+    return {"status": result}

@@ -19,7 +19,11 @@ from payments.domain.entities import PaymentStatus, ProviderOperationStatus
 from payments.domain.exceptions import PaymentProviderResultUnknown
 from payments.event_consumer import handle_payment_requested
 from payments.infrastructure.database import utc_now
-from payments.infrastructure.models import OutboxEventModel, ProviderOperationModel
+from payments.infrastructure.models import (
+    OutboxEventModel,
+    ProviderOperationModel,
+    WebhookInboxModel,
+)
 from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
 from payments.main import app
 
@@ -129,6 +133,23 @@ async def _authoritative_payment(
     return order_id, user_id
 
 
+async def _process_webhooks(
+    session_factory: async_sessionmaker[AsyncSession],
+    provider: FakeProvider,
+) -> int:
+    async with session_factory() as session:
+        service = PaymentService(
+            session=session,
+            payment_repo=PaymentRepository(session),
+            outbox_repo=OutboxRepository(session),
+            provider=provider,
+            provider_name="yookassa",
+            return_url="https://shop.test/payment/return",
+            test_mode_required=True,
+        )
+        return await service.process_webhook_inbox(limit=50)
+
+
 @pytest.mark.asyncio
 async def test_checkout_is_idempotent_and_webhook_is_verified(
     client: AsyncClient,
@@ -157,6 +178,9 @@ async def test_checkout_is_idempotent_and_webhook_is_verified(
     duplicate = await client.post("/api/v1/payments/webhooks/yookassa", json=notification)
     assert response.status_code == 200
     assert duplicate.status_code == 200
+    assert response.json()["status"] == "accepted"
+    assert duplicate.json()["status"] == "duplicate"
+    assert await _process_webhooks(session_factory, provider) == 1
 
     async with session_factory() as session:
         payment = await PaymentRepository(session).get_by_order_id(order_id)
@@ -274,13 +298,79 @@ async def test_webhook_rejects_provider_amount_mismatch(
             "object": {"id": external_id},
         },
     )
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "payment_verification_failed"
+    assert response.status_code == 200
+    assert await _process_webhooks(session_factory, provider) == 1
 
     async with session_factory() as session:
         payment = await PaymentRepository(session).get_by_order_id(order_id)
         assert payment is not None
         assert payment.status == PaymentStatus.PENDING
+        inbox = await session.scalar(select(WebhookInboxModel))
+        assert inbox is not None
+        assert inbox.status == "QUARANTINED"
+        assert inbox.last_error_code == "payment_verification_failed"
+
+
+@pytest.mark.asyncio
+async def test_malformed_webhook_is_durably_quarantined_and_acknowledged(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    response = await client.post(
+        "/api/v1/payments/webhooks/yookassa",
+        content=b"not-json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "acknowledged"
+    async with session_factory() as session:
+        inbox = await session.scalar(select(WebhookInboxModel))
+        assert inbox is not None
+        assert inbox.status == "QUARANTINED"
+        assert inbox.last_error_code == "malformed_notification"
+
+
+@pytest.mark.asyncio
+async def test_out_of_order_webhooks_apply_current_provider_state_once(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = FakeProvider()
+    app.dependency_overrides[get_payment_provider] = lambda: provider
+    order_id, _ = await _authoritative_payment(session_factory)
+    await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+    external_id = next(iter(provider.payments))
+    provider.payments[external_id] = replace(provider.payments[external_id], status="succeeded")
+
+    canceled_hint = await client.post(
+        "/api/v1/payments/webhooks/yookassa",
+        json={
+            "type": "notification",
+            "event": "payment.canceled",
+            "object": {"id": external_id, "status": "canceled"},
+        },
+    )
+    succeeded_hint = await client.post(
+        "/api/v1/payments/webhooks/yookassa",
+        json={
+            "type": "notification",
+            "event": "payment.succeeded",
+            "object": {"id": external_id, "status": "succeeded"},
+        },
+    )
+    assert canceled_hint.status_code == succeeded_hint.status_code == 200
+    assert await _process_webhooks(session_factory, provider) == 2
+
+    async with session_factory() as session:
+        payment = await PaymentRepository(session).get_by_order_id(order_id)
+        events = (
+            await session.scalars(
+                select(OutboxEventModel).where(OutboxEventModel.event_type == "PaymentSucceeded")
+            )
+        ).all()
+        assert payment is not None
+        assert payment.status == PaymentStatus.SUCCESS
+        assert len(events) == 1
 
 
 @pytest.mark.asyncio
@@ -302,6 +392,7 @@ async def test_full_refund_changes_state_only_after_provider_success(
             "object": {"id": external_id},
         },
     )
+    assert await _process_webhooks(session_factory, provider) == 1
 
     async with session_factory() as session:
         payment = await PaymentRepository(session).get_by_order_id(order_id)

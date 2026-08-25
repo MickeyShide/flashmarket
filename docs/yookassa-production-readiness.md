@@ -45,17 +45,17 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 ## 4. Webhook ingestion
 
-- [ ] Additive `webhook_inbox` migration and repository.
-- [ ] Semantic deduplication without relying on a provider event ID.
-- [ ] Handler persists then returns HTTP 200 without provider network I/O.
-- [ ] Inbox worker verifies current provider state through GET.
-- [ ] Duplicate, out-of-order, malformed, and permanent-mismatch handling.
-- [ ] Retry and quarantine state with bounded attempts.
-- [ ] Dedicated gateway location, body limit, source allowlist, and independent burst policy.
+- [x] Additive `webhook_inbox` migration and repository.
+- [x] Semantic deduplication without relying on a provider event ID.
+- [x] Handler persists then returns HTTP 200 without provider network I/O.
+- [x] Inbox worker verifies current provider state through GET.
+- [x] Duplicate, out-of-order, malformed, and permanent-mismatch handling.
+- [x] Retry and quarantine state with bounded attempts.
+- [x] Dedicated gateway location, body limit, source allowlist, and independent burst policy.
 
 ## 5. Reconciliation
 
-- [~] Worker claims bounded batches with `FOR UPDATE SKIP LOCKED` (provider operations done; other queues pending).
+- [~] Worker claims bounded batches with `FOR UPDATE SKIP LOCKED` (provider operations and webhooks done; attempts/refunds pending).
 - [~] No database transaction remains open during provider I/O (checkout/recovery done; refunds/webhooks pending).
 - [x] Reconcile unknown create operations.
 - [ ] Reconcile active/stale payment attempts.
@@ -123,3 +123,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 | 2026-08-25 | CI repair | Payments `25 passed`; strict mypy; changed-file Ruff/format; OpenAPI generation; OpenAPI tests `4 passed` | Pass |
 | 2026-08-25 | Provider resilience | Payments `29 passed`; strict mypy; scoped Ruff/format | Pass |
 | 2026-08-25 | Durable provider operations | Payments `31 passed`; strict mypy; scoped Ruff/format | Pass |
+| 2026-08-25 | Durable webhook inbox | Payments `33 passed`; strict mypy; scoped Ruff/format; gateway syntax not runnable because local Docker daemon is unavailable | Pass with noted local-tool limitation |

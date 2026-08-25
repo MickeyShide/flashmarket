@@ -6,6 +6,7 @@ services:
     container_name: flashmarket-gateway
     volumes:
       - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      - ./yookassa-allowlist.conf:/etc/nginx/yookassa-allowlist.conf:ro
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:80"
       - "127.0.0.1:${MEDIA_STORAGE_PORT:-9000}:9000"

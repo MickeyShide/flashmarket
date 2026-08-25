@@ -156,7 +156,8 @@
       "name": "Payments",
       "operationCount": 9,
       "prefixes": [
-        "/api/v1/payments"
+        "/api/v1/payments",
+        "/api/v1/payments/webhooks/yookassa"
       ],
       "statusUrl": "/dev/status/payments",
       "tags": [

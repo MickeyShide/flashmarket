@@ -56,6 +56,7 @@ def get_payment_service(
         provider_name=settings.payment_provider,
         return_url=settings.yookassa_return_url or "http://localhost/payment/return",
         test_mode_required=settings.yookassa_test_mode_required,
+        webhook_max_attempts=settings.webhook_max_attempts,
     )
 
 
