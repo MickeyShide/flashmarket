@@ -22,6 +22,14 @@ export function parseRoute(
     };
   }
 
+  if (path === '/architecture' || /^\/docs\/architecture\/?$/.test(path)) {
+    return { view: 'architecture' };
+  }
+
+  if (path === '/dev') {
+    return { view: 'dev' };
+  }
+
   // 4. Product Details: /product/:slug or /products/:slug
   const productMatch = path.match(/^\/products?\/([^/]+)/);
   if (productMatch) {
@@ -105,6 +113,10 @@ export function formatRouteUrl({ view, productSlug, dropIdentifier, orderId, pro
       return orderId
         ? `/payment/return?order_id=${encodeURIComponent(orderId)}`
         : '/payment/return';
+    case 'architecture':
+      return '/architecture';
+    case 'dev':
+      return '/dev';
     case 'order-detail':
       return orderId ? `/orders/${encodeURIComponent(orderId)}` : '/profile/orders';
     case 'auth':
