@@ -297,8 +297,13 @@ class YooKassaPaymentProvider:
                 cancellation_reason=(
                     str(cancellation["reason"]) if cancellation.get("reason") else None
                 ),
+                expires_at=(
+                    datetime.fromisoformat(str(payload["expires_at"]).replace("Z", "+00:00"))
+                    if payload.get("expires_at")
+                    else None
+                ),
             )
-        except (KeyError, TypeError, AttributeError) as exc:
+        except (KeyError, TypeError, AttributeError, ValueError) as exc:
             raise PaymentProviderMalformedResponse from exc
 
     @staticmethod

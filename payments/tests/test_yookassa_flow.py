@@ -291,7 +291,7 @@ async def test_concurrent_checkout_converges_on_one_active_attempt(
 
 
 @pytest.mark.asyncio
-async def test_expired_attempt_creates_a_new_attempt_for_same_order(
+async def test_expired_attempt_requires_provider_confirmation_before_retry(
     client: AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -305,10 +305,31 @@ async def test_expired_attempt_creates_a_new_attempt_for_same_order(
         attempt = await session.get(PaymentAttemptModel, uuid.UUID(first_attempt_id))
         assert attempt is not None
         attempt.expires_at = utc_now() - timedelta(seconds=1)
+        attempt.next_reconcile_at = utc_now() - timedelta(seconds=1)
 
     second = await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
     assert second.status_code == 200
-    assert second.json()["attempt_id"] != first_attempt_id
+    assert second.json()["attempt_id"] == first_attempt_id
+    assert provider.create_calls == 1
+    external_id = next(iter(provider.payments))
+    provider.payments[external_id] = replace(
+        provider.payments[external_id],
+        status="canceled",
+        cancellation_reason="expired_on_confirmation",
+    )
+    async with session_factory() as session:
+        service = PaymentService(
+            session=session,
+            payment_repo=PaymentRepository(session),
+            outbox_repo=OutboxRepository(session),
+            provider=provider,
+            provider_name="yookassa",
+        )
+        assert await service.reconcile_active_attempts(limit=10) == 1
+
+    third = await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+    assert third.status_code == 200
+    assert third.json()["attempt_id"] != first_attempt_id
     assert provider.create_calls == 2
     async with session_factory() as session:
         attempts = (
@@ -316,7 +337,7 @@ async def test_expired_attempt_creates_a_new_attempt_for_same_order(
                 select(PaymentAttemptModel).order_by(PaymentAttemptModel.attempt_number)
             )
         ).all()
-        assert [attempt.status for attempt in attempts] == ["EXPIRED", "PENDING"]
+        assert [attempt.status for attempt in attempts] == ["CANCELED", "PENDING"]
 
 
 @pytest.mark.asyncio

@@ -55,12 +55,12 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 ## 5. Reconciliation
 
-- [~] Worker claims bounded batches with `FOR UPDATE SKIP LOCKED` (provider operations and webhooks done; attempts/refunds pending).
+- [x] Worker claims bounded batches with `FOR UPDATE SKIP LOCKED` for operations, webhooks, attempts, and refunds.
 - [x] No database transaction remains open during provider I/O.
 - [x] Reconcile unknown create operations.
-- [ ] Reconcile active/stale payment attempts.
+- [x] Reconcile active/stale payment attempts without trusting local expiry alone.
 - [x] Reconcile pending refunds, including canceled refunds without a webhook.
-- [ ] Backoff, jitter, heartbeat, lag, and quarantine metrics.
+- [x] Backoff, jitter, heartbeat, lag, quarantine metrics, and alert rules.
 
 ## 6. Multiple payment attempts
 
@@ -103,14 +103,14 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 ## 10. Observability and final verification
 
-- [ ] Provider latency/outcome, concurrency, and circuit metrics.
-- [ ] Unknown-operation age/count metrics and alerts.
-- [ ] Webhook inbox depth, lag, retries, and quarantine metrics.
-- [ ] Attempt/refund/reconciliation age and drift metrics.
-- [ ] No high-cardinality financial identifiers in metric labels.
-- [ ] Migration upgrade verification.
-- [ ] Payments unit/integration/concurrency suite.
-- [ ] Ruff for changed code and strict mypy.
+- [x] Provider latency/outcome, concurrency, and circuit metrics.
+- [x] Unknown-operation age/count metrics and alerts.
+- [x] Webhook inbox depth, lag, retries, and quarantine metrics.
+- [x] Attempt/refund/reconciliation age and drift metrics.
+- [x] No high-cardinality financial identifiers in metric labels.
+- [x] Migration upgrade verification from an empty database through revision `20260825_0013`.
+- [x] Payments unit/integration/concurrency suite.
+- [x] Ruff for changed code and strict mypy.
 - [ ] Repository OpenAPI generation and tests.
 - [ ] Frontend tests and production build.
 - [ ] Final security and failure-mode audit.
@@ -127,4 +127,5 @@ Live payments must remain disabled. An item is marked complete only after its re
 | 2026-08-25 | Multiple payment attempts | Payments `36 passed`; strict mypy; scoped Ruff/format; concurrent file-backed SQLite test | Pass |
 | 2026-08-25 | Normalized refunds | Payments `42 passed`; strict mypy; scoped Ruff/format; partial/over-refund, reason-policy, and unknown-result recovery tests | Pass |
 | 2026-08-25 | Frontend payment flow | Frontend `25 passed`; Vite production build; Payments `42 passed`; strict mypy; scoped Ruff/format | Pass |
-| 2026-08-25 | Ledger, receipts, and reports | Payments `46 passed`; full Payments Ruff; strict mypy; deterministic Moscow-time CSV reconciliation | Pass |
+| 2026-08-25 | Ledger, receipts, and reports | Payments `47 passed`; full Payments Ruff; strict mypy; deterministic Moscow-time CSV reconciliation | Pass |
+| 2026-08-25 | Attempt reconciliation and observability | Payments `48 passed`; full Payments Ruff; strict mypy; Alembic empty SQLite upgrade through `20260825_0013`; Prometheus alert rules added | Pass |

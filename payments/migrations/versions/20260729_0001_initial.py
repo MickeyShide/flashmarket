@@ -34,11 +34,11 @@ def upgrade() -> None:
     )
     op.create_index("ix_payments_order_id", "payments", ["order_id"])
     op.create_index("ix_payments_user_id", "payments", ["user_id"])
-    op.create_check_constraint(
-        "ck_payments_amount_positive",
-        "payments",
-        "amount > 0",
-    )
+    with op.batch_alter_table("payments") as batch_op:
+        batch_op.create_check_constraint(
+            "ck_payments_amount_positive",
+            "amount > 0",
+        )
 
     op.create_table(
         "outbox_events",

@@ -338,7 +338,11 @@ class PaymentService:
         locked_attempt.confirmation_url = remote.confirmation_url
         locked_attempt.provider_test = remote.test
         locked_attempt.cancellation_reason = remote.cancellation_reason
+        locked_attempt.expires_at = remote.expires_at or locked_attempt.expires_at
         locked_attempt.status = PaymentAttemptStatus.PENDING
+        locked_attempt.next_reconcile_at = utc_now() + timedelta(
+            seconds=random.uniform(30, 60)  # noqa: S311
+        )
         self._sync_attempt_summary(locked, locked_attempt)
         locked_operation.status = ProviderOperationStatus.SUCCEEDED
         locked_operation.external_id = remote.id
@@ -371,7 +375,7 @@ class PaymentService:
 
     @staticmethod
     def _attempt_expired(attempt: PaymentAttemptModel) -> bool:
-        if attempt.status == PaymentAttemptStatus.UNKNOWN or attempt.expires_at is None:
+        if attempt.status != PaymentAttemptStatus.NEW or attempt.expires_at is None:
             return False
         expires_at = attempt.expires_at
         if expires_at.tzinfo is None:
@@ -419,6 +423,7 @@ class PaymentService:
                 "metadata": remote.metadata,
                 "confirmation_url": remote.confirmation_url,
                 "cancellation_reason": remote.cancellation_reason,
+                "expires_at": remote.expires_at.isoformat() if remote.expires_at else None,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -850,6 +855,7 @@ class PaymentService:
             attempt.external_status = remote.status
             attempt.provider_test = remote.test
             attempt.cancellation_reason = remote.cancellation_reason
+            attempt.expires_at = remote.expires_at or attempt.expires_at
             if remote.confirmation_url:
                 attempt.confirmation_url = remote.confirmation_url
         else:
@@ -861,6 +867,9 @@ class PaymentService:
         if remote.status == "succeeded":
             if attempt is not None:
                 attempt.status = PaymentAttemptStatus.SUCCEEDED
+                attempt.next_reconcile_at = None
+                attempt.claim_token = None
+                attempt.claimed_until = None
                 self._sync_attempt_summary(payment, attempt)
             if payment.status not in (PaymentStatus.SUCCESS, PaymentStatus.REFUNDED):
                 payment.status = PaymentStatus.SUCCESS
@@ -868,6 +877,9 @@ class PaymentService:
         elif remote.status == "canceled":
             if attempt is not None:
                 attempt.status = PaymentAttemptStatus.CANCELED
+                attempt.next_reconcile_at = None
+                attempt.claim_token = None
+                attempt.claimed_until = None
                 if payment.current_attempt_id == attempt.id:
                     self._sync_attempt_summary(payment, attempt)
             expires_at = payment.expires_at
@@ -885,6 +897,11 @@ class PaymentService:
                 )
         elif attempt is not None:
             attempt.status = PaymentAttemptStatus.PENDING
+            attempt.next_reconcile_at = utc_now() + timedelta(
+                seconds=random.uniform(30, 60)  # noqa: S311
+            )
+            attempt.claim_token = None
+            attempt.claimed_until = None
             if payment.current_attempt_id == attempt.id:
                 self._sync_attempt_summary(payment, attempt)
 
@@ -899,6 +916,65 @@ class PaymentService:
         if remote.id != external_id:
             raise PaymentVerificationFailed("Provider payment identifier does not match")
         return await self.reconcile_payment(remote)
+
+    async def reconcile_active_attempts(self, *, limit: int = 20) -> int:
+        """Poll a leased, bounded batch of active provider payments."""
+        claim_token, claimed = await self._attempt_repo.claim_due(limit=limit)
+        snapshots = [(attempt.id, attempt.external_id) for attempt in claimed]
+        await self._session.commit()
+        for attempt_id, external_id in snapshots:
+            if external_id is None:
+                continue
+            try:
+                remote = await self._provider.get_payment(external_id)
+                if remote.id != external_id:
+                    raise PaymentVerificationFailed("Provider payment identifier does not match")
+                await self.reconcile_payment(remote)
+            except PaymentProviderUnavailable as exc:
+                await self._reschedule_attempt(attempt_id, claim_token, exc.code)
+            except PaymentProviderRejected, PaymentVerificationFailed:
+                await self._quarantine_attempt(attempt_id, claim_token)
+        return len(snapshots)
+
+    async def _reschedule_attempt(
+        self,
+        attempt_id: uuid.UUID,
+        claim_token: uuid.UUID,
+        error_code: str,
+    ) -> None:
+        attempt = await self._attempt_repo.get_by_id_for_update(attempt_id)
+        if attempt is None or attempt.claim_token != claim_token:
+            await self._session.rollback()
+            return
+        ceiling = min(15 * (2 ** min(attempt.reconcile_attempt_count, 6)), 900)
+        attempt.next_reconcile_at = utc_now() + timedelta(
+            seconds=random.uniform(ceiling / 2, ceiling)  # noqa: S311
+        )
+        attempt.cancellation_reason = error_code
+        attempt.claim_token = None
+        attempt.claimed_until = None
+        await self._session.commit()
+
+    async def _quarantine_attempt(
+        self,
+        attempt_id: uuid.UUID,
+        claim_token: uuid.UUID,
+    ) -> None:
+        attempt = await self._attempt_repo.get_by_id_for_update(attempt_id)
+        if attempt is None or attempt.claim_token != claim_token:
+            await self._session.rollback()
+            return
+        # Verification failure does not prove that the remote payment cannot
+        # still succeed. Keep the attempt active and block a second charge.
+        attempt.status = PaymentAttemptStatus.UNKNOWN
+        attempt.cancellation_reason = "reconciliation_verification_failed"
+        attempt.next_reconcile_at = None
+        attempt.claim_token = None
+        attempt.claimed_until = None
+        payment = await self._payment_repo.get_by_id_for_update(attempt.payment_id)
+        if payment is not None and payment.current_attempt_id == attempt.id:
+            self._sync_attempt_summary(payment, attempt)
+        await self._session.commit()
 
     @staticmethod
     def _verify_refund(

@@ -258,6 +258,47 @@ class PaymentAttemptRepository:
         )
         return int(current or 0) + 1
 
+    async def claim_due(
+        self,
+        *,
+        limit: int,
+        lease_seconds: int = 60,
+    ) -> tuple[UUID, Sequence[PaymentAttemptModel]]:
+        """Claim active attempts that already have a safe provider GET identity."""
+        now = utc_now()
+        token = uuid.uuid4()
+        result = await self._session.scalars(
+            select(PaymentAttemptModel)
+            .where(
+                PaymentAttemptModel.status.in_(
+                    [
+                        PaymentAttemptStatus.PREPARING,
+                        PaymentAttemptStatus.UNKNOWN,
+                        PaymentAttemptStatus.PENDING,
+                    ]
+                ),
+                PaymentAttemptModel.external_id.is_not(None),
+                or_(
+                    PaymentAttemptModel.next_reconcile_at.is_(None),
+                    PaymentAttemptModel.next_reconcile_at <= now,
+                ),
+                or_(
+                    PaymentAttemptModel.claimed_until.is_(None),
+                    PaymentAttemptModel.claimed_until <= now,
+                ),
+            )
+            .order_by(PaymentAttemptModel.created_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        attempts = result.all()
+        for attempt in attempts:
+            attempt.claim_token = token
+            attempt.claimed_until = now + timedelta(seconds=lease_seconds)
+            attempt.reconcile_attempt_count += 1
+        await self._session.flush()
+        return token, attempts
+
 
 class RefundRepository:
     """Persistence and balance queries for normalized refunds."""

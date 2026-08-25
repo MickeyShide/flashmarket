@@ -20,6 +20,7 @@ class ProviderPayment:
     metadata: dict[str, str]
     confirmation_url: str | None = None
     cancellation_reason: str | None = None
+    expires_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

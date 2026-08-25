@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from payments.domain.exceptions import (
+    PaymentProviderMalformedResponse,
     PaymentProviderRateLimited,
     PaymentProviderRejected,
     PaymentProviderResultUnknown,
@@ -67,6 +68,7 @@ def _payment_payload() -> dict[str, object]:
         "test": True,
         "metadata": {"payment_id": str(uuid.UUID(int=1)), "order_id": str(uuid.UUID(int=2))},
         "confirmation": {"confirmation_url": "https://pay.test/confirm"},
+        "expires_at": "2026-08-25T15:30:00Z",
     }
 
 
@@ -89,10 +91,33 @@ async def test_provider_retries_server_error_with_nonzero_backoff() -> None:
     payment = await provider.get_payment("payment-1")
 
     assert payment.id == "payment-1"
+    assert payment.expires_at is not None
+    assert payment.expires_at.isoformat() == "2026-08-25T15:30:00+00:00"
     assert calls == 2
     assert len(delays) == 1
     assert delays[0] > 0
     assert not client.is_closed
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_provider_classifies_malformed_successful_write_as_uncertain() -> None:
+    provider, client = _provider(
+        httpx.MockTransport(lambda _request: httpx.Response(200, json={"status": "pending"}))
+    )
+
+    with pytest.raises(PaymentProviderMalformedResponse):
+        await provider.create_payment(
+            payment_id=uuid.UUID(int=1),
+            attempt_id=uuid.UUID(int=3),
+            order_id=uuid.UUID(int=2),
+            amount=100,
+            currency="RUB",
+            description="Order",
+            return_url="https://shop.test/payment/return",
+            idempotency_key="operation-malformed",
+        )
+
     await client.aclose()
 
 

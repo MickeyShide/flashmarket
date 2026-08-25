@@ -74,3 +74,60 @@ groups:
         annotations:
           summary: FlashMarket RabbitMQ publications are failing
           description: Publisher timeouts, rejections, or errors have persisted for five minutes.
+
+  - name: flashmarket-payments-reconciliation
+    rules:
+      - alert: FlashMarketPaymentsReconciliationStale
+        expr: time() - payments_reconciliation_last_success_unixtime > 120
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: Payments reconciliation worker has stopped making progress
+          description: No complete financial reconciliation cycle succeeded for two minutes.
+
+      - alert: FlashMarketPaymentsUnknownOperationOld
+        expr: payments_financial_queue_oldest_age_seconds{queue="provider_operation",state="UNKNOWN"} > 900
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: A YooKassa write result remains unknown
+          description: An uncertain financial write has not been resolved within 15 minutes.
+
+      - alert: FlashMarketPaymentsWebhookLag
+        expr: max(payments_financial_queue_oldest_age_seconds{queue="webhook",state=~"PENDING|RETRY"}) > 300
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: YooKassa webhook inbox is delayed
+          description: A verified provider notification has waited more than five minutes.
+
+      - alert: FlashMarketPaymentsQuarantineNotEmpty
+        expr: sum(payments_financial_queue_items{state=~"QUARANTINED|FAILED"}) > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Payments financial quarantine requires investigation
+          description: At least one provider operation, webhook, attempt, or refund needs review.
+
+      - alert: FlashMarketPaymentsActiveAttemptDrift
+        expr: max(payments_financial_queue_oldest_age_seconds{queue="attempt",state=~"PREPARING|UNKNOWN|PENDING"}) > 7200
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: A payment attempt has remained active for over two hours
+          description: Check provider state, payment method expiry, and worker health.
+
+      - alert: FlashMarketPaymentsCircuitOpen
+        expr: payments_provider_circuit_open > 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: YooKassa circuit breaker is open
+          description: Provider requests are being suppressed after repeated transient failures.
+
+      - alert: FlashMarketPaymentsDailyReportDiscrepancy
+        expr: increase(payments_daily_report_discrepancies_total[24h]) > 0
+        labels: {severity: critical}
+        annotations:
+          summary: YooKassa daily report differs from the local ledger
+          description: Investigate quarantined report lines; payment state was not auto-mutated.

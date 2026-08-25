@@ -19,6 +19,7 @@ from payments.infrastructure.repositories.payment import (
     DailyReportRepository,
     FinancialLedgerRepository,
 )
+from payments.observability import REPORT_DISCREPANCIES, REPORT_IMPORTS
 
 MOSCOW = ZoneInfo("Europe/Moscow")
 
@@ -87,6 +88,7 @@ async def import_daily_report(
     reports = DailyReportRepository(session)
     existing = await reports.get_by_content_hash(content_hash)
     if existing is not None:
+        REPORT_IMPORTS.labels(result="duplicate").inc()
         return existing
     try:
         decoded = content.decode("utf-8-sig")
@@ -170,6 +172,10 @@ async def import_daily_report(
         concurrent = await reports.get_by_content_hash(content_hash)
         if concurrent is None:
             raise
+        REPORT_IMPORTS.labels(result="duplicate").inc()
         return concurrent
     await session.refresh(report)
+    REPORT_IMPORTS.labels(result="discrepancies" if discrepancy_count else "matched").inc()
+    if discrepancy_count:
+        REPORT_DISCREPANCIES.inc(discrepancy_count)
     return report

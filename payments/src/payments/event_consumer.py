@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import datetime
@@ -40,6 +41,12 @@ from payments.infrastructure.repositories.payment import (
     OutboxRepository,
     PaymentReceiptRepository,
     PaymentRepository,
+)
+from payments.observability import (
+    RECONCILIATION_BATCH_DURATION,
+    RECONCILIATION_ITEMS,
+    RECONCILIATION_LAST_SUCCESS,
+    observe_financial_state,
 )
 
 logger = logging.getLogger(__name__)
@@ -212,6 +219,8 @@ async def run_reconciliation_loop() -> None:
     settings = get_settings()
     provider = get_shared_payment_provider()
     while True:
+        started_at = time.perf_counter()
+        result = "error"
         try:
             async with SessionFactory() as session:
                 service = PaymentService(
@@ -234,17 +243,42 @@ async def run_reconciliation_loop() -> None:
                 refunds_processed = await service.reconcile_refunds(
                     limit=settings.reconciliation_batch_size
                 )
-                if operations_processed or webhooks_processed or refunds_processed:
+                attempts_processed = await service.reconcile_active_attempts(
+                    limit=settings.reconciliation_batch_size
+                )
+                for kind, count in (
+                    ("provider_operation", operations_processed),
+                    ("webhook", webhooks_processed),
+                    ("refund", refunds_processed),
+                    ("attempt", attempts_processed),
+                ):
+                    if count:
+                        RECONCILIATION_ITEMS.labels(kind=kind).inc(count)
+                await observe_financial_state(session)
+                RECONCILIATION_LAST_SUCCESS.set_to_current_time()
+                result = "success"
+                if (
+                    operations_processed
+                    or webhooks_processed
+                    or refunds_processed
+                    or attempts_processed
+                ):
                     logger.info(
-                        "Reconciliation batch completed: operations=%s webhooks=%s refunds=%s",
+                        "Reconciliation batch completed: operations=%s webhooks=%s "
+                        "refunds=%s attempts=%s",
                         operations_processed,
                         webhooks_processed,
                         refunds_processed,
+                        attempts_processed,
                     )
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("Payments reconciliation batch failed")
+        finally:
+            RECONCILIATION_BATCH_DURATION.labels(result=result).observe(
+                time.perf_counter() - started_at
+            )
         await asyncio.sleep(settings.reconciliation_poll_interval_seconds)
 
 

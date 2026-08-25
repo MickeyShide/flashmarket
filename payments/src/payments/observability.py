@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
+from typing import Any
 
 from fastapi import Request, Response
 from prometheus_client import (
@@ -19,6 +20,8 @@ from prometheus_client import (
     generate_latest,
     multiprocess,
 )
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from payments.config import get_settings
 
@@ -63,6 +66,39 @@ WEBHOOK_EVENTS = Counter(
     "payments_provider_webhooks_total",
     "Incoming payment provider notifications",
     labelnames=("event", "result"),
+)
+FINANCIAL_QUEUE_ITEMS = Gauge(
+    "payments_financial_queue_items",
+    "Durable financial work items by bounded queue and state",
+    labelnames=("queue", "state"),
+)
+FINANCIAL_QUEUE_OLDEST_AGE = Gauge(
+    "payments_financial_queue_oldest_age_seconds",
+    "Age of the oldest durable financial work item",
+    labelnames=("queue", "state"),
+)
+RECONCILIATION_BATCH_DURATION = Histogram(
+    "payments_reconciliation_batch_duration_seconds",
+    "Duration of one full financial reconciliation cycle",
+    labelnames=("result",),
+)
+RECONCILIATION_ITEMS = Counter(
+    "payments_reconciliation_items_total",
+    "Financial reconciliation items claimed",
+    labelnames=("kind",),
+)
+RECONCILIATION_LAST_SUCCESS = Gauge(
+    "payments_reconciliation_last_success_unixtime",
+    "Unix time of the last successful financial reconciliation cycle",
+)
+REPORT_IMPORTS = Counter(
+    "payments_daily_report_imports_total",
+    "Imported YooKassa daily reports",
+    labelnames=("result",),
+)
+REPORT_DISCREPANCIES = Counter(
+    "payments_daily_report_discrepancies_total",
+    "Quarantined YooKassa daily report lines",
 )
 
 SENSITIVE_KEYS = {
@@ -209,6 +245,109 @@ def generate_metrics() -> bytes:
     registry = CollectorRegistry()
     multiprocess.MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
     return generate_latest(registry)
+
+
+async def observe_financial_state(session: AsyncSession) -> None:
+    """Refresh bounded-cardinality queue depth and age gauges from durable state."""
+    from payments.infrastructure.models import (
+        PaymentAttemptModel,
+        ProviderOperationModel,
+        RefundModel,
+        WebhookInboxModel,
+    )
+
+    observations: tuple[tuple[str, str, type[Any], Any, Any], ...] = (
+        (
+            "provider_operation",
+            "UNKNOWN",
+            ProviderOperationModel,
+            ProviderOperationModel.status,
+            ProviderOperationModel.created_at,
+        ),
+        (
+            "provider_operation",
+            "QUARANTINED",
+            ProviderOperationModel,
+            ProviderOperationModel.status,
+            ProviderOperationModel.created_at,
+        ),
+        (
+            "webhook",
+            "PENDING",
+            WebhookInboxModel,
+            WebhookInboxModel.status,
+            WebhookInboxModel.received_at,
+        ),
+        (
+            "webhook",
+            "RETRY",
+            WebhookInboxModel,
+            WebhookInboxModel.status,
+            WebhookInboxModel.received_at,
+        ),
+        (
+            "webhook",
+            "QUARANTINED",
+            WebhookInboxModel,
+            WebhookInboxModel.status,
+            WebhookInboxModel.received_at,
+        ),
+        (
+            "attempt",
+            "PREPARING",
+            PaymentAttemptModel,
+            PaymentAttemptModel.status,
+            PaymentAttemptModel.created_at,
+        ),
+        (
+            "attempt",
+            "UNKNOWN",
+            PaymentAttemptModel,
+            PaymentAttemptModel.status,
+            PaymentAttemptModel.created_at,
+        ),
+        (
+            "attempt",
+            "PENDING",
+            PaymentAttemptModel,
+            PaymentAttemptModel.status,
+            PaymentAttemptModel.created_at,
+        ),
+        (
+            "attempt",
+            "FAILED",
+            PaymentAttemptModel,
+            PaymentAttemptModel.status,
+            PaymentAttemptModel.created_at,
+        ),
+        ("refund", "NEW", RefundModel, RefundModel.status, RefundModel.created_at),
+        ("refund", "UNKNOWN", RefundModel, RefundModel.status, RefundModel.created_at),
+        ("refund", "PENDING", RefundModel, RefundModel.status, RefundModel.created_at),
+        (
+            "refund",
+            "QUARANTINED",
+            RefundModel,
+            RefundModel.status,
+            RefundModel.created_at,
+        ),
+    )
+    now = datetime.now(UTC)
+    for queue, state, model, status_column, time_column in observations:
+        count, oldest = (
+            await session.execute(
+                select(func.count(), func.min(time_column))
+                .select_from(model)
+                .where(status_column == state)
+            )
+        ).one()
+        FINANCIAL_QUEUE_ITEMS.labels(queue=queue, state=state).set(int(count or 0))
+        if oldest is None:
+            age = 0.0
+        else:
+            if oldest.tzinfo is None:
+                oldest = oldest.replace(tzinfo=UTC)
+            age = max(0.0, (now - oldest).total_seconds())
+        FINANCIAL_QUEUE_OLDEST_AGE.labels(queue=queue, state=state).set(age)
 
 
 async def request_observability_middleware(

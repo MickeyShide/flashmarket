@@ -139,6 +139,12 @@ class PaymentAttemptModel(Base):
         ),
         CheckConstraint("amount > 0", name="ck_payment_attempts_amount_positive"),
         CheckConstraint("attempt_number > 0", name="ck_payment_attempts_number_positive"),
+        Index(
+            "ix_payment_attempts_reconcile",
+            "status",
+            "next_reconcile_at",
+            "created_at",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
@@ -160,6 +166,10 @@ class PaymentAttemptModel(Base):
     cancellation_reason: Mapped[str | None] = mapped_column(String(255))
     provider_test: Mapped[bool | None] = mapped_column(Boolean)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    reconcile_attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_reconcile_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    claim_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
