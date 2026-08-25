@@ -124,8 +124,8 @@ class OrderService:
                 "items": [
                     {
                         "description": order.product_name[:128],
-                        "quantity": "1",
-                        "unit_amount": int(final_total),
+                        "quantity": str(data.quantity),
+                        "unit_amount": int(final_total // data.quantity) if data.quantity else int(final_total),
                         "vat_code": 1,
                         "payment_subject": "commodity",
                         "payment_mode": "full_payment",
@@ -247,8 +247,8 @@ class OrderService:
                 "items": [
                     {
                         "description": order.product_name[:128],
-                        "quantity": "1",
-                        "unit_amount": int(final),
+                        "quantity": str(line.quantity),
+                        "unit_amount": int(final // line.quantity) if line.quantity else int(final),
                         "vat_code": 1,
                         "payment_subject": "commodity",
                         "payment_mode": "full_payment",
