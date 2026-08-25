@@ -20,10 +20,6 @@ Manages the order lifecycle and publishes saga events.
 - `POST /api/v1/orders/{order_id}/fail?payment_id=...` — fail payment
 - `GET /health/ready` — readiness probe
 
-Order creation accepts an optional normalized `receipt_email`. When present, the
-immutable `PaymentRequested.receipt_snapshot` carries it as the fiscal receipt
-contact. Batch requests must use one contact for every order line.
-
 ## Events
 
 Published via transactional outbox:

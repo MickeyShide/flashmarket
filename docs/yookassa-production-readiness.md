@@ -136,7 +136,9 @@ worker request sent a historical `mock-*` ID to YooKassa after the provider swit
 - [x] Approve and commit the remediation design.
 - [x] Write the implementation plan.
 - [x] Implement provider-neutral receipt contracts and YooKassa serialization.
-- [x] Propagate authenticated profile email into new order receipt snapshots.
+- [!] Early profile-email propagation in Orders was rolled back after two
+  production health failures; Payments checkout enrichment remains the active
+  fail-closed receipt-contact path while the Orders deploy failure is isolated.
 - [x] Enrich and freeze legacy `NEEDS_CONTACT` snapshots at checkout.
 - [x] Add payment and refund receipt payloads with exact-total validation.
 - [x] Scope all financial worker claims and reconciliation by provider.
