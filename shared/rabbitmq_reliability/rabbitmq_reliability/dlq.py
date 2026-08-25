@@ -25,6 +25,9 @@ def _replay_copy(source: AbstractIncomingMessage) -> tuple[Message, str]:
     if not routing_key:
         raise ValueError("DLQ message has no original routing key")
     headers["x-flashmarket-replayed"] = True
+    headers["x-flashmarket-attempt"] = 0
+    headers.pop("x-flashmarket-failure-kind", None)
+    headers.pop("x-flashmarket-last-error", None)
     return (
         Message(
             body=source.body,
