@@ -6,6 +6,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Query, status
 
 from catalog.api.dependencies import AdminPrincipal, ProductServiceDep
+from catalog.domain.entities import ProductStatus
+from catalog.domain.exceptions import ProductNotFound
 from catalog.application.schemas import (
     CreateProductRequest,
     ErrorResponse,
@@ -122,6 +124,8 @@ async def get_product(
     try:
         product_id = uuid.UUID(slug)
         product = await service.get_by_id(product_id)
+        if product.status != ProductStatus.ACTIVE:
+            raise ProductNotFound
     except ValueError:
         product = await service.get_by_slug(slug)
     return _product_to_response(product)
