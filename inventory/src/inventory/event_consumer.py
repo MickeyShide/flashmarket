@@ -151,8 +151,11 @@ async def handle_payment_failed(
 
     result = await _find_active_reservation(session, payload)
     if result is None:
-        logger.warning("No active reservation for order/payload %s to release", payload)
-        return None
+        logger.warning(
+            "No active reservation for order/payload %s to release; raising for retry",
+            payload,
+        )
+        raise RuntimeError(f"No active reservation found yet for order {order_id}; retrying")
     reservation, stock = result
 
     if reservation.status != ReservationStatus.RESERVED:
