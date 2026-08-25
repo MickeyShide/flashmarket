@@ -133,7 +133,13 @@ class PromocodeService:
         )
 
     async def record_usage(
-        self, promo_id: UUID, user_id: UUID, order_id: UUID, discount_amount: Decimal
+        self,
+        promo_id: UUID,
+        user_id: UUID,
+        order_id: UUID,
+        discount_amount: Decimal,
+        *,
+        increment_uses: bool = True,
     ) -> PromocodeUsageModel:
         """Record usage of a promocode by a user for an order."""
         usage = PromocodeUsageModel(
@@ -144,10 +150,11 @@ class PromocodeService:
         )
         await self._repo.add_usage(usage)
 
-        promo = await self._repo.get_by_id_for_update(promo_id)
-        if promo:
-            promo.current_uses += 1
-            await self._repo.update(promo)
+        if increment_uses:
+            promo = await self._repo.get_by_id_for_update(promo_id)
+            if promo:
+                promo.current_uses += 1
+                await self._repo.update(promo)
 
         return usage
 
