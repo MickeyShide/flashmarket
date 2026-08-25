@@ -4,6 +4,10 @@ Updated: 2026-08-25
 
 This is the living implementation tracker for the test-only, production-grade YooKassa architecture described in [the approved design](superpowers/specs/2026-08-25-yookassa-production-hardening-design.md).
 
+Receipt delivery and provider-switch remediation are tracked against the
+[approved follow-up design](superpowers/specs/2026-08-25-yookassa-receipt-and-provider-isolation-design.md)
+and its [implementation plan](superpowers/plans/2026-08-25-yookassa-receipt-and-provider-isolation-implementation.md).
+
 Status markers:
 
 - `[ ]` planned;
@@ -118,6 +122,31 @@ Live payments must remain disabled. An item is marked complete only after its re
 - [x] Frontend tests and production build.
 - [x] Final security and failure-mode audit completed; both high-severity fail-safe accounting defects are resolved in `9b335a7` and re-verified in `docs/yookassa-security-review-2026-08-25.md`.
 - [x] Implementation, audit, and approved security fixes are committed and pushed to `origin/main`.
+
+## 11. Test-shop receipt rejection and provider isolation
+
+Production test evidence on 2026-08-25 reopened receipt delivery and provider
+isolation work. YooKassa rejected payment creation with `invalid_request`,
+`parameter=receipt`, and `description=Receipt is missing or illegal`. A separate
+worker request sent a historical `mock-*` ID to YooKassa after the provider switch.
+
+- [x] Capture the exact YooKassa request and error response from the event log.
+- [x] Identify the missing provider receipt serialization root cause.
+- [x] Identify unscoped reconciliation claims as the `mock-*` request root cause.
+- [x] Approve and commit the remediation design.
+- [x] Write the implementation plan.
+- [~] Implement provider-neutral receipt contracts and YooKassa serialization.
+- [ ] Propagate authenticated profile email into new order receipt snapshots.
+- [ ] Enrich and freeze legacy `NEEDS_CONTACT` snapshots at checkout.
+- [ ] Add payment and refund receipt payloads with exact-total validation.
+- [ ] Scope all financial worker claims and reconciliation by provider.
+- [ ] Log bounded, sanitized YooKassa error details without public disclosure.
+- [ ] Add receipt, retry, concurrency, refund, and provider-switch regressions.
+- [ ] Apply the receipt-state migration and regenerate OpenAPI artifacts.
+- [ ] Pass all affected service, frontend, deployment, migration, lint, and type checks.
+- [ ] Commit and push the implementation in reviewable units.
+- [ ] Verify a new test-shop payment reaches the hosted confirmation page.
+- [ ] Verify YooKassa receives no further `mock-*` identifiers.
 
 ## Verification log
 

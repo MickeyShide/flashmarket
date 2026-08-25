@@ -2,7 +2,7 @@
 
 Date: 2026-08-25
 
-Status: approved approach, pending written-spec review
+Status: approved
 
 ## Context
 
