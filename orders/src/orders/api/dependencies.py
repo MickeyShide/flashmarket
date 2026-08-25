@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from orders.application.services.order import OrderService
 from orders.application.services.promocode import PromocodeService
 from orders.config import get_settings
+from orders.infrastructure.catalog_client import CatalogClient
 from orders.infrastructure.database import get_db
 from orders.infrastructure.repositories.order import OrderRepository, OutboxRepository
 from orders.infrastructure.repositories.promocode import PromocodeRepository
@@ -25,6 +26,17 @@ def get_verifier() -> JWTVerifier:
         algorithm=settings.jwt_algorithm,
         issuer=settings.jwt_issuer,
         audience=settings.jwt_audience,
+    )
+
+
+@lru_cache
+def get_catalog_client() -> CatalogClient | None:
+    settings = get_settings()
+    if not settings.catalog_base_url:
+        return None
+    return CatalogClient(
+        base_url=settings.catalog_base_url,
+        timeout_seconds=settings.catalog_timeout_seconds,
     )
 
 
@@ -53,6 +65,7 @@ def get_order_service(db: DbSession) -> OrderService:
         order_repo=OrderRepository(db),
         outbox_repo=OutboxRepository(db),
         promocode_service=promocode_service,
+        catalog_client=get_catalog_client(),
     )
 
 

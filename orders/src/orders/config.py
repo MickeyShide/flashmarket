@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     rabbitmq_exchange: str = "flashmarket.events"
     allow_insecure_internal_services: bool = False
     payment_timeout_seconds: int = 300
+    catalog_base_url: str | None = "http://catalog:8000"
+    catalog_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
     rabbitmq_publish_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
