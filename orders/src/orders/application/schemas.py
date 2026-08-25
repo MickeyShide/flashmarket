@@ -76,9 +76,7 @@ class CreateOrderBatchRequest(BaseModel):
             raise ValueError("all lines must belong to the same user")
         line_emails = {line.receipt_email for line in self.lines if line.receipt_email is not None}
         if len(line_emails) > 1 or (
-            self.receipt_email is not None
-            and line_emails
-            and line_emails != {self.receipt_email}
+            self.receipt_email is not None and line_emails and line_emails != {self.receipt_email}
         ):
             raise ValueError("all lines must use the same receipt email")
         return self

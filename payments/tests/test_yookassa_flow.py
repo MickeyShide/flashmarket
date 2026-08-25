@@ -521,9 +521,7 @@ async def test_worker_claims_are_isolated_from_historical_mock_provider(
         provider="yookassa", limit=20
     )
     _, refunds = await RefundRepository(db_session).claim_due(provider="yookassa", limit=20)
-    _, webhooks = await WebhookInboxRepository(db_session).claim_due(
-        provider="yookassa", limit=20
-    )
+    _, webhooks = await WebhookInboxRepository(db_session).claim_due(provider="yookassa", limit=20)
 
     assert [item.external_id for item in attempts] == ["yookassa-payment-id"]
     assert [item.id for item in operations] == [yookassa_operation.id]
