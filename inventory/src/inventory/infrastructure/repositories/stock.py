@@ -130,7 +130,7 @@ class ReservationRepository:
         )
         return result.first()
 
-    async def list_expired(self, before: datetime) -> Sequence[ReservationModel]:
+    async def list_expired(self, before: datetime, limit: int) -> Sequence[ReservationModel]:
         """Return reserved reservations that have expired."""
         result = await self._session.scalars(
             select(ReservationModel)
@@ -139,6 +139,7 @@ class ReservationRepository:
                 ReservationModel.expires_at <= before,
             )
             .order_by(ReservationModel.expires_at)
+            .limit(limit)
             .with_for_update(skip_locked=True)
         )
         return result.all()

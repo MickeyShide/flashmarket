@@ -285,10 +285,10 @@ class InventoryService:
     async def expire_reservations(self, batch_size: int = 100) -> int:
         """Release all expired reservations and return the count."""
         now = utc_now()
-        expired = await self._reservation_repo.list_expired(now)
+        expired = await self._reservation_repo.list_expired(now, batch_size)
         count = 0
         changed_stocks: dict[UUID, StockModel] = {}
-        for reservation in expired[:batch_size]:
+        for reservation in expired:
             stock = await self._stock_repo.get_by_id_for_update(reservation.stock_id)
             if stock is None:
                 continue
