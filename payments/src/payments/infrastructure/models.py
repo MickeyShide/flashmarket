@@ -186,6 +186,7 @@ class RefundModel(Base):
         UniqueConstraint("request_key", name="uq_refunds_request_key"),
         CheckConstraint("amount > 0", name="ck_refunds_amount_positive"),
         Index("ix_refunds_reconcile", "status", "next_attempt_at", "created_at"),
+        Index("ix_refunds_reserved_balance", "payment_id", "funds_reserved"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
@@ -197,6 +198,9 @@ class RefundModel(Base):
     reason: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[RefundStatus] = mapped_column(
         String(20), nullable=False, default=RefundStatus.NEW, server_default="NEW"
+    )
+    funds_reserved: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
     )
     external_id: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
     external_status: Mapped[str | None] = mapped_column(String(64))

@@ -138,8 +138,11 @@ def snapshot_from_order_event(payload: dict[str, object]) -> ReceiptSnapshot:
     if isinstance(explicit, dict):
         return ReceiptSnapshot.model_validate(explicit)
     amount = int(str(payload["amount"]))
+    currency = str(payload.get("currency", "RUB"))
+    if currency != "RUB":
+        raise ValueError("receipt currency must be RUB")
     return ReceiptSnapshot(
-        currency=str(payload.get("currency", "RUB")),
+        currency="RUB",
         total_amount=amount,
         items=[
             ReceiptItem(

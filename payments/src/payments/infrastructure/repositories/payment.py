@@ -303,14 +303,6 @@ class PaymentAttemptRepository:
 class RefundRepository:
     """Persistence and balance queries for normalized refunds."""
 
-    RESERVED_STATUSES = (
-        RefundStatus.NEW,
-        RefundStatus.PREPARING,
-        RefundStatus.UNKNOWN,
-        RefundStatus.PENDING,
-        RefundStatus.SUCCEEDED,
-    )
-
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -371,7 +363,7 @@ class RefundRepository:
         value = await self._session.scalar(
             select(func.coalesce(func.sum(RefundModel.amount), 0)).where(
                 RefundModel.payment_id == payment_id,
-                RefundModel.status.in_(self.RESERVED_STATUSES),
+                RefundModel.funds_reserved.is_(True),
             )
         )
         return int(value or 0)
