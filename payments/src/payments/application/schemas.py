@@ -63,7 +63,9 @@ class CheckoutResponse(BaseModel):
 
     payment_id: uuid.UUID
     status: PaymentStatus
-    confirmation_url: str
+    confirmation_url: str | None = None
+    preparation_status: str = "ready"
+    retry_after_seconds: int | None = None
 
 
 class YooKassaWebhook(BaseModel):

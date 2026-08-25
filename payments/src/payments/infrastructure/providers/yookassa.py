@@ -8,12 +8,17 @@ import random
 import time
 import uuid
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
 
-from payments.application.contracts import ProviderPayment, ProviderRefund
+from payments.application.contracts import (
+    ProviderPayment,
+    ProviderPaymentPage,
+    ProviderRefund,
+)
 from payments.domain.exceptions import (
     PaymentProviderAuthenticationFailed,
     PaymentProviderMalformedResponse,
@@ -180,6 +185,7 @@ class YooKassaPaymentProvider:
         *,
         json_body: dict[str, object] | None = None,
         idempotency_key: str | None = None,
+        params: dict[str, str | int] | None = None,
     ) -> dict[str, Any]:
         operation = self._operation_name(method, path)
         headers: dict[str, str] = {}
@@ -204,6 +210,7 @@ class YooKassaPaymentProvider:
                         path.lstrip("/"),
                         json=json_body,
                         headers=headers,
+                        params=params,
                     )
             except (httpx.TimeoutException, httpx.TransportError) as exc:
                 self._circuit.record_failure()
@@ -342,6 +349,33 @@ class YooKassaPaymentProvider:
 
     async def get_payment(self, external_id: str) -> ProviderPayment:
         return self._payment(await self._request("GET", f"payments/{external_id}"))
+
+    async def list_payments(
+        self,
+        *,
+        created_gte: datetime,
+        created_lte: datetime,
+        limit: int,
+        cursor: str | None = None,
+    ) -> ProviderPaymentPage:
+        params: dict[str, str | int] = {
+            "created_at.gte": created_gte.isoformat(),
+            "created_at.lte": created_lte.isoformat(),
+            "limit": min(max(limit, 1), 100),
+        }
+        if cursor is not None:
+            params["cursor"] = cursor
+        payload = await self._request("GET", "payments", params=params)
+        raw_items = payload.get("items")
+        if not isinstance(raw_items, list):
+            raise PaymentProviderMalformedResponse
+        items = tuple(self._payment(item) for item in raw_items if isinstance(item, dict))
+        if len(items) != len(raw_items):
+            raise PaymentProviderMalformedResponse
+        next_cursor = payload.get("next_cursor")
+        if next_cursor is not None and not isinstance(next_cursor, str):
+            raise PaymentProviderMalformedResponse
+        return ProviderPaymentPage(items=items, next_cursor=next_cursor)
 
     async def create_refund(
         self,

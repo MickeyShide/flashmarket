@@ -189,16 +189,48 @@ async def run_consumer() -> None:
                         logger.exception("Failed to process message")
 
 
+async def run_reconciliation_loop() -> None:
+    """Continuously reconcile durable uncertain provider operations."""
+    settings = get_settings()
+    provider = get_shared_payment_provider()
+    while True:
+        try:
+            async with SessionFactory() as session:
+                service = PaymentService(
+                    session=session,
+                    payment_repo=PaymentRepository(session),
+                    outbox_repo=OutboxRepository(session),
+                    provider=provider,
+                    provider_name=settings.payment_provider,
+                    return_url=(settings.yookassa_return_url or "http://localhost/payment/return"),
+                    test_mode_required=settings.yookassa_test_mode_required,
+                )
+                processed = await service.reconcile_unknown_operations(
+                    limit=settings.reconciliation_batch_size
+                )
+                if processed:
+                    logger.info("Reconciled %s uncertain provider operations", processed)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Provider operation reconciliation batch failed")
+        await asyncio.sleep(settings.reconciliation_poll_interval_seconds)
+
+
 async def run() -> None:
     """Start the consumer coroutine."""
     try:
         settings = get_settings()
-        await run_forever(
-            run_consumer,
-            initial_delay=settings.rabbitmq_reconnect_initial_seconds,
-            max_delay=settings.rabbitmq_reconnect_max_seconds,
-            label="Payments consumer",
-        )
+        async with asyncio.TaskGroup() as tasks:
+            tasks.create_task(
+                run_forever(
+                    run_consumer,
+                    initial_delay=settings.rabbitmq_reconnect_initial_seconds,
+                    max_delay=settings.rabbitmq_reconnect_max_seconds,
+                    label="Payments consumer",
+                )
+            )
+            tasks.create_task(run_reconciliation_loop())
     finally:
         await close_shared_payment_provider()
         await engine.dispose()

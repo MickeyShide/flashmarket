@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import replace
+from datetime import datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -12,11 +13,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from payments.api.dependencies import get_payment_provider
-from payments.application.contracts import ProviderPayment, ProviderRefund
+from payments.application.contracts import ProviderPayment, ProviderPaymentPage, ProviderRefund
 from payments.application.services.payment import PaymentService
-from payments.domain.entities import PaymentStatus
+from payments.domain.entities import PaymentStatus, ProviderOperationStatus
+from payments.domain.exceptions import PaymentProviderResultUnknown
 from payments.event_consumer import handle_payment_requested
-from payments.infrastructure.models import OutboxEventModel
+from payments.infrastructure.database import utc_now
+from payments.infrastructure.models import OutboxEventModel, ProviderOperationModel
 from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
 from payments.main import app
 
@@ -59,6 +62,17 @@ class FakeProvider:
     async def get_payment(self, external_id: str) -> ProviderPayment:
         return self.payments[external_id]
 
+    async def list_payments(
+        self,
+        *,
+        created_gte: datetime,
+        created_lte: datetime,
+        limit: int,
+        cursor: str | None = None,
+    ) -> ProviderPaymentPage:
+        del created_gte, created_lte, cursor
+        return ProviderPaymentPage(items=tuple(self.payments.values())[:limit])
+
     async def create_refund(
         self,
         *,
@@ -80,6 +94,21 @@ class FakeProvider:
 
     async def get_refund(self, external_id: str) -> ProviderRefund:
         return self.refunds[external_id]
+
+
+class UnknownAfterCreateProvider(FakeProvider):
+    """Simulate a timeout after YooKassa durably created the payment."""
+
+    async def create_payment(self, **kwargs: object) -> ProviderPayment:
+        await super().create_payment(**kwargs)  # type: ignore[arg-type]
+        raise PaymentProviderResultUnknown
+
+
+class UnknownWithoutCreateProvider(FakeProvider):
+    async def create_payment(self, **kwargs: object) -> ProviderPayment:
+        del kwargs
+        self.create_calls += 1
+        raise PaymentProviderResultUnknown
 
 
 async def _authoritative_payment(
@@ -134,11 +163,91 @@ async def test_checkout_is_idempotent_and_webhook_is_verified(
         assert payment is not None
         assert payment.status == PaymentStatus.SUCCESS
         events = await session.scalars(
-            select(OutboxEventModel).where(
-                OutboxEventModel.event_type == "PaymentSucceeded"
-            )
+            select(OutboxEventModel).where(OutboxEventModel.event_type == "PaymentSucceeded")
         )
         assert len(events.all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_unknown_checkout_is_durable_and_never_blindly_reposted(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = UnknownAfterCreateProvider()
+    app.dependency_overrides[get_payment_provider] = lambda: provider
+    order_id, _ = await _authoritative_payment(session_factory)
+
+    first = await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+    second = await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+
+    assert first.status_code == 202
+    assert first.headers["retry-after"] == "2"
+    assert first.json()["preparation_status"] == "pending"
+    assert second.status_code == 202
+    assert provider.create_calls == 1
+
+    async with session_factory() as session:
+        operation = await session.scalar(select(ProviderOperationModel))
+        assert operation is not None
+        assert operation.status == ProviderOperationStatus.UNKNOWN
+        assert operation.attempt_count == 1
+        assert operation.request_hash
+        assert operation.idempotency_key.startswith("payment-")
+
+    async with session_factory() as session:
+        service = PaymentService(
+            session=session,
+            payment_repo=PaymentRepository(session),
+            outbox_repo=OutboxRepository(session),
+            provider=provider,
+            provider_name="yookassa",
+            return_url="https://shop.test/payment/return",
+            test_mode_required=True,
+        )
+        assert await service.reconcile_unknown_operations(limit=10) == 1
+
+    async with session_factory() as session:
+        operation = await session.scalar(select(ProviderOperationModel))
+        payment = await PaymentRepository(session).get_by_order_id(order_id)
+        assert operation is not None
+        assert operation.status == ProviderOperationStatus.SUCCEEDED
+        assert payment is not None
+        assert payment.external_id == operation.external_id
+
+
+@pytest.mark.asyncio
+async def test_unknown_operation_is_quarantined_after_idempotency_window(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = UnknownWithoutCreateProvider()
+    app.dependency_overrides[get_payment_provider] = lambda: provider
+    order_id, _ = await _authoritative_payment(session_factory)
+    assert (await client.post(f"/api/v1/payments/orders/{order_id}/checkout")).status_code == 202
+
+    async with session_factory() as session, session.begin():
+        operation = await session.scalar(select(ProviderOperationModel))
+        assert operation is not None
+        operation.first_requested_at = utc_now() - timedelta(hours=25)
+
+    async with session_factory() as session:
+        service = PaymentService(
+            session=session,
+            payment_repo=PaymentRepository(session),
+            outbox_repo=OutboxRepository(session),
+            provider=provider,
+            provider_name="yookassa",
+            return_url="https://shop.test/payment/return",
+            test_mode_required=True,
+        )
+        assert await service.reconcile_unknown_operations(limit=10) == 1
+
+    async with session_factory() as session:
+        operation = await session.scalar(select(ProviderOperationModel))
+        assert operation is not None
+        assert operation.status == ProviderOperationStatus.QUARANTINED
+        assert operation.last_error_code == "idempotency_expired:provider_payment_not_found"
+        assert provider.create_calls == 1
 
 
 @pytest.mark.asyncio

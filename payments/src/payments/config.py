@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     yookassa_retry_max_seconds: float = Field(default=2.0, ge=0.1, le=30)
     yookassa_circuit_failure_threshold: int = Field(default=5, ge=1, le=100)
     yookassa_circuit_recovery_seconds: float = Field(default=15.0, ge=1, le=300)
+    reconciliation_batch_size: int = Field(default=20, ge=1, le=100)
+    reconciliation_poll_interval_seconds: float = Field(default=5.0, ge=0.5, le=300)
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
     rabbitmq_publish_timeout_seconds: float = Field(default=5.0, gt=0, le=60)

@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
+from datetime import timedelta
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from payments.domain.entities import ProviderOperationStatus
 from payments.infrastructure.database import utc_now
-from payments.infrastructure.models import OutboxEventModel, PaymentModel
+from payments.infrastructure.models import (
+    OutboxEventModel,
+    PaymentModel,
+    ProviderOperationModel,
+)
 
 
 class PaymentRepository:
@@ -102,6 +109,79 @@ class PaymentRepository:
         """Flush pending attribute changes on a payment."""
         await self._session.flush()
         return payment
+
+
+class ProviderOperationRepository:
+    """Persistence for idempotent provider write operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(self, operation: ProviderOperationModel) -> ProviderOperationModel:
+        self._session.add(operation)
+        await self._session.flush()
+        return operation
+
+    async def get_by_type_and_entity(
+        self,
+        operation_type: str,
+        entity_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> ProviderOperationModel | None:
+        query = select(ProviderOperationModel).where(
+            ProviderOperationModel.operation_type == operation_type,
+            ProviderOperationModel.entity_id == entity_id,
+        )
+        if for_update:
+            query = query.with_for_update().execution_options(populate_existing=True)
+        result = await self._session.scalars(query)
+        return result.first()
+
+    async def get_by_id_for_update(self, operation_id: UUID) -> ProviderOperationModel | None:
+        result = await self._session.scalars(
+            select(ProviderOperationModel)
+            .where(ProviderOperationModel.id == operation_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.first()
+
+    async def claim_due_unknown(
+        self,
+        *,
+        limit: int,
+        lease_seconds: int = 60,
+    ) -> tuple[UUID, Sequence[ProviderOperationModel]]:
+        now = utc_now()
+        claim_token = uuid.uuid4()
+        result = await self._session.scalars(
+            select(ProviderOperationModel)
+            .where(
+                ProviderOperationModel.status == ProviderOperationStatus.UNKNOWN,
+                (
+                    (ProviderOperationModel.next_attempt_at.is_(None))
+                    | (ProviderOperationModel.next_attempt_at <= now)
+                ),
+                (
+                    (ProviderOperationModel.claimed_until.is_(None))
+                    | (ProviderOperationModel.claimed_until <= now)
+                ),
+            )
+            .order_by(ProviderOperationModel.created_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        operations = result.all()
+        for operation in operations:
+            operation.claim_token = claim_token
+            operation.claimed_until = now + timedelta(seconds=lease_seconds)
+        await self._session.flush()
+        return claim_token, operations
+
+    async def update(self, operation: ProviderOperationModel) -> ProviderOperationModel:
+        await self._session.flush()
+        return operation
 
 
 class OutboxRepository:

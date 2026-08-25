@@ -4271,13 +4271,36 @@
         "description": "Browser-safe data needed to continue a hosted payment.",
         "properties": {
           "confirmation_url": {
-            "title": "Confirmation Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Url"
           },
           "payment_id": {
             "format": "uuid",
             "title": "Payment Id",
             "type": "string"
+          },
+          "preparation_status": {
+            "default": "ready",
+            "title": "Preparation Status",
+            "type": "string"
+          },
+          "retry_after_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After Seconds"
           },
           "status": {
             "$ref": "#/components/schemas/PaymentsPaymentStatus"
@@ -4285,8 +4308,7 @@
         },
         "required": [
           "payment_id",
-          "status",
-          "confirmation_url"
+          "status"
         ],
         "title": "CheckoutResponse",
         "type": "object"
@@ -8167,6 +8189,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsCheckoutResponse"
+                }
+              }
+            },
+            "description": "Provider result is being reconciled"
           },
           "422": {
             "content": {

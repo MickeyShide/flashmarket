@@ -22,3 +22,14 @@ class PaymentEventType(StrEnum):
     PAYMENT_FAILED = "PaymentFailed"
     PAYMENT_CANCELLED = "PaymentCancelled"
     PAYMENT_REFUNDED = "PaymentRefunded"
+
+
+class ProviderOperationStatus(StrEnum):
+    """Durable lifecycle of a financial provider write."""
+
+    NEW = "NEW"
+    IN_FLIGHT = "IN_FLIGHT"
+    UNKNOWN = "UNKNOWN"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    QUARANTINED = "QUARANTINED"

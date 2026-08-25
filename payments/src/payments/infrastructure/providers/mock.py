@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
-from payments.application.contracts import ProviderPayment, ProviderRefund
+from payments.application.contracts import ProviderPayment, ProviderPaymentPage, ProviderRefund
 
 
 class MockPaymentProvider:
@@ -35,6 +36,17 @@ class MockPaymentProvider:
 
     async def get_payment(self, external_id: str) -> ProviderPayment:
         raise LookupError(f"Mock payment state was not registered: {external_id}")
+
+    async def list_payments(
+        self,
+        *,
+        created_gte: datetime,
+        created_lte: datetime,
+        limit: int,
+        cursor: str | None = None,
+    ) -> ProviderPaymentPage:
+        del created_gte, created_lte, limit, cursor
+        return ProviderPaymentPage(items=())
 
     async def create_refund(
         self,

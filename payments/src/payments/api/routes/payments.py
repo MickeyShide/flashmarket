@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 
 from payments.api.dependencies import AdminPrincipal, CurrentPrincipal, get_payment_service
 from payments.application.schemas import (
@@ -13,6 +14,7 @@ from payments.application.schemas import (
     PaymentResponse,
 )
 from payments.application.services.payment import PaymentService
+from payments.domain.exceptions import PaymentProviderResultUnknown
 from payments.infrastructure.models import PaymentModel
 
 router = APIRouter(prefix="/api/v1/payments", tags=["payments"])
@@ -43,6 +45,12 @@ async def create_payment(
 @router.post(
     "/orders/{order_id:uuid}/checkout",
     response_model=CheckoutResponse,
+    responses={
+        status.HTTP_202_ACCEPTED: {
+            "model": CheckoutResponse,
+            "description": "Provider result is being reconciled",
+        }
+    },
     summary="Start or resume hosted checkout",
     openapi_extra={"x-flashmarket-access": "authenticated"},
 )
@@ -50,7 +58,7 @@ async def start_checkout(
     order_id: UUID,
     principal: CurrentPrincipal,
     service: PaymentService = Depends(get_payment_service),
-) -> CheckoutResponse:
+) -> CheckoutResponse | JSONResponse:
     """Create a provider payment from the authoritative PaymentRequested event."""
     payment = await service.get_payment_by_order_id(order_id)
     if principal.role != "ADMIN" and payment.user_id != principal.user_id:
@@ -58,7 +66,20 @@ async def start_checkout(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot pay another user's order",
         )
-    payment = await service.start_checkout(order_id)
+    try:
+        payment = await service.start_checkout(order_id)
+    except PaymentProviderResultUnknown:
+        response = CheckoutResponse(
+            payment_id=payment.id,
+            status=payment.status,
+            preparation_status="pending",
+            retry_after_seconds=2,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=response.model_dump(mode="json"),
+            headers={"Retry-After": "2"},
+        )
     if payment.confirmation_url is None:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

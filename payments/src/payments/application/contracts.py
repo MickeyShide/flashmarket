@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 
@@ -33,6 +34,14 @@ class ProviderRefund:
     cancellation_reason: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderPaymentPage:
+    """Bounded page returned by the provider payment collection."""
+
+    items: tuple[ProviderPayment, ...]
+    next_cursor: str | None = None
+
+
 class PaymentProvider(Protocol):
     """Operations needed by the payment lifecycle."""
 
@@ -49,6 +58,15 @@ class PaymentProvider(Protocol):
     ) -> ProviderPayment: ...
 
     async def get_payment(self, external_id: str) -> ProviderPayment: ...
+
+    async def list_payments(
+        self,
+        *,
+        created_gte: datetime,
+        created_lte: datetime,
+        limit: int,
+        cursor: str | None = None,
+    ) -> ProviderPaymentPage: ...
 
     async def create_refund(
         self,

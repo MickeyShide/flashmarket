@@ -29,19 +29,19 @@ Live payments must remain disabled. An item is marked complete only after its re
 - [x] Separate read/write concurrency gates.
 - [x] Typed provider error taxonomy for rejection, rate limiting, and uncertain results.
 - [x] Increasing backoff with jitter; no zero-delay retry.
-- [~] Interactive retry budget separated from durable worker retries (durable worker pending).
+- [x] Interactive retry budget separated from durable worker reconciliation retries.
 - [x] Circuit breaker that does not turn uncertain writes into definite failures.
 - [x] Sanitized provider error IDs and latency/concurrency metrics.
 
 ## 3. Durable provider operations
 
-- [ ] Additive `provider_operations` migration and repository.
-- [ ] Immutable canonical request payload and request hash.
-- [ ] Stable idempotence key bound to the request hash.
-- [ ] States `NEW`, `IN_FLIGHT`, `UNKNOWN`, `SUCCEEDED`, `FAILED`, `QUARANTINED`.
-- [ ] Never automatically POST an unknown operation after 24 hours.
-- [ ] Crash-after-provider-success recovery tests.
-- [ ] Bounded list-based recovery when no external ID is known.
+- [x] Additive `provider_operations` migration and repository.
+- [x] Immutable canonical request payload and request hash.
+- [x] Stable idempotence key bound to the request hash.
+- [x] States `NEW`, `IN_FLIGHT`, `UNKNOWN`, `SUCCEEDED`, `FAILED`, `QUARANTINED`.
+- [x] Never automatically POST an unknown operation after 24 hours.
+- [x] Crash-after-provider-success recovery tests.
+- [x] Bounded list-based recovery when no external ID is known.
 
 ## 4. Webhook ingestion
 
@@ -55,9 +55,9 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 ## 5. Reconciliation
 
-- [ ] Worker claims bounded batches with `FOR UPDATE SKIP LOCKED`.
-- [ ] No database transaction remains open during provider I/O.
-- [ ] Reconcile unknown create operations.
+- [~] Worker claims bounded batches with `FOR UPDATE SKIP LOCKED` (provider operations done; other queues pending).
+- [~] No database transaction remains open during provider I/O (checkout/recovery done; refunds/webhooks pending).
+- [x] Reconcile unknown create operations.
 - [ ] Reconcile active/stale payment attempts.
 - [ ] Reconcile pending refunds, including canceled refunds without a webhook.
 - [ ] Backoff, jitter, heartbeat, lag, and quarantine metrics.
@@ -122,3 +122,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 |---|---|---|---|
 | 2026-08-25 | CI repair | Payments `25 passed`; strict mypy; changed-file Ruff/format; OpenAPI generation; OpenAPI tests `4 passed` | Pass |
 | 2026-08-25 | Provider resilience | Payments `29 passed`; strict mypy; scoped Ruff/format | Pass |
+| 2026-08-25 | Durable provider operations | Payments `31 passed`; strict mypy; scoped Ruff/format | Pass |

@@ -18,7 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from payments.domain.entities import PaymentStatus
+from payments.domain.entities import PaymentStatus, ProviderOperationStatus
 from payments.infrastructure.database import Base, utc_now
 
 
@@ -59,6 +59,56 @@ class PaymentModel(Base):
         nullable=False,
         default=utc_now,
         onupdate=utc_now,
+    )
+
+
+class ProviderOperationModel(Base):
+    """Durable identity and outcome of a financial provider POST."""
+
+    __tablename__ = "provider_operations"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_provider_operations_idempotency_key"),
+        UniqueConstraint(
+            "operation_type",
+            "entity_id",
+            name="uq_provider_operations_type_entity",
+        ),
+        Index(
+            "ix_provider_operations_recovery",
+            "status",
+            "next_attempt_at",
+            "created_at",
+        ),
+        CheckConstraint("attempt_count >= 0", name="ck_provider_operations_attempts"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
+    operation_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    entity_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    payment_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_payload: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[ProviderOperationStatus] = mapped_column(
+        String(20),
+        nullable=False,
+        default=ProviderOperationStatus.NEW,
+        server_default="NEW",
+    )
+    external_id: Mapped[str | None] = mapped_column(String(255), index=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    first_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    claim_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_code: Mapped[str | None] = mapped_column(String(64))
+    response_payload: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
     )
 
 
