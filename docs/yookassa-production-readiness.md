@@ -20,6 +20,7 @@ Live payments must remain disabled. An item is marked complete only after its re
 - [x] Every public payment route has an explicit OpenAPI access classification.
 - [x] Repository OpenAPI artifacts regenerate successfully.
 - [x] Approved production-hardening design is committed.
+- [x] Production workflow consumes test-shop GitHub configuration with fail-fast validation and never permits live mode.
 - [x] Baseline pushed to `origin/main` (`d5f4626`).
 
 ## 2. Provider HTTP resilience
@@ -52,6 +53,7 @@ Live payments must remain disabled. An item is marked complete only after its re
 - [x] Duplicate, out-of-order, malformed, and permanent-mismatch handling.
 - [x] Retry and quarantine state with bounded attempts.
 - [x] Dedicated gateway location, body limit, source allowlist, and independent burst policy.
+- [x] Production gateway deploy copies and mounts the versioned YooKassa source allowlist read-only.
 
 ## 5. Reconciliation
 
@@ -132,3 +134,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 | 2026-08-25 | Attempt reconciliation and observability | Payments `48 passed`; full Payments Ruff; strict mypy; Alembic empty SQLite upgrade through `20260825_0013`; Prometheus alert rules added | Pass |
 | 2026-08-25 | Final verification before security fixes | OpenAPI generation; OpenAPI/gateway contracts `16 passed`; frontend `25 passed` and production build; dependency audits found 0 known vulnerabilities; secrets scan found 0 exposed credentials | Pass with two security-review fixes pending |
 | 2026-08-25 | Approved security fixes | Payments `52 passed`; full Ruff/format; strict mypy; empty migration upgrade and seeded reservation backfill through `20260825_0014`; OpenAPI/gateway `16 passed`; frontend `25 passed` and production build | Pass |
+| 2026-08-25 | Test-shop deployment wiring | Payments deployment and gateway/OpenAPI contracts `20 passed`; workflow YAML parsed; Payments and gateway production Compose rendered; official webhook IP list re-verified | Pass |

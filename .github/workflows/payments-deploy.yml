@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - payments/**
+      - tests/test_payments_deployment_workflow.py
       - .github/workflows/payments-deploy.yml
   push:
     branches:
@@ -16,6 +17,7 @@ on:
       - payments-v*
     paths:
       - payments/**
+      - tests/test_payments_deployment_workflow.py
       - .github/workflows/payments-deploy.yml
   workflow_dispatch:
 
@@ -168,7 +170,9 @@ jobs:
       - name: Run tests
         env:
           PAYMENTS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@localhost:5436/payments
-        run: uv run pytest
+        run: |
+          uv run pytest
+          uv run pytest ../tests/test_payments_deployment_workflow.py
 
   image:
     name: Build image
@@ -245,6 +249,11 @@ jobs:
       PAYMENTS_IMAGE: ghcr.io/mickeyshide/flashmarket-payments@${{ needs.image.outputs.digest }}
       GATEWAY_DOMAIN: ${{ vars.GATEWAY_DOMAIN || 'flashmarket.shide.world' }}
       PAYMENTS_CORS_ORIGINS: ${{ vars.PAYMENTS_CORS_ORIGINS }}
+      PAYMENTS_PAYMENT_PROVIDER: ${{ vars.PAYMENTS_PAYMENT_PROVIDER || 'mock' }}
+      PAYMENTS_YOOKASSA_SHOP_ID: ${{ secrets.PAYMENTS_YOOKASSA_SHOP_ID }}
+      PAYMENTS_YOOKASSA_SECRET_KEY: ${{ secrets.PAYMENTS_YOOKASSA_SECRET_KEY }}
+      PAYMENTS_YOOKASSA_RETURN_URL: ${{ vars.PAYMENTS_YOOKASSA_RETURN_URL }}
+      PAYMENTS_YOOKASSA_WEBHOOK_REQUIRE_HTTPS: ${{ vars.PAYMENTS_YOOKASSA_WEBHOOK_REQUIRE_HTTPS || 'true' }}
       DEPLOY_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       DEPLOY_RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
     steps:
@@ -261,6 +270,33 @@ jobs:
           INFRA_USER="${INFRA_USER:-shide}"
           : "${DEPLOY_POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
           : "${DEPLOY_RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
+
+          if [[ "$PAYMENTS_PAYMENT_PROVIDER" != "mock" && "$PAYMENTS_PAYMENT_PROVIDER" != "yookassa" ]]; then
+            echo "::error::PAYMENTS_PAYMENT_PROVIDER must be mock or yookassa"
+            exit 1
+          fi
+          if [[ "$PAYMENTS_PAYMENT_PROVIDER" == "yookassa" ]]; then
+            : "${PAYMENTS_YOOKASSA_SHOP_ID:?PAYMENTS_YOOKASSA_SHOP_ID is required}"
+            : "${PAYMENTS_YOOKASSA_SECRET_KEY:?PAYMENTS_YOOKASSA_SECRET_KEY is required}"
+            : "${PAYMENTS_YOOKASSA_RETURN_URL:?PAYMENTS_YOOKASSA_RETURN_URL is required}"
+            if [[ ! "$PAYMENTS_YOOKASSA_SHOP_ID" =~ ^[0-9]+$ ]]; then
+              echo "::error::PAYMENTS_YOOKASSA_SHOP_ID must contain only digits"
+              exit 1
+            fi
+            if [[ "$PAYMENTS_YOOKASSA_SECRET_KEY" == *$'\n'* || "$PAYMENTS_YOOKASSA_SECRET_KEY" == *$'\r'* ]]; then
+              echo "::error::PAYMENTS_YOOKASSA_SECRET_KEY contains an invalid line break"
+              exit 1
+            fi
+            expected_return_url="https://${GATEWAY_DOMAIN}/payment/return"
+            if [[ "$PAYMENTS_YOOKASSA_RETURN_URL" != "$expected_return_url" ]]; then
+              echo "::error::PAYMENTS_YOOKASSA_RETURN_URL must equal $expected_return_url"
+              exit 1
+            fi
+            if [[ "$PAYMENTS_YOOKASSA_WEBHOOK_REQUIRE_HTTPS" != "true" ]]; then
+              echo "::error::PAYMENTS_YOOKASSA_WEBHOOK_REQUIRE_HTTPS must be true"
+              exit 1
+            fi
+          fi
 
           if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
             echo "::error::DEPLOY_HOST must be a hostname or IPv4 address"
@@ -315,6 +351,12 @@ jobs:
             printf 'PAYMENTS_DOCS_ENABLED=false\n'
             printf 'PAYMENTS_CORS_ORIGINS=%s\n' "$cors_origins"
             printf 'PAYMENTS_TRUSTED_HOSTS=["%s","%s","*.%s","localhost","127.0.0.1","payments","api"]\n' "$PAYMENTS_DOMAIN" "$GATEWAY_DOMAIN" "$GATEWAY_DOMAIN"
+            printf 'PAYMENTS_PAYMENT_PROVIDER=%s\n' "$PAYMENTS_PAYMENT_PROVIDER"
+            printf 'PAYMENTS_YOOKASSA_SHOP_ID=%s\n' "$PAYMENTS_YOOKASSA_SHOP_ID"
+            printf 'PAYMENTS_YOOKASSA_SECRET_KEY=%s\n' "$PAYMENTS_YOOKASSA_SECRET_KEY"
+            printf 'PAYMENTS_YOOKASSA_RETURN_URL=%s\n' "$PAYMENTS_YOOKASSA_RETURN_URL"
+            printf 'PAYMENTS_YOOKASSA_TEST_MODE_REQUIRED=true\n'
+            printf 'PAYMENTS_YOOKASSA_WEBHOOK_REQUIRE_HTTPS=%s\n' "$PAYMENTS_YOOKASSA_WEBHOOK_REQUIRE_HTTPS"
             printf 'INFRA_USER=%s\n' "$INFRA_USER"
             printf 'POSTGRES_PASSWORD=%s\n' "$DEPLOY_POSTGRES_PASSWORD"
             printf 'RABBITMQ_PASSWORD=%s\n' "$DEPLOY_RABBITMQ_PASSWORD"

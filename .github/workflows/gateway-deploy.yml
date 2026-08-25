@@ -39,6 +39,7 @@ on:
       - media/uv.lock
       - shared/jwt_verifier/**
       - docker-compose.prod.yml
+      - tests/test_gateway_routing.py
       - .github/workflows/gateway-deploy.yml
   push:
     branches:
@@ -78,6 +79,7 @@ on:
       - media/uv.lock
       - shared/jwt_verifier/**
       - docker-compose.prod.yml
+      - tests/test_gateway_routing.py
       - .github/workflows/gateway-deploy.yml
   workflow_dispatch:
 
@@ -118,6 +120,9 @@ jobs:
 
       - name: Generate public API contract
         run: python tools/openapi/generate.py
+
+      - name: Verify OpenAPI and gateway contracts
+        run: uv run --project payments pytest tests/test_openapi_generation.py tests/test_gateway_routing.py
 
       - name: Reject Developer Hub mock artifacts
         shell: bash
@@ -251,7 +256,8 @@ jobs:
             "$target:$DEPLOY_PATH/docker-compose.yml"
           scp -P "$DEPLOY_PORT" \
             gateway/nginx.conf \
-            "$target:$DEPLOY_PATH/nginx.conf"
+            gateway/yookassa-allowlist.conf \
+            "$target:$DEPLOY_PATH/"
           ssh -p "$DEPLOY_PORT" "$target" \
             "umask 077; cat > '$DEPLOY_PATH/.env.next' && mv '$DEPLOY_PATH/.env.next' '$DEPLOY_PATH/.env'" \
             < "$RUNNER_TEMP/flashmarket-gateway.env"

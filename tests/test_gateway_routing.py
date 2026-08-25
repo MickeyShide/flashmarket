@@ -6,6 +6,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 NGINX_CONF_PATH = PROJECT_ROOT / "gateway" / "nginx.conf"
 GATEWAY_COMPOSE_PATH = PROJECT_ROOT / "gateway" / "docker-compose.yml"
+PRODUCTION_COMPOSE_PATH = PROJECT_ROOT / "docker-compose.prod.yml"
+GATEWAY_WORKFLOW_PATH = PROJECT_ROOT / ".github" / "workflows" / "gateway-deploy.yml"
+YOOKASSA_ALLOWLIST_PATH = PROJECT_ROOT / "gateway" / "yookassa-allowlist.conf"
 
 
 def _config() -> str:
@@ -66,7 +69,9 @@ def _location(server: str, declaration: str) -> str:
 
 def test_gw_001_nginx_conf_location_rules_exist() -> None:
     """GW-001: Verify all required service paths and admin routes are present in nginx.conf."""
-    assert NGINX_CONF_PATH.exists(), f"gateway/nginx.conf file is missing at {NGINX_CONF_PATH}"
+    assert NGINX_CONF_PATH.exists(), (
+        f"gateway/nginx.conf file is missing at {NGINX_CONF_PATH}"
+    )
 
     content = _config()
 
@@ -230,7 +235,13 @@ def test_gw_007_service_subdomains_use_expected_profiles() -> None:
 def test_gw_008_frontend_and_monitoring_locations_have_no_limiter() -> None:
     """GW-008: Static assets and service endpoints never consume API quota."""
     main = _main_server(_config())
-    for declaration in ("/", "/health", "/prometheus", "/prometheus/", "= /nginx_status"):
+    for declaration in (
+        "/",
+        "/health",
+        "/prometheus",
+        "/prometheus/",
+        "= /nginx_status",
+    ):
         assert "limit_req zone=" not in _location(main, declaration), declaration
 
 
@@ -326,3 +337,28 @@ def test_gw_012_same_origin_storage_route_strips_prefix_and_streams() -> None:
     assert "limit_req zone=" not in storage
     assert "proxy_pass $upstream_media" not in storage
     assert "return 308 /media-storage/;" in _location(main, "= /media-storage")
+
+
+def test_gw_013_yookassa_webhook_allowlist_is_deployed_and_mounted() -> None:
+    """GW-013: Production deploys the reviewed provider source ranges fail-closed."""
+    allowlist = YOOKASSA_ALLOWLIST_PATH.read_text(encoding="utf-8")
+    for source in (
+        "185.71.76.0/27",
+        "185.71.77.0/27",
+        "77.75.153.0/25",
+        "77.75.156.11/32",
+        "77.75.156.35/32",
+        "77.75.154.128/25",
+        "2a02:5180::/32",
+    ):
+        assert f"allow {source};" in allowlist
+    assert "deny all;" in allowlist
+    assert "allow all;" not in allowlist
+
+    mount = "./yookassa-allowlist.conf:/etc/nginx/yookassa-allowlist.conf:ro"
+    local_compose = GATEWAY_COMPOSE_PATH.read_text(encoding="utf-8")
+    production_compose = PRODUCTION_COMPOSE_PATH.read_text(encoding="utf-8")
+    workflow = GATEWAY_WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert mount in local_compose
+    assert mount in production_compose
+    assert "gateway/yookassa-allowlist.conf" in workflow
