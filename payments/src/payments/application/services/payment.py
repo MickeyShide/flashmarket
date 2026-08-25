@@ -345,6 +345,14 @@ class PaymentService:
         locked = await self._payment_repo.get_by_id_for_update(payment_id)
         if locked is None:
             raise PaymentNotFound
+        if locked.status != PaymentStatus.PENDING:
+            locked_attempt = await self._attempt_repo.get_by_id_for_update(attempt_id)
+            if locked_attempt is not None:
+                locked_attempt.status = PaymentAttemptStatus.CANCELED
+                locked_attempt.next_reconcile_at = None
+                await self._attempt_repo.update(locked_attempt)
+            await self._session.commit()
+            raise InvalidPaymentState(f"Cannot checkout payment in status {locked.status}")
         locked_attempt = await self._attempt_repo.get_by_id_for_update(attempt_id)
         if locked_attempt is None:
             raise PaymentVerificationFailed("Payment attempt was not found")
