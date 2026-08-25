@@ -70,7 +70,8 @@ async def handle_payment_succeeded(
         return
     if order.status == OrderStatus.CANCELLED:
         logger.warning(
-            "Order %s was already CANCELLED, but received PaymentSucceeded %s; emitting PaymentRefundRequested",
+            "Order %s was already CANCELLED, but received PaymentSucceeded %s; "
+            "emitting PaymentRefundRequested",
             order_id,
             payment_id,
         )
@@ -82,7 +83,11 @@ async def handle_payment_succeeded(
                 "reservation_id": str(order.reservation_id),
                 "payment_id": str(payment_id),
                 "user_id": str(order.user_id),
-                "amount": payload.get("amount", int(order.final_price)),
+                "amount": (
+                    int(payload["amount"])
+                    if payload.get("amount") is not None
+                    else int(order.final_price or order.price * order.quantity)
+                ),
                 "currency": order.currency,
                 "reason": "order_already_cancelled",
             },

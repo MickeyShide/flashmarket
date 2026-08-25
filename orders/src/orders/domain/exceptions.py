@@ -91,4 +91,3 @@ class DuplicatePromocodeCode(PromocodeError):
 
     code = "duplicate_promocode_code"
     message = "A promocode with this code already exists"
-

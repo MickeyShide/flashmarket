@@ -89,7 +89,9 @@ async def test_validate_fixed_discount(
         )
 
         user_id = uuid.uuid4()
-        res = await service.validate_and_apply("FIXED500", user_id, Decimal("2000.00"), for_update=False)
+        res = await service.validate_and_apply(
+            "FIXED500", user_id, Decimal("2000.00"), for_update=False
+        )
 
         assert res.discount_amount == Decimal("500.00")
         assert res.final_amount == Decimal("1500.00")
@@ -115,7 +117,9 @@ async def test_validate_percentage_discount(
         )
 
         user_id = uuid.uuid4()
-        res = await service.validate_and_apply("PERCENT10", user_id, Decimal("10000.00"), for_update=False)
+        res = await service.validate_and_apply(
+            "PERCENT10", user_id, Decimal("10000.00"), for_update=False
+        )
 
         assert res.discount_amount == Decimal("1000.00")
         assert res.final_amount == Decimal("9000.00")
@@ -142,7 +146,9 @@ async def test_validate_percentage_with_cap(
         )
 
         user_id = uuid.uuid4()
-        res = await service.validate_and_apply("CAP20", user_id, Decimal("10000.00"), for_update=False)
+        res = await service.validate_and_apply(
+            "CAP20", user_id, Decimal("10000.00"), for_update=False
+        )
 
         assert res.discount_amount == Decimal("500.00")
         assert res.final_amount == Decimal("9500.00")
@@ -167,7 +173,9 @@ async def test_validate_expired(session_factory: async_sessionmaker[AsyncSession
 
         user_id = uuid.uuid4()
         with pytest.raises(PromocodeExpired):
-            await service.validate_and_apply("EXPIREDPROMO", user_id, Decimal("1000.00"), for_update=False)
+            await service.validate_and_apply(
+                "EXPIREDPROMO", user_id, Decimal("1000.00"), for_update=False
+            )
 
 
 @pytest.mark.asyncio
@@ -192,7 +200,9 @@ async def test_validate_disabled(session_factory: async_sessionmaker[AsyncSessio
 
         user_id = uuid.uuid4()
         with pytest.raises(PromocodeDisabled):
-            await service.validate_and_apply("DISABLEME", user_id, Decimal("1000.00"), for_update=False)
+            await service.validate_and_apply(
+                "DISABLEME", user_id, Decimal("1000.00"), for_update=False
+            )
 
 
 @pytest.mark.asyncio
@@ -274,7 +284,9 @@ async def test_validate_min_amount(
 
         user_id = uuid.uuid4()
         with pytest.raises(PromocodeMinAmountNotMet):
-            await service.validate_and_apply("MIN5000", user_id, Decimal("3000.00"), for_update=False)
+            await service.validate_and_apply(
+                "MIN5000", user_id, Decimal("3000.00"), for_update=False
+            )
 
 
 @pytest.mark.asyncio
@@ -297,7 +309,9 @@ async def test_discount_not_exceed_order(
         )
 
         user_id = uuid.uuid4()
-        res = await service.validate_and_apply("HUGE5000", user_id, Decimal("3000.00"), for_update=False)
+        res = await service.validate_and_apply(
+            "HUGE5000", user_id, Decimal("3000.00"), for_update=False
+        )
 
         assert res.discount_amount == Decimal("3000.00")
         assert res.final_amount == Decimal("0.00")
@@ -323,7 +337,11 @@ async def test_code_case_insensitive(
         )
 
         user_id = uuid.uuid4()
-        res1 = await service.validate_and_apply("flash10", user_id, Decimal("1000.00"), for_update=False)
-        res2 = await service.validate_and_apply("FLASH10", user_id, Decimal("1000.00"), for_update=False)
+        res1 = await service.validate_and_apply(
+            "flash10", user_id, Decimal("1000.00"), for_update=False
+        )
+        res2 = await service.validate_and_apply(
+            "FLASH10", user_id, Decimal("1000.00"), for_update=False
+        )
 
         assert res1.promocode_id == res2.promocode_id

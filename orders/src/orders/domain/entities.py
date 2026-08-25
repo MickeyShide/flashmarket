@@ -39,4 +39,3 @@ class PromocodeStatus(StrEnum):
     ACTIVE = "ACTIVE"
     EXPIRED = "EXPIRED"
     DISABLED = "DISABLED"
-

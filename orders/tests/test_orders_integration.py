@@ -1,24 +1,24 @@
 """Comprehensive integration tests for Orders microservice (ORD-001 through ORD-018)."""
 
 import uuid
-from decimal import Decimal
+from datetime import UTC
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from orders.domain.entities import OrderEventType, OrderStatus
 from orders.event_consumer import (
     handle_payment_failed,
     handle_payment_succeeded,
-    handle_reservation_released,
 )
-from orders.infrastructure.models import OrderModel, OutboxEventModel
+from orders.infrastructure.models import OutboxEventModel
 from orders.outbox_worker import publish_outbox_batch
 
 
 @pytest.mark.asyncio
-async def test_ord_001_create_order_from_reservation(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_ord_001_create_order_from_reservation(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
     """ORD-001: Create an order from a reservation and verify outbox events."""
     user_id = uuid.uuid4()
     product_id = uuid.uuid4()
@@ -60,9 +60,9 @@ async def test_ord_001_create_order_from_reservation(client: AsyncClient, db_ses
 @pytest.mark.asyncio
 async def test_ord_010_and_011_promocode_crud_and_math(client: AsyncClient) -> None:
     """ORD-010 & ORD-011: Promocode percentage math and order creation."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Create promocode SALE20 (20% off)
     promo_resp = await client.post(
         "/api/v1/promocodes/",
@@ -121,7 +121,7 @@ async def test_ord_010_and_011_promocode_crud_and_math(client: AsyncClient) -> N
 async def test_ord_008_and_009_consumer_handlers(
     session_factory: async_sessionmaker[AsyncSession], client: AsyncClient
 ) -> None:
-    """ORD-008 & ORD-009: Test PaymentSucceeded, PaymentFailed, ReservationReleased consumer handlers."""
+    """ORD-008/009: Test payment and reservation event consumer handlers."""
     user_id = uuid.uuid4()
     product_id = uuid.uuid4()
     reservation_id = uuid.uuid4()
@@ -143,7 +143,9 @@ async def test_ord_008_and_009_consumer_handlers(
 
     # Process PaymentSucceeded
     async with session_factory() as session, session.begin():
-        await handle_payment_succeeded(session, {"order_id": str(order_id), "payment_id": str(payment_id)})
+        await handle_payment_succeeded(
+            session, {"order_id": str(order_id), "payment_id": str(payment_id)}
+        )
 
     # Verify order CONFIRMED
     get_1 = await client.get(f"/api/v1/orders/{order_id}")
@@ -151,7 +153,9 @@ async def test_ord_008_and_009_consumer_handlers(
 
     # Redelivery of PaymentSucceeded should remain CONFIRMED
     async with session_factory() as session, session.begin():
-        await handle_payment_succeeded(session, {"order_id": str(order_id), "payment_id": str(payment_id)})
+        await handle_payment_succeeded(
+            session, {"order_id": str(order_id), "payment_id": str(payment_id)}
+        )
 
     get_2 = await client.get(f"/api/v1/orders/{order_id}")
     assert get_2.json()["status"] == "CONFIRMED"
@@ -183,7 +187,7 @@ async def test_ord_008_and_009_consumer_handlers(
 
 @pytest.mark.asyncio
 async def test_ord_016_outbox_worker_retries(
-    session_factory: async_sessionmaker[AsyncSession]
+    session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """ORD-016: Outbox worker retries failed order events."""
     async with session_factory() as session, session.begin():

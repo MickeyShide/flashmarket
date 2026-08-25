@@ -47,9 +47,7 @@ class OrderModel(Base):
         default=OrderStatus.PENDING,
         server_default="PENDING",
     )
-    reservation_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, nullable=False, unique=True, index=True
-    )
+    reservation_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, unique=True, index=True)
     payment_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     checkout_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     variant_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
