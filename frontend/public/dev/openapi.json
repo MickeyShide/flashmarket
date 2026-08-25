@@ -4442,6 +4442,17 @@
             ],
             "title": "Cancellation Reason"
           },
+          "confirmation_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Url"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -4462,6 +4473,17 @@
               }
             ],
             "title": "Current Attempt Id"
+          },
+          "current_attempt_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Attempt Status"
           },
           "expires_at": {
             "anyOf": [

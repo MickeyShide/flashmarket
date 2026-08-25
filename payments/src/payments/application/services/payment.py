@@ -188,6 +188,7 @@ class PaymentService:
                 await self._session.rollback()
                 return await self.start_checkout(order_id)
             payment.current_attempt_id = attempt.id
+            payment.current_attempt_status = attempt.status
             payment.external_id = None
             payment.external_status = None
             payment.confirmation_url = None
@@ -246,6 +247,7 @@ class PaymentService:
 
         now = utc_now()
         attempt.status = PaymentAttemptStatus.PREPARING
+        payment.current_attempt_status = attempt.status
         operation.status = ProviderOperationStatus.IN_FLIGHT
         operation.attempt_count += 1
         operation.first_requested_at = operation.first_requested_at or now
@@ -369,6 +371,7 @@ class PaymentService:
         attempt: PaymentAttemptModel,
     ) -> None:
         payment.current_attempt_id = attempt.id
+        payment.current_attempt_status = attempt.status
         payment.external_id = attempt.external_id
         payment.external_status = attempt.external_status
         payment.confirmation_url = attempt.confirmation_url
@@ -385,6 +388,10 @@ class PaymentService:
             await self._session.rollback()
             return
         attempt.status = status
+        await self._session.commit()
+        payment = await self._payment_repo.get_by_id_for_update(attempt.payment_id)
+        if payment is not None and payment.current_attempt_id == attempt.id:
+            payment.current_attempt_status = attempt.status
         await self._session.commit()
 
     @staticmethod
@@ -575,7 +582,15 @@ class PaymentService:
             attempt = await self._attempt_repo.get_by_id_for_update(entity_id)
             if attempt is not None and attempt.status == PaymentAttemptStatus.UNKNOWN:
                 attempt.status = PaymentAttemptStatus.EXPIRED
+                payment_id = attempt.payment_id
+            else:
+                payment_id = None
             await self._session.commit()
+            if payment_id is not None:
+                payment = await self._payment_repo.get_by_id_for_update(payment_id)
+                if payment is not None and payment.current_attempt_id == entity_id:
+                    payment.current_attempt_status = PaymentAttemptStatus.EXPIRED
+                await self._session.commit()
 
     async def _emit_succeeded(self, payment: PaymentModel) -> None:
         payload = {

@@ -45,6 +45,8 @@ class PaymentResponse(BaseModel):
     cancellation_reason: str | None = None
     provider_test: bool | None = None
     current_attempt_id: uuid.UUID | None = None
+    current_attempt_status: str | None = None
+    confirmation_url: str | None = None
     expires_at: datetime | None
     created_at: datetime
     updated_at: datetime

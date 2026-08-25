@@ -58,6 +58,7 @@ class PaymentModel(Base):
     refund_external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     refund_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
     current_attempt_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
+    current_attempt_status: Mapped[str | None] = mapped_column(String(20))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now

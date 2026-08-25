@@ -83,11 +83,11 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 ## 8. Frontend flow
 
-- [ ] Checkout handles immediate redirect and HTTP 202 preparation.
-- [ ] Preparation and return polling use increasing delay plus jitter.
-- [ ] Polling pauses in hidden tabs and remains bounded.
-- [ ] Expired/canceled attempts offer a new attempt without a new order.
-- [ ] Frontend tests and production build pass.
+- [x] Checkout handles immediate redirect and HTTP 202 preparation.
+- [x] Preparation and return polling use increasing delay plus jitter.
+- [x] Polling pauses in hidden tabs and remains bounded.
+- [x] Expired/canceled attempts offer a new attempt without a new order.
+- [x] Frontend tests and production build pass.
 
 ## 9. Ledger, receipts, and reports
 
@@ -126,3 +126,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 | 2026-08-25 | Durable webhook inbox | Payments `33 passed`; strict mypy; scoped Ruff/format; gateway syntax not runnable because local Docker daemon is unavailable | Pass with noted local-tool limitation |
 | 2026-08-25 | Multiple payment attempts | Payments `36 passed`; strict mypy; scoped Ruff/format; concurrent file-backed SQLite test | Pass |
 | 2026-08-25 | Normalized refunds | Payments `42 passed`; strict mypy; scoped Ruff/format; partial/over-refund, reason-policy, and unknown-result recovery tests | Pass |
+| 2026-08-25 | Frontend payment flow | Frontend `25 passed`; Vite production build; Payments `42 passed`; strict mypy; scoped Ruff/format | Pass |

@@ -1,5 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../services/api';
+import {
+  abortableDelay,
+  isAbortError,
+  paymentPollingDelay,
+  waitForVisible,
+} from '../../services/payment-polling';
 
 const MAX_POLLS = 15;
 
@@ -18,13 +24,14 @@ export const PaymentReturnView = ({ orderId, onOpenOrder, onGoToOrders }) => {
       return undefined;
     }
 
-    let cancelled = false;
-    let timerId = null;
+    const controller = new AbortController();
 
     const poll = async (attempt = 0) => {
       try {
-        const payment = await apiJson(`/api/v1/payments/orders/${resolvedOrderId}`);
-        if (cancelled) return;
+        await waitForVisible(controller.signal);
+        const payment = await apiJson(`/api/v1/payments/orders/${resolvedOrderId}`, {
+          signal: controller.signal,
+        });
         if (payment.status === 'SUCCESS') {
           window.sessionStorage.removeItem('flashmarket:lastPaymentOrderId');
           setState('success');
@@ -43,7 +50,7 @@ export const PaymentReturnView = ({ orderId, onOpenOrder, onGoToOrders }) => {
           return;
         }
       } catch (err) {
-        if (cancelled) return;
+        if (isAbortError(err)) return;
         if (err.data?.error?.code !== 'payment_not_ready') {
           setState('error');
           setMessage(err.message || 'Не удалось проверить платёж.');
@@ -56,14 +63,16 @@ export const PaymentReturnView = ({ orderId, onOpenOrder, onGoToOrders }) => {
         setMessage('Проверка занимает больше времени. Статус обновится в заказе.');
         return;
       }
-      timerId = window.setTimeout(() => poll(attempt + 1), 2000);
+      try {
+        await abortableDelay(paymentPollingDelay(attempt), controller.signal);
+        await poll(attempt + 1);
+      } catch (err) {
+        if (!isAbortError(err)) throw err;
+      }
     };
 
     poll();
-    return () => {
-      cancelled = true;
-      if (timerId !== null) window.clearTimeout(timerId);
-    };
+    return () => controller.abort();
   }, [resolvedOrderId]);
 
   const tones = {

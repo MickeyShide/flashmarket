@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../services/api';
+import {
+  abortableDelay,
+  isAbortError,
+  paymentPollingDelay,
+  waitForVisible,
+} from '../../services/payment-polling';
 import { formatDate, formatPrice, getOrderStatusClass, getOrderStatusLabel } from '../../utils/formatters';
 
 export const OrderDetailView = ({ orderId, onBack }) => {
@@ -10,6 +16,8 @@ export const OrderDetailView = ({ orderId, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [paying, setPaying] = useState(false);
+  const [paymentPreparation, setPaymentPreparation] = useState('');
+  const paymentAbortRef = useRef(null);
 
   const fetchOrderDetails = async () => {
     setLoading(true);
@@ -30,33 +38,64 @@ export const OrderDetailView = ({ orderId, onBack }) => {
     }
   }, [orderId]);
 
+  useEffect(() => () => paymentAbortRef.current?.abort(), []);
+
   const handlePayOrder = async (orderId, payableAmountKopecks, currency) => {
     if (!window.confirm(`Подтвердите оплату на сумму ${formatPrice(payableAmountKopecks, currency, true)}`)) return;
 
     setPaying(true);
+    setPaymentPreparation('Подготавливаем безопасный переход к оплате…');
+    paymentAbortRef.current?.abort();
+    const controller = new AbortController();
+    paymentAbortRef.current = controller;
     try {
       let checkout = null;
       for (let attempt = 0; attempt < 5; attempt += 1) {
         try {
           checkout = await apiJson(`/api/v1/payments/orders/${orderId}/checkout`, {
-            method: 'POST'
+            method: 'POST',
+            signal: controller.signal,
           });
           break;
         } catch (err) {
           if (err.data?.error?.code !== 'payment_not_ready' || attempt === 4) {
             throw err;
           }
-          await new Promise(resolve => window.setTimeout(resolve, 300 * (attempt + 1)));
+          await abortableDelay(paymentPollingDelay(attempt), controller.signal);
         }
       }
-      if (!checkout?.confirmation_url) {
+      window.sessionStorage.setItem('flashmarket:lastPaymentOrderId', orderId);
+      if (checkout?.confirmation_url) {
+        window.location.assign(checkout.confirmation_url);
+        return;
+      }
+      if (checkout?.preparation_status !== 'pending') {
         throw new Error('Платёжная ссылка не получена');
       }
-      window.sessionStorage.setItem('flashmarket:lastPaymentOrderId', orderId);
-      window.location.assign(checkout.confirmation_url);
+      setPaymentPreparation('ЮKassa обрабатывает запрос. Это обычно занимает несколько секунд…');
+      for (let poll = 0; poll < 12; poll += 1) {
+        await waitForVisible(controller.signal);
+        const payment = await apiJson(`/api/v1/payments/orders/${orderId}`, {
+          signal: controller.signal,
+        });
+        if (payment.confirmation_url) {
+          window.location.assign(payment.confirmation_url);
+          return;
+        }
+        if (['CANCELED', 'EXPIRED', 'FAILED'].includes(payment.current_attempt_status)) {
+          throw new Error('Попытка оплаты завершилась. Нажмите «Оплатить» ещё раз.');
+        }
+        await abortableDelay(
+          paymentPollingDelay(poll, checkout.retry_after_seconds),
+          controller.signal,
+        );
+      }
+      throw new Error('Подготовка заняла больше времени. Попробуйте снова чуть позже.');
     } catch (err) {
+      if (isAbortError(err)) return;
       triggerToast('Ошибка оплаты: ' + err.message, true);
       setPaying(false);
+      setPaymentPreparation('');
     }
   };
 
@@ -189,6 +228,11 @@ export const OrderDetailView = ({ orderId, onBack }) => {
                   ? 'ОБРАБОТКА ОПЛАТЫ...'
                   : `ОПЛАТИТЬ ${formatPrice(finalPriceKopecks, order.currency, true)}`}
             </button>
+            {paying && paymentPreparation ? (
+              <p className="mt-3 text-xs font-semibold text-amber-800" role="status">
+                {paymentPreparation}
+              </p>
+            ) : null}
           </div>
         ) : order.payment_id ? (
           <div className="border-t border-border-color pt-4">
