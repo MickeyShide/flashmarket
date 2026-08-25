@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { apiJson } from '../../services/api';
 import { formatDate, formatPrice, getOrderStatusClass, getOrderStatusLabel } from '../../utils/formatters';
+import { OrdersTabSkeleton } from './OrdersTabSkeleton';
+import { prefetchOrder } from '../../services/prefetch';
 
 export const OrdersTab = ({ onSelectOrder }) => {
   const { user } = useAuth();
@@ -34,7 +36,7 @@ export const OrdersTab = ({ onSelectOrder }) => {
     loadOrders();
   }, [user?.id]);
 
-  if (loading) return <div className="spinner"></div>;
+  if (loading) return <OrdersTabSkeleton />;
 
   if (error) {
     return (
@@ -59,6 +61,9 @@ export const OrdersTab = ({ onSelectOrder }) => {
           key={order.id}
           className="p-4 bg-white border border-border-color rounded-lg hover:border-black transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
           onClick={() => onSelectOrder(order.id)}
+          onMouseEnter={() => prefetchOrder(order.id, apiJson)}
+          onTouchStart={() => prefetchOrder(order.id, apiJson)}
+          onFocus={() => prefetchOrder(order.id, apiJson)}
         >
           <div>
             <div className="font-extrabold text-[12.5px] uppercase mb-1">

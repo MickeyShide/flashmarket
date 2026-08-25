@@ -7,6 +7,7 @@ import { VariantsTab } from './VariantsTab';
 import { StockTab } from '../Inventory/StockTab';
 import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
 import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+import { AdminTableSkeleton } from '../AdminTableSkeleton';
 
 const PAGE_SIZE = 10;
 const PRODUCT_STATUSES = ['ACTIVE', 'HIDDEN', 'ARCHIVED'];
@@ -185,7 +186,7 @@ export const ProductsTab = () => {
     }
   };
 
-  if (loading) return <div className="spinner"></div>;
+  if (loading) return <AdminTableSkeleton rows={6} />;
 
   const visibleProducts = products;
   const flatCategories = flattenCategoryTree(categories);

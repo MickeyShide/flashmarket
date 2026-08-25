@@ -1,6 +1,8 @@
 import React from 'react';
 import { formatPrice } from '../../utils/formatters';
 import { useWishlist } from '../../context/WishlistContext';
+import { prefetchProduct } from '../../services/prefetch';
+import { apiJson } from '../../services/api';
 
 export const ProductCard = ({ product, onClick, eager = false }) => {
   const { isWished, toggleWishlist } = useWishlist();
@@ -17,6 +19,12 @@ export const ProductCard = ({ product, onClick, eager = false }) => {
     toggleWishlist(product.id);
   };
 
+  const handleMouseEnter = () => {
+    if (product?.slug) {
+      prefetchProduct(product.slug, apiJson);
+    }
+  };
+
   const displayPrice = product.effective_price !== undefined && product.effective_price !== null
     ? product.effective_price
     : product.price;
@@ -25,6 +33,9 @@ export const ProductCard = ({ product, onClick, eager = false }) => {
     <div
       className="flex flex-col items-center text-center cursor-pointer relative group"
       onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onTouchStart={handleMouseEnter}
+      onFocus={handleMouseEnter}
     >
       {/* Thumbnail Box */}
       <div

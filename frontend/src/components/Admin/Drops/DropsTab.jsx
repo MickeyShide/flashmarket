@@ -4,6 +4,7 @@ import { useToast } from '../../../context/ToastContext';
 import { MediaUploader } from '../../Media/MediaUploader';
 import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
 import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+import { AdminTableSkeleton } from '../AdminTableSkeleton';
 
 const PAGE_SIZE = 20;
 
@@ -185,7 +186,7 @@ export const DropsTab = () => {
 
   const filteredDrops = drops;
 
-  if (loading) return <div className="spinner"></div>;
+  if (loading) return <AdminTableSkeleton rows={5} />;
 
   return (
     <div className="space-y-6">

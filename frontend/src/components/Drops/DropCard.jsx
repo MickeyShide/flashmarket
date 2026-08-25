@@ -1,5 +1,7 @@
 import React from 'react';
 import { Countdown } from './Countdown';
+import { prefetchDrop } from '../../services/prefetch';
+import { apiJson } from '../../services/api';
 
 export const DropCard = ({ drop, onClick, onRefresh }) => {
   const isScheduled = drop.status === 'SCHEDULED' || (drop.starts_at && new Date(drop.starts_at) > new Date());
@@ -12,10 +14,19 @@ export const DropCard = ({ drop, onClick, onRefresh }) => {
     ? { background: `url(${drop.cover_image}) center/cover no-repeat #000` }
     : {};
 
+  const handleMouseEnter = () => {
+    if (drop?.slug || drop?.id) {
+      prefetchDrop(drop.slug || drop.id, apiJson);
+    }
+  };
+
   return (
     <div
       className="bg-white border border-border-color rounded-lg overflow-hidden cursor-pointer group hover:border-black transition-all flex flex-col justify-between"
       onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onTouchStart={handleMouseEnter}
+      onFocus={handleMouseEnter}
     >
       <div
         className="w-full h-44 bg-black relative flex flex-col justify-between p-3"

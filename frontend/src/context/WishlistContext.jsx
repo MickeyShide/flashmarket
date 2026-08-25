@@ -47,16 +47,22 @@ export const WishlistProvider = ({ children }) => {
       window.dispatchEvent(new CustomEvent('flashmarket:auth-required', { detail: { tab: 'wishlist' } }));
       return false;
     }
+
+    // Optimistic UI update: instantly mark as wished
+    const previous = new Set(wishedProductIds);
+    setWishedProductIds(prev => new Set([...prev, productId]));
+    triggerToast('Товар добавлен в избранное');
+
     try {
       await apiJson(`/api/v1/wishlist/users/${user.id}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ product_id: productId })
       });
-      setWishedProductIds(prev => new Set([...prev, productId]));
-      triggerToast('Товар добавлен в избранное');
       return true;
     } catch (err) {
+      // Rollback on failure
+      setWishedProductIds(previous);
       triggerToast(err.message || 'Не удалось добавить в избранное', true);
       return false;
     }
@@ -64,18 +70,24 @@ export const WishlistProvider = ({ children }) => {
 
   const removeFromWishlist = async (productId) => {
     if (!user) return false;
+
+    // Optimistic UI update: instantly unmark
+    const previous = new Set(wishedProductIds);
+    setWishedProductIds(prev => {
+      const next = new Set(prev);
+      next.delete(productId);
+      return next;
+    });
+    triggerToast('Товар удален из избранного');
+
     try {
       await apiJson(`/api/v1/wishlist/users/${user.id}/items/${productId}`, {
         method: 'DELETE'
       });
-      setWishedProductIds(prev => {
-        const next = new Set(prev);
-        next.delete(productId);
-        return next;
-      });
-      triggerToast('Товар удален из избранного');
       return true;
     } catch (err) {
+      // Rollback on failure
+      setWishedProductIds(previous);
       triggerToast(err.message || 'Не удалось удалить из избранного', true);
       return false;
     }

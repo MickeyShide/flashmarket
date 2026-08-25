@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiJson } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
+import { AdminTableSkeleton } from '../AdminTableSkeleton';
 
 const flattenCategoryTree = (nodes, depth = 0) => nodes.flatMap(category => [
   { ...category, depth },
@@ -66,7 +67,7 @@ export const CategoriesTab = () => {
     }
   };
 
-  if (loading) return <div className="spinner"></div>;
+  if (loading) return <AdminTableSkeleton rows={4} />;
 
   const flatCategories = flattenCategoryTree(categories);
 

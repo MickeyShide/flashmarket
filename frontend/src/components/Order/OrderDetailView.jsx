@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../services/api';
 import {
@@ -8,8 +9,10 @@ import {
   waitForVisible,
 } from '../../services/payment-polling';
 import { formatDate, formatPrice, getOrderStatusClass, getOrderStatusLabel } from '../../utils/formatters';
+import { OrderDetailSkeleton } from './OrderDetailSkeleton';
 
 export const OrderDetailView = ({ orderId, onBack }) => {
+  const { user } = useAuth();
   const { triggerToast } = useToast();
 
   const [order, setOrder] = useState(null);
@@ -54,6 +57,8 @@ export const OrderDetailView = ({ orderId, onBack }) => {
         try {
           checkout = await apiJson(`/api/v1/payments/orders/${orderId}/checkout`, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receipt_email: user?.email || null }),
             signal: controller.signal,
           });
           break;
@@ -100,14 +105,7 @@ export const OrderDetailView = ({ orderId, onBack }) => {
   };
 
   if (loading) {
-    return (
-      <div className="max-w-[800px] mx-auto my-8 px-4">
-        <button className="text-[11px] font-bold uppercase mb-6 cursor-pointer text-text-muted hover:text-black" onClick={onBack}>
-          ← Назад к заказам
-        </button>
-        <div className="spinner"></div>
-      </div>
-    );
+    return <OrderDetailSkeleton onBack={onBack} />;
   }
 
   if (error || !order) {

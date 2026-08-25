@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiJson } from '../../services/api';
 import { ProductCard } from '../Catalog/ProductCard';
+import { ProductGridSkeleton } from '../Catalog/ProductGridSkeleton';
 import { useWishlist } from '../../context/WishlistContext';
 import { useToast } from '../../context/ToastContext';
 
@@ -50,8 +51,8 @@ export const WishlistView = ({ onOpenProduct, onGoToCatalog }) => {
 
   if (loading) {
     return (
-      <div className="py-8 flex justify-center">
-        <div className="spinner"></div>
+      <div className="my-4">
+        <ProductGridSkeleton count={4} />
       </div>
     );
   }

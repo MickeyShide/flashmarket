@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { buildProductGallery } from './productGallery';
+import { ProductDetailSkeleton } from './ProductDetailSkeleton';
 
 export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
   const { addToCart, fetchStock } = useCart();
@@ -127,14 +128,7 @@ export const ProductDetail = ({ productSlug, dropInfo = null, onBack }) => {
   }, [product, selectedVariant, fetchStock]);
 
   if (loading) {
-    return (
-      <div className="max-w-[1040px] mx-auto my-8 px-4">
-        <button className="text-[11px] font-bold uppercase mb-6 cursor-pointer text-text-muted hover:text-black" onClick={onBack}>
-          ← Назад в каталог
-        </button>
-        <div className="spinner"></div>
-      </div>
-    );
+    return <ProductDetailSkeleton onBack={onBack} />;
   }
 
   if (error || !product) {

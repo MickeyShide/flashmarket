@@ -3,6 +3,7 @@ import { apiJson } from '../../../services/api';
 import { formatDate } from '../../../utils/formatters';
 import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
 import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+import { AdminTableSkeleton } from '../AdminTableSkeleton';
 
 const PAGE_SIZE = 25;
 const auditKey = log => log.id || `${log.event_type}-${log.created_at}-${log.actor_user_id}`;
@@ -28,7 +29,7 @@ export const AuditTab = () => {
     loadAuditLogs();
   }, [loadAuditLogs]);
 
-  if (loading) return <div className="spinner"></div>;
+  if (loading) return <AdminTableSkeleton rows={5} />;
 
   return (
     <div className="space-y-4">

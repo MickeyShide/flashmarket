@@ -17,6 +17,7 @@ import { DropsSection } from './components/Drops/DropsSection';
 import { usePaginatedResource } from './hooks/usePaginatedResource';
 
 import { parseRoute, formatRouteUrl } from './utils/router';
+import { PageSkeleton } from './components/Common/PageSkeleton';
 
 const lazyNamed = (loader, exportName) => lazy(() => loader().then(module => ({ default: module[exportName] })));
 
@@ -235,7 +236,7 @@ export const App = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col">
-        <Suspense fallback={<div className="spinner" aria-label="Загрузка страницы" />}>
+        <Suspense fallback={<PageSkeleton />}>
         {currentView === 'catalog' && (
           <>
             <BrandActiveBanner

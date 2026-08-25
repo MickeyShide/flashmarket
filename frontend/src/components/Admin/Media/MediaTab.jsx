@@ -4,6 +4,7 @@ import { useToast } from '../../../context/ToastContext';
 import { formatDate } from '../../../utils/formatters';
 import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
 import { InfiniteScrollTrigger } from '../../Common/InfiniteScrollTrigger';
+import { AdminTableSkeleton } from '../AdminTableSkeleton';
 
 const PAGE_SIZE = 25;
 
@@ -51,7 +52,7 @@ export const MediaTab = () => {
     }
   };
 
-  if (loading) return <div className="spinner"></div>;
+  if (loading) return <AdminTableSkeleton rows={5} />;
 
   const visibleAssets = assets;
 

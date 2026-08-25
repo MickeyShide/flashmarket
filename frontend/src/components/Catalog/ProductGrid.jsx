@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProductCard } from './ProductCard';
+import { ProductGridSkeleton } from './ProductGridSkeleton';
 import { InfiniteScrollTrigger } from '../Common/InfiniteScrollTrigger';
 
 export const ProductGrid = ({
@@ -16,7 +17,7 @@ export const ProductGrid = ({
   return (
     <div className="max-w-[1280px] mx-auto px-3.5 md:px-6 pb-12 md:pb-16">
       {loading ? (
-        <div className="spinner"></div>
+        <ProductGridSkeleton count={8} />
       ) : error ? (
         <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-lg text-center my-6">
           <div className="mb-3 font-semibold">Ошибка загрузки каталога: {error}</div>

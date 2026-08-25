@@ -1,6 +1,8 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { flattenCategories } from '../../utils/formatters';
+import { prefetchCategories, prefetchProfile, prefetchAdmin } from '../../services/prefetch';
+import { apiJson } from '../../services/api';
 
 export const CategoryNav = ({
   categoriesData,
@@ -40,6 +42,8 @@ export const CategoryNav = ({
             setCurrentView('categories');
             closeMobileNav();
           }}
+          onMouseEnter={() => prefetchCategories(apiJson)}
+          onFocus={() => prefetchCategories(apiJson)}
         >
           КАТЕГОРИИ
           {(currentView === 'categories' || activeCategoryId) && (
@@ -57,6 +61,8 @@ export const CategoryNav = ({
             if (switchProfileTab) switchProfileTab('wishlist');
             closeMobileNav();
           }}
+          onMouseEnter={() => prefetchProfile()}
+          onFocus={() => prefetchProfile()}
         >
           ИЗБРАННОЕ
         </button>
@@ -87,6 +93,8 @@ export const CategoryNav = ({
             setCurrentView('auth');
             closeMobileNav();
           }}
+          onMouseEnter={() => prefetchProfile()}
+          onFocus={() => prefetchProfile()}
         >
           {user ? 'ПРОФИЛЬ' : 'ВОЙТИ'}
         </button>
@@ -99,6 +107,8 @@ export const CategoryNav = ({
               setCurrentView('admin');
               closeMobileNav();
             }}
+            onMouseEnter={() => prefetchAdmin()}
+            onFocus={() => prefetchAdmin()}
           >
             <span className="px-1.5 py-0.5 text-[9px] font-mono font-black bg-red-600 text-white rounded">ADMIN</span>
             АДМИН ПАНЕЛЬ

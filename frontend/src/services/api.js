@@ -1,5 +1,6 @@
 import { ACCESS_TOKEN_KEY } from '../config/constants';
 import { getCsrfToken } from '../utils/formatters';
+import { getPrefetchEntry, setPrefetchEntry, invalidatePrefetch } from './prefetch';
 
 let refreshPromise = null;
 let onSessionExpiredCallback = null;
@@ -74,6 +75,17 @@ export async function api(path, options = {}, tokenOverride = null) {
 }
 
 export async function apiJson(path, options = {}, tokenOverride = null) {
+  const method = (options.method || 'GET').toUpperCase();
+  const isGet = method === 'GET';
+
+  // Check prefetch cache for GET requests
+  if (isGet && !options.skipCache) {
+    const cachedPromise = getPrefetchEntry(path);
+    if (cachedPromise) {
+      return await cachedPromise;
+    }
+  }
+
   const res = await api(path, options, tokenOverride);
   const data = await res.json().catch(() => ({}));
 
@@ -111,5 +123,14 @@ export async function apiJson(path, options = {}, tokenOverride = null) {
     }
     throw err;
   }
+
+  // Store successful GET in prefetch cache
+  if (isGet && !options.skipCache) {
+    setPrefetchEntry(path, { data });
+  } else if (!isGet) {
+    // Invalidate prefetch on mutations
+    invalidatePrefetch();
+  }
+
   return data;
 }

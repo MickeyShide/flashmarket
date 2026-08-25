@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiJson } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
+import { AdminTableSkeleton } from '../AdminTableSkeleton';
 import { MediaUploader } from '../../Media/MediaUploader';
 
 export const BrandsTab = () => {
@@ -98,7 +99,7 @@ export const BrandsTab = () => {
     }
   };
 
-  if (loading) return <div className="spinner"></div>;
+  if (loading) return <AdminTableSkeleton rows={5} />;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

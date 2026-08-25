@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiJson } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
+import { AdminTableSkeleton } from '../AdminTableSkeleton';
 
 export const StockTab = ({ product, variant = null }) => {
   const { triggerToast } = useToast();
@@ -65,7 +66,7 @@ export const StockTab = ({ product, variant = null }) => {
     }
   };
 
-  if (loading) return <div className="spinner"></div>;
+  if (loading) return <AdminTableSkeleton rows={2} />;
 
   return (
     <div className="bg-white border border-border-color rounded-lg p-5 space-y-4">

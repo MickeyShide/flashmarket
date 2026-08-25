@@ -123,25 +123,11 @@ export const CartProvider = ({ children }) => {
     const item = cart[index];
     if (!item) return;
 
-    if (delta > 0) {
-      try {
-        const cacheKey = item.variant_id ? `${item.id}_${item.variant_id}` : item.id;
-        const stock = stockCache[cacheKey] || await fetchStock(item.id, item.variant_id);
-        const available = stock.available || 0;
+    const previousCart = cart;
 
-        if (item.qty + delta > available) {
-          triggerToast(`Достигнут лимит наличия на складе (${available} шт.)`, true);
-          setCart(prev => {
-            const updated = [...prev];
-            updated[index] = { ...updated[index], qty: Math.min(updated[index].qty, available) };
-            return updated;
-          });
-          return;
-        }
-      } catch (e) {}
-    }
-
+    // Optimistic UI update: instantly apply delta
     setCart(prev => {
+      if (!prev[index]) return prev;
       const updated = [...prev];
       const newQty = updated[index].qty + delta;
       if (newQty <= 0) {
@@ -151,6 +137,35 @@ export const CartProvider = ({ children }) => {
         return updated;
       }
     });
+
+    // If increasing quantity, verify with stock cache/backend
+    if (delta > 0) {
+      try {
+        const cacheKey = item.variant_id ? `${item.id}_${item.variant_id}` : item.id;
+        const stock = stockCache[cacheKey] || await fetchStock(item.id, item.variant_id);
+        const available = stock.available ?? 0;
+
+        if (item.qty + delta > available) {
+          triggerToast(`Достигнут лимит наличия на складе (${available} шт.)`, true);
+          setCart(prev => {
+            const currentItemIdx = prev.findIndex(i =>
+              i.id === item.id &&
+              (i.variant_id || null) === (item.variant_id || null) &&
+              (i.drop_id || null) === (item.drop_id || null)
+            );
+            if (currentItemIdx === -1) return prev;
+            const updated = [...prev];
+            updated[currentItemIdx] = {
+              ...updated[currentItemIdx],
+              qty: Math.min(updated[currentItemIdx].qty, available)
+            };
+            return updated;
+          });
+        }
+      } catch (e) {
+        // In case of error, we can either keep or rollback
+      }
+    }
   };
 
   const clearCart = () => {

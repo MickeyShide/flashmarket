@@ -3,6 +3,7 @@ import { apiJson } from '../../services/api';
 import { ProductCard } from '../Catalog/ProductCard';
 import { Countdown } from './Countdown';
 import { useToast } from '../../context/ToastContext';
+import { DropDetailSkeleton } from './DropDetailSkeleton';
 
 export const DropDetail = ({ dropIdentifier, onOpenProductWithDrop, onBack }) => {
   const { triggerToast } = useToast();
@@ -58,14 +59,7 @@ export const DropDetail = ({ dropIdentifier, onOpenProductWithDrop, onBack }) =>
   }, [dropIdentifier, loadDrop]);
 
   if (loading) {
-    return (
-      <div className="max-w-[1280px] mx-auto my-8 px-4">
-        <button className="text-[11px] font-bold uppercase mb-6 cursor-pointer text-text-muted hover:text-black" onClick={onBack}>
-          ← Назад в каталог
-        </button>
-        <div className="spinner"></div>
-      </div>
-    );
+    return <DropDetailSkeleton onBack={onBack} />;
   }
 
   if (error || !drop) {

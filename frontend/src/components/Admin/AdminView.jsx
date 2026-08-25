@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { AdminNav } from './AdminNav';
+import { PageSkeleton } from '../Common/PageSkeleton';
 
 const lazyNamed = (loader, exportName) => lazy(() => loader().then(module => ({ default: module[exportName] })));
 
@@ -55,7 +56,7 @@ export const AdminView = ({ onBack }) => {
       <AdminNav activeTab={activeTab} onSelectTab={setActiveTab} />
 
       <main className="mt-6">
-        <Suspense fallback={<div className="spinner" aria-label="Загрузка раздела" />}>
+        <Suspense fallback={<PageSkeleton />}>
           {activeTab === 'catalog' && <ProductsTab />}
           {activeTab === 'brands' && <BrandsTab />}
           {activeTab === 'categories' && <CategoriesTab />}

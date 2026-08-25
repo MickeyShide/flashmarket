@@ -135,22 +135,33 @@ export const AuthProvider = ({ children }) => {
   };
 
   const closeSession = async (sessionId) => {
+    const prevSessions = sessions;
+    // Optimistic UI update
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
+    triggerToast('Сессия закрыта');
+
     try {
       await apiJson('/sessions/' + sessionId, { method: 'DELETE' });
-      triggerToast('Сессия закрыта');
-      loadProfile();
     } catch (err) {
+      setSessions(prevSessions);
       triggerToast('Ошибка: ' + err.message, true);
     }
   };
 
   const markNotifRead = async (notificationId) => {
+    const prevNotifications = notifications;
+    const prevUnreadCount = unreadNotifCount;
+
+    // Optimistic UI update
+    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, status: 'READ', read_at: new Date().toISOString() } : n));
+    setUnreadNotifCount(prev => Math.max(0, prev - 1));
+    triggerToast('Уведомление прочитано');
+
     try {
       await apiJson(`/api/v1/notifications/${notificationId}/read`, { method: 'POST' });
-      triggerToast('Уведомление прочитано');
-      loadNotifications();
     } catch (err) {
-      loadNotifications();
+      setNotifications(prevNotifications);
+      setUnreadNotifCount(prevUnreadCount);
     }
   };
 

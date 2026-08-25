@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
 import { formatPrice } from '../../utils/formatters';
+import { CartSkeleton } from './CartSkeleton';
 
 export const CartView = ({ onBack, onGoToCheckout, onGoToCatalog }) => {
   const { cart, removeCartItem, changeQty, cartTotal, fetchStock, stockCache } = useCart();
@@ -64,7 +65,7 @@ export const CartView = ({ onBack, onGoToCheckout, onGoToCatalog }) => {
       </h2>
 
       {loadingValidation ? (
-        <div className="spinner"></div>
+        <CartSkeleton />
       ) : (
         <div className="space-y-4 mb-8">
           {cart.map((item, idx) => {

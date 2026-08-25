@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiJson } from '../../services/api';
 import { DropCard } from './DropCard';
+import { DropCardSkeleton } from './DropCardSkeleton';
 
 export const DropsSection = ({ onSelectDrop, onViewAllDrops, showAll = false }) => {
   const [drops, setDrops] = useState([]);
@@ -23,6 +24,16 @@ export const DropsSection = ({ onSelectDrop, onViewAllDrops, showAll = false }) 
   useEffect(() => {
     fetchDrops();
   }, [fetchDrops]);
+
+  if (loading && showAll) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {[1, 2, 3].map(i => (
+          <DropCardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
 
   if (loading || drops.length === 0) return null;
 

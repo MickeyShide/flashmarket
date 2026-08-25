@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { formatDate } from '../../utils/formatters';
+import { prefetchCart, prefetchProfile, prefetchAdmin } from '../../services/prefetch';
 
 export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, switchProfileTab }) => {
   const { user, notifications, unreadNotifCount, markNotifRead } = useAuth();
@@ -59,6 +60,8 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
           {user?.role === 'ADMIN' && (
             <button
               onClick={() => setCurrentView('admin')}
+              onMouseEnter={() => prefetchAdmin()}
+              onFocus={() => prefetchAdmin()}
               className="hidden md:inline-flex px-2.5 py-1 text-[10px] font-mono font-extrabold uppercase tracking-wider bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer transition-colors"
               title="Админ панель"
             >
@@ -135,6 +138,8 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
           <button
             className="p-[4px] flex items-center justify-center cursor-pointer"
             onClick={() => setCurrentView('auth')}
+            onMouseEnter={() => prefetchProfile()}
+            onFocus={() => prefetchProfile()}
             title={user ? rawLabel : 'Войти'}
           >
             {user ? (
@@ -153,6 +158,8 @@ export const Header = ({ currentView, setCurrentView, toggleMobileNav, goHome, s
           <button
             className="p-[4px] flex items-center justify-center cursor-pointer relative"
             onClick={() => setCurrentView('cart')}
+            onMouseEnter={() => prefetchCart()}
+            onFocus={() => prefetchCart()}
             title="Корзина"
           >
             <svg className="w-[18px] md:w-[20px] h-[18px] md:h-[20px] stroke-black fill-none stroke-2 stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24">
