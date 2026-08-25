@@ -1,10 +1,18 @@
 """Pure conversion tests for the YooKassa adapter."""
 
+import json
 import uuid
+from decimal import Decimal
 
 import httpx
 import pytest
 
+from payments.application.contracts import (
+    ProviderPayment,
+    ProviderReceipt,
+    ProviderReceiptCustomer,
+    ProviderReceiptItem,
+)
 from payments.domain.exceptions import (
     PaymentProviderMalformedResponse,
     PaymentProviderRateLimited,
@@ -70,6 +78,132 @@ def _payment_payload() -> dict[str, object]:
         "confirmation": {"confirmation_url": "https://pay.test/confirm"},
         "expires_at": "2026-08-25T15:30:00Z",
     }
+
+
+def _receipt(*, amount: int = 100) -> ProviderReceipt:
+    return ProviderReceipt(
+        customer=ProviderReceiptCustomer(email="buyer@example.test"),
+        currency="RUB",
+        items=(
+            ProviderReceiptItem(
+                description="Test product",
+                quantity=Decimal("1"),
+                amount=amount,
+                vat_code=1,
+                payment_subject="commodity",
+                payment_mode="full_payment",
+                measure="piece",
+            ),
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_provider_serializes_payment_and_refund_receipts_exactly() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path.endswith("/payments"):
+            return httpx.Response(200, json=_payment_payload())
+        return httpx.Response(
+            200,
+            json={
+                "id": "refund-1",
+                "payment_id": "payment-1",
+                "status": "pending",
+                "amount": {"value": "0.50", "currency": "RUB"},
+            },
+        )
+
+    provider, client = _provider(httpx.MockTransport(handler))
+    payment = await provider.create_payment(
+        payment_id=uuid.UUID(int=1),
+        attempt_id=uuid.UUID(int=3),
+        order_id=uuid.UUID(int=2),
+        amount=100,
+        currency="RUB",
+        description="Order",
+        return_url="https://shop.test/payment/return",
+        idempotency_key="operation-payment",
+        receipt=_receipt(),
+    )
+    await provider.create_refund(
+        payment=ProviderPayment(
+            id=payment.id,
+            status="succeeded",
+            amount=100,
+            currency="RUB",
+            test=True,
+            metadata=payment.metadata,
+        ),
+        amount=50,
+        idempotency_key="operation-refund",
+        reason="partial",
+        receipt=_receipt(amount=50),
+    )
+
+    payment_json = json.loads(requests[0].content)
+    refund_json = json.loads(requests[1].content)
+    assert payment_json["receipt"] == {
+        "customer": {"email": "buyer@example.test"},
+        "items": [
+            {
+                "description": "Test product",
+                "quantity": "1",
+                "amount": {"value": "1.00", "currency": "RUB"},
+                "vat_code": 1,
+                "payment_subject": "commodity",
+                "payment_mode": "full_payment",
+                "measure": "piece",
+            }
+        ],
+    }
+    assert refund_json["receipt"]["items"][0]["amount"]["value"] == "0.50"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_provider_logs_bounded_yookassa_error_fields(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    description = "Receipt is missing or illegal\n" + ("x" * 700)
+    provider, client = _provider(
+        httpx.MockTransport(
+            lambda _request: httpx.Response(
+                400,
+                json={
+                    "type": "error",
+                    "id": "provider-error-id",
+                    "code": "invalid_request",
+                    "parameter": "receipt",
+                    "description": description,
+                },
+            )
+        )
+    )
+
+    with caplog.at_level("WARNING"), pytest.raises(PaymentProviderRejected):
+        await provider.create_payment(
+            payment_id=uuid.UUID(int=1),
+            attempt_id=uuid.UUID(int=3),
+            order_id=uuid.UUID(int=2),
+            amount=100,
+            currency="RUB",
+            description="Order",
+            return_url="https://shop.test/payment/return",
+            idempotency_key="operation-rejected",
+            receipt=_receipt(),
+        )
+
+    record = next(record for record in caplog.records if record.name.endswith("yookassa"))
+    assert record.provider_error_id == "provider-error-id"  # type: ignore[attr-defined]
+    assert record.provider_error_code == "invalid_request"  # type: ignore[attr-defined]
+    assert record.provider_error_parameter == "receipt"  # type: ignore[attr-defined]
+    logged_description = record.provider_error_description  # type: ignore[attr-defined]
+    assert "\n" not in logged_description
+    assert len(logged_description) == 512
+    await client.aclose()
 
 
 @pytest.mark.asyncio

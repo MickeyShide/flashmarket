@@ -135,12 +135,12 @@ worker request sent a historical `mock-*` ID to YooKassa after the provider swit
 - [x] Identify unscoped reconciliation claims as the `mock-*` request root cause.
 - [x] Approve and commit the remediation design.
 - [x] Write the implementation plan.
-- [~] Implement provider-neutral receipt contracts and YooKassa serialization.
+- [x] Implement provider-neutral receipt contracts and YooKassa serialization.
 - [ ] Propagate authenticated profile email into new order receipt snapshots.
 - [ ] Enrich and freeze legacy `NEEDS_CONTACT` snapshots at checkout.
 - [ ] Add payment and refund receipt payloads with exact-total validation.
 - [ ] Scope all financial worker claims and reconciliation by provider.
-- [ ] Log bounded, sanitized YooKassa error details without public disclosure.
+- [x] Log bounded, sanitized YooKassa error details without public disclosure.
 - [ ] Add receipt, retry, concurrency, refund, and provider-switch regressions.
 - [ ] Apply the receipt-state migration and regenerate OpenAPI artifacts.
 - [ ] Pass all affected service, frontend, deployment, migration, lint, and type checks.

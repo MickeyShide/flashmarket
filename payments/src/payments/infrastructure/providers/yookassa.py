@@ -17,6 +17,7 @@ import httpx
 from payments.application.contracts import (
     ProviderPayment,
     ProviderPaymentPage,
+    ProviderReceipt,
     ProviderRefund,
     ProviderRefundPage,
 )
@@ -33,6 +34,7 @@ from payments.observability import (
     PROVIDER_DURATION,
     PROVIDER_IN_PROGRESS,
     PROVIDER_OPERATIONS,
+    request_id_var,
 )
 
 logger = logging.getLogger(__name__)
@@ -166,14 +168,56 @@ class YooKassaPaymentProvider:
         return random.uniform(ceiling / 2, ceiling)  # noqa: S311
 
     @staticmethod
-    def _provider_error_id(response: httpx.Response) -> str | None:
+    def _provider_error(response: httpx.Response) -> dict[str, str | None]:
+        """Extract bounded diagnostic fields without logging provider payloads."""
         try:
             payload = response.json()
         except ValueError:
-            return None
-        if isinstance(payload, dict) and isinstance(payload.get("id"), str):
-            return str(payload["id"])
-        return None
+            payload = None
+        if not isinstance(payload, dict):
+            return {"id": None, "code": None, "parameter": None, "description": None}
+
+        def bounded(name: str, limit: int) -> str | None:
+            value = payload.get(name)
+            if not isinstance(value, str):
+                return None
+            return " ".join(value.split())[:limit]
+
+        return {
+            "id": bounded("id", 64),
+            "code": bounded("code", 64),
+            "parameter": bounded("parameter", 128),
+            "description": bounded("description", 512),
+        }
+
+    @staticmethod
+    def _receipt(receipt: ProviderReceipt) -> dict[str, object]:
+        customer = {
+            key: value
+            for key, value in {
+                "email": receipt.customer.email,
+                "phone": receipt.customer.phone,
+            }.items()
+            if value is not None
+        }
+        return {
+            "customer": customer,
+            "items": [
+                {
+                    "description": item.description,
+                    "quantity": format(item.quantity, "f"),
+                    "amount": {
+                        "value": kopecks_to_value(item.amount),
+                        "currency": receipt.currency,
+                    },
+                    "vat_code": item.vat_code,
+                    "payment_subject": item.payment_subject,
+                    "payment_mode": item.payment_mode,
+                    "measure": item.measure,
+                }
+                for item in receipt.items
+            ],
+        }
 
     @staticmethod
     def _temporary_exception(method: str) -> type[PaymentProviderUnavailable]:
@@ -245,13 +289,17 @@ class YooKassaPaymentProvider:
                 raise PaymentProviderAuthenticationFailed
             if response.status_code >= 400:
                 PROVIDER_OPERATIONS.labels(operation=operation, result="rejected").inc()
-                provider_error_id = self._provider_error_id(response)
+                provider_error = self._provider_error(response)
                 logger.warning(
                     "Payment provider rejected an operation",
                     extra={
                         "operation": operation,
-                        "provider_error_id": provider_error_id,
+                        "provider_error_id": provider_error["id"],
+                        "provider_error_code": provider_error["code"],
+                        "provider_error_parameter": provider_error["parameter"],
+                        "provider_error_description": provider_error["description"],
                         "provider_status_code": response.status_code,
+                        "request_id": request_id_var.get(),
                     },
                 )
                 raise PaymentProviderRejected(
@@ -335,22 +383,26 @@ class YooKassaPaymentProvider:
         description: str,
         return_url: str,
         idempotency_key: str,
+        receipt: ProviderReceipt | None = None,
     ) -> ProviderPayment:
+        request_body: dict[str, object] = {
+            "amount": {"value": kopecks_to_value(amount), "currency": currency},
+            "capture": True,
+            "confirmation": {"type": "redirect", "return_url": return_url},
+            "description": description,
+            "metadata": {
+                "payment_id": str(payment_id),
+                "attempt_id": str(attempt_id),
+                "order_id": str(order_id),
+            },
+        }
+        if receipt is not None:
+            request_body["receipt"] = self._receipt(receipt)
         payload = await self._request(
             "POST",
             "payments",
             idempotency_key=idempotency_key,
-            json_body={
-                "amount": {"value": kopecks_to_value(amount), "currency": currency},
-                "capture": True,
-                "confirmation": {"type": "redirect", "return_url": return_url},
-                "description": description,
-                "metadata": {
-                    "payment_id": str(payment_id),
-                    "attempt_id": str(attempt_id),
-                    "order_id": str(order_id),
-                },
-            },
+            json_body=request_body,
         )
         return self._payment(payload)
 
@@ -391,19 +443,23 @@ class YooKassaPaymentProvider:
         amount: int,
         idempotency_key: str,
         reason: str,
+        receipt: ProviderReceipt | None = None,
     ) -> ProviderRefund:
         del reason
+        request_body: dict[str, object] = {
+            "payment_id": payment.id,
+            "amount": {
+                "value": kopecks_to_value(amount),
+                "currency": payment.currency,
+            },
+        }
+        if receipt is not None:
+            request_body["receipt"] = self._receipt(receipt)
         payload = await self._request(
             "POST",
             "refunds",
             idempotency_key=idempotency_key,
-            json_body={
-                "payment_id": payment.id,
-                "amount": {
-                    "value": kopecks_to_value(amount),
-                    "currency": payment.currency,
-                },
-            },
+            json_body=request_body,
         )
         return self._refund(payload)
 

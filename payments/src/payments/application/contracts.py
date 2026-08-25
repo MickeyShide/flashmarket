@@ -5,7 +5,38 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import Protocol
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderReceiptCustomer:
+    """Customer contact sent with a fiscal receipt."""
+
+    email: str | None = None
+    phone: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderReceiptItem:
+    """Exact provider-neutral fiscal line."""
+
+    description: str
+    quantity: Decimal
+    amount: int
+    vat_code: int
+    payment_subject: str
+    payment_mode: str
+    measure: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderReceipt:
+    """Validated receipt input for a provider financial write."""
+
+    customer: ProviderReceiptCustomer
+    currency: str
+    items: tuple[ProviderReceiptItem, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +96,7 @@ class PaymentProvider(Protocol):
         description: str,
         return_url: str,
         idempotency_key: str,
+        receipt: ProviderReceipt | None = None,
     ) -> ProviderPayment: ...
 
     async def get_payment(self, external_id: str) -> ProviderPayment: ...
@@ -85,6 +117,7 @@ class PaymentProvider(Protocol):
         amount: int,
         idempotency_key: str,
         reason: str,
+        receipt: ProviderReceipt | None = None,
     ) -> ProviderRefund: ...
 
     async def get_refund(self, external_id: str) -> ProviderRefund: ...

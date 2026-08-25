@@ -8,6 +8,7 @@ from datetime import datetime
 from payments.application.contracts import (
     ProviderPayment,
     ProviderPaymentPage,
+    ProviderReceipt,
     ProviderRefund,
     ProviderRefundPage,
 )
@@ -27,8 +28,9 @@ class MockPaymentProvider:
         description: str,
         return_url: str,
         idempotency_key: str,
+        receipt: ProviderReceipt | None = None,
     ) -> ProviderPayment:
-        del description, return_url, idempotency_key
+        del description, return_url, idempotency_key, receipt
         external_id = f"mock-{attempt_id}"
         return ProviderPayment(
             id=external_id,
@@ -65,8 +67,9 @@ class MockPaymentProvider:
         amount: int,
         idempotency_key: str,
         reason: str,
+        receipt: ProviderReceipt | None = None,
     ) -> ProviderRefund:
-        del idempotency_key, reason
+        del idempotency_key, reason, receipt
         return ProviderRefund(
             id=f"mock-refund-{payment.id}",
             payment_id=payment.id,
