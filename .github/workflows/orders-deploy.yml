@@ -387,6 +387,20 @@ jobs:
               sleep 2
             done
             docker compose --env-file .env logs --tail 100 "$service"
+            state="$(
+              docker inspect \
+                --format 'status={{.State.Status}},exit={{.State.ExitCode}},restarts={{.RestartCount}},error={{.State.Error}}' \
+                "$container"
+            )"
+            printf '::error title=Orders %s health details::%s\n' "$service" "$state"
+            if [[ "$service" == "consumer" || "$service" == "outbox" ]]; then
+              if docker compose --env-file .env exec -T "$service" python -c \
+                "import socket; socket.create_connection(('shide-rabbitmq', 5672), 5).close()"; then
+                printf '::notice title=Orders %s RabbitMQ TCP probe::reachable\n' "$service"
+              else
+                printf '::error title=Orders %s RabbitMQ TCP probe::unreachable\n' "$service"
+              fi
+            fi
             return 1
           }
 
