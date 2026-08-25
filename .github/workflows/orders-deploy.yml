@@ -363,8 +363,14 @@ jobs:
           fi
 
           export ORDERS_IMAGE
-          docker compose --env-file .env config --quiet
-          docker compose --env-file .env pull
+          if ! docker compose --env-file .env config --quiet; then
+            echo '::error title=Orders Compose configuration invalid::docker compose config failed'
+            exit 1
+          fi
+          if ! docker compose --env-file .env pull; then
+            echo '::error title=Orders image pull failed::Unable to pull the exact image digest'
+            exit 1
+          fi
 
           wait_for_healthy() {
             service="$1"
@@ -385,25 +391,43 @@ jobs:
           }
 
           echo 'Applying database migrations...'
-          timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps api migrate </dev/null
+          if ! timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps api migrate </dev/null; then
+            echo '::error title=Orders migration failed::The production migration command failed or timed out'
+            exit 1
+          fi
           echo 'Database migrations complete.'
 
           echo 'Starting Orders runtime containers...'
-          docker compose --env-file .env up \
-            -d \
-            --no-build \
-            --force-recreate \
-            --remove-orphans \
-            api consumer outbox nginx
+          if ! docker compose --env-file .env up \
+              -d \
+              --no-build \
+              --force-recreate \
+              --remove-orphans \
+              api consumer outbox nginx; then
+            echo '::error title=Orders container start failed::docker compose up failed'
+            exit 1
+          fi
           echo 'Orders runtime containers started.'
 
           echo 'Waiting for Orders API...'
-          wait_for_healthy api
+          if ! wait_for_healthy api; then
+            echo '::error title=Orders API unhealthy::The API did not become healthy'
+            exit 1
+          fi
           echo 'Waiting for Orders workers...'
-          wait_for_healthy consumer
-          wait_for_healthy outbox
+          if ! wait_for_healthy consumer; then
+            echo '::error title=Orders consumer unhealthy::The consumer heartbeat did not become healthy'
+            exit 1
+          fi
+          if ! wait_for_healthy outbox; then
+            echo '::error title=Orders outbox unhealthy::The outbox heartbeat did not become healthy'
+            exit 1
+          fi
           echo 'Waiting for internal Nginx...'
-          wait_for_healthy nginx
+          if ! wait_for_healthy nginx; then
+            echo '::error title=Orders Nginx unhealthy::The internal proxy did not become healthy'
+            exit 1
+          fi
           docker compose --env-file .env ps -a
           echo 'Checking internal Nginx endpoint...'
           curl --fail --silent --show-error \
