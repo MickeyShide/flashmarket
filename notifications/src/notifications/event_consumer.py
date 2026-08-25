@@ -61,7 +61,8 @@ async def _create_notification(
         event_key=event_key,
     )
     try:
-        await repo.create(notification)
+        async with session.begin_nested():
+            await repo.create(notification)
         logger.info("Created notification %s for user %s", notification.id, user_id)
     except IntegrityError:
         logger.info("Notification with event_key %s already exists, skipping", event_key)

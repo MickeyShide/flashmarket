@@ -55,12 +55,13 @@ async def create_order_batch(
     principal: CurrentPrincipal,
     service: OrderService = Depends(get_order_service),
 ) -> OrderBatchResponse:
-    user_id = data.lines[0].user_id
-    if principal.role != "ADMIN" and user_id != principal.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot create checkout for another user",
-        )
+    if principal.role != "ADMIN":
+        for line in data.lines:
+            if line.user_id != principal.user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cannot create checkout for another user",
+                )
     result = await service.create_batch(data)
     return OrderBatchResponse(
         checkout_id=result.checkout_id,
