@@ -3309,6 +3309,18 @@
               }
             ],
             "title": "Promocode Code"
+          },
+          "receipt_email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Email"
           }
         },
         "required": [
@@ -3386,6 +3398,18 @@
             "minimum": 1.0,
             "title": "Quantity",
             "type": "integer"
+          },
+          "receipt_email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Email"
           },
           "reservation_id": {
             "format": "uuid",
@@ -4265,6 +4289,25 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "PaymentsCheckoutRequest": {
+        "description": "Optional receipt contact used to make legacy orders payable.",
+        "properties": {
+          "receipt_email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Email"
+          }
+        },
+        "title": "CheckoutRequest",
         "type": "object"
       },
       "PaymentsCheckoutResponse": {
@@ -8200,6 +8243,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PaymentsCheckoutRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

@@ -139,12 +139,12 @@ worker request sent a historical `mock-*` ID to YooKassa after the provider swit
 - [x] Propagate authenticated profile email into new order receipt snapshots.
 - [x] Enrich and freeze legacy `NEEDS_CONTACT` snapshots at checkout.
 - [x] Add payment and refund receipt payloads with exact-total validation.
-- [ ] Scope all financial worker claims and reconciliation by provider.
+- [x] Scope all financial worker claims and reconciliation by provider.
 - [x] Log bounded, sanitized YooKassa error details without public disclosure.
-- [~] Add receipt, retry, concurrency, refund, and provider-switch regressions.
-- [ ] Apply the receipt-state migration and regenerate OpenAPI artifacts.
-- [ ] Pass all affected service, frontend, deployment, migration, lint, and type checks.
-- [ ] Commit and push the implementation in reviewable units.
+- [x] Add receipt, retry, concurrency, refund, and provider-switch regressions.
+- [x] Apply the receipt-state migration and regenerate OpenAPI artifacts.
+- [x] Pass all affected service, frontend, deployment, migration, lint, and type checks.
+- [~] Commit the implementation in reviewable units; push to `origin/main` is pending.
 - [ ] Verify a new test-shop payment reaches the hosted confirmation page.
 - [ ] Verify YooKassa receives no further `mock-*` identifiers.
 
@@ -164,3 +164,4 @@ worker request sent a historical `mock-*` ID to YooKassa after the provider swit
 | 2026-08-25 | Final verification before security fixes | OpenAPI generation; OpenAPI/gateway contracts `16 passed`; frontend `25 passed` and production build; dependency audits found 0 known vulnerabilities; secrets scan found 0 exposed credentials | Pass with two security-review fixes pending |
 | 2026-08-25 | Approved security fixes | Payments `52 passed`; full Ruff/format; strict mypy; empty migration upgrade and seeded reservation backfill through `20260825_0014`; OpenAPI/gateway `16 passed`; frontend `25 passed` and production build | Pass |
 | 2026-08-25 | Test-shop deployment wiring | Payments deployment and gateway/OpenAPI contracts `20 passed`; workflow YAML parsed; production Compose rendered; official webhook IP list re-verified; GitHub Payments, Gateway, and Reliability runs succeeded; main-domain Payments readiness and return page returned `200`, foreign-source webhook request returned `403` | Pass |
+| 2026-08-25 | Receipt delivery and provider isolation | Payments `57 passed`, including YooKassa flow `24 passed` and Alembic `0014 -> 0015 -> 0014` receipt-state regression; Orders `37 passed`; frontend `38 passed` and production build; OpenAPI generation and contracts `17 passed`; deployment/OpenAPI/gateway contracts `20 passed`; affected Ruff/format and strict mypy checks | Pass |
