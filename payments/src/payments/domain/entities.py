@@ -68,3 +68,18 @@ class RefundStatus(StrEnum):
     SUCCEEDED = "SUCCEEDED"
     CANCELED = "CANCELED"
     QUARANTINED = "QUARANTINED"
+
+
+class ReceiptStatus(StrEnum):
+    """Local fiscal snapshot readiness while live receipts stay disabled."""
+
+    NEEDS_CONTACT = "NEEDS_CONTACT"
+    SIMULATED = "SIMULATED"
+    INVALID = "INVALID"
+
+
+class ReportImportStatus(StrEnum):
+    """Outcome of deterministic daily report reconciliation."""
+
+    MATCHED = "MATCHED"
+    DISCREPANCIES = "DISCREPANCIES"

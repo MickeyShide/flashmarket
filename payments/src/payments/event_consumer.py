@@ -26,16 +26,21 @@ from rabbitmq_reliability import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from payments.application.receipts import snapshot_from_order_event
 from payments.application.services.payment import PaymentService
 from payments.config import get_settings
-from payments.domain.entities import PaymentStatus
+from payments.domain.entities import PaymentStatus, ReceiptStatus
 from payments.infrastructure.database import SessionFactory, engine
-from payments.infrastructure.models import PaymentModel, ProcessedEventModel
+from payments.infrastructure.models import PaymentModel, PaymentReceiptModel, ProcessedEventModel
 from payments.infrastructure.providers import (
     close_shared_payment_provider,
     get_shared_payment_provider,
 )
-from payments.infrastructure.repositories.payment import OutboxRepository, PaymentRepository
+from payments.infrastructure.repositories.payment import (
+    OutboxRepository,
+    PaymentReceiptRepository,
+    PaymentRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +79,17 @@ async def handle_payment_requested(
         expires_at=expires_at,
     )
     await payment_repo.create(payment)
+    snapshot = snapshot_from_order_event(payload)
+    snapshot_json = snapshot.canonical_json()
+    await PaymentReceiptRepository(session).create(
+        PaymentReceiptModel(
+            payment_id=payment.id,
+            snapshot=snapshot_json,
+            snapshot_hash=snapshot.content_hash(),
+            status=(ReceiptStatus.SIMULATED if snapshot.customer else ReceiptStatus.NEEDS_CONTACT),
+            error_code=None if snapshot.customer else "customer_contact_missing",
+        )
+    )
     logger.info("Created payment %s for order %s", payment.id, order_id)
 
 

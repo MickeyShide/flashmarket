@@ -57,10 +57,13 @@ class OrderService:
         price = data.price
         currency = data.currency
         if self._catalog_client:
-            cat_price = await self._catalog_client.get_price(data.product_id, variant_id=data.variant_id)
+            cat_price = await self._catalog_client.get_price(
+                data.product_id, variant_id=data.variant_id
+            )
             if cat_price is None:
                 raise InvalidOrderState(
-                    f"Unable to verify authoritative price from catalog for product {data.product_id}"
+                    "Unable to verify authoritative price from catalog for product "
+                    f"{data.product_id}"
                 )
             if cat_price.price != Decimal(str(data.price)):
                 raise InvalidOrderState(
@@ -126,6 +129,21 @@ class OrderService:
                 "payment_expires_at": (
                     order.payment_expires_at.isoformat() if order.payment_expires_at else None
                 ),
+                "receipt_snapshot": {
+                    "currency": order.currency,
+                    "total_amount": int(final_total),
+                    "items": [
+                        {
+                            "description": order.product_name[:128],
+                            "quantity": "1",
+                            "unit_amount": int(final_total),
+                            "vat_code": 1,
+                            "payment_subject": "commodity",
+                            "payment_mode": "full_payment",
+                            "measure": "piece",
+                        }
+                    ],
+                },
             }
             await self._outbox_repo.add(
                 OrderEventType.ORDER_CREATED,
@@ -150,10 +168,13 @@ class OrderService:
             if await self._order_repo.get_by_reservation_id(line.reservation_id) is not None:
                 raise DuplicateOrder
             if self._catalog_client:
-                cat_price = await self._catalog_client.get_price(line.product_id, variant_id=line.variant_id)
+                cat_price = await self._catalog_client.get_price(
+                    line.product_id, variant_id=line.variant_id
+                )
                 if cat_price is None:
                     raise InvalidOrderState(
-                        f"Unable to verify authoritative price from catalog for product {line.product_id}"
+                        "Unable to verify authoritative price from catalog for product "
+                        f"{line.product_id}"
                     )
                 if cat_price.price != Decimal(str(line.price)):
                     raise InvalidOrderState(
@@ -181,12 +202,12 @@ class OrderService:
             exact = [Decimal(discount_units) * total / original_amount for total in line_totals]
             allocations = [int(value.to_integral_value(rounding=ROUND_FLOOR)) for value in exact]
             remainder = discount_units - sum(allocations)
-            order = sorted(
+            allocation_order = sorted(
                 range(len(exact)),
                 key=lambda index: (exact[index] - allocations[index], -index),
                 reverse=True,
             )
-            for index in order[:remainder]:
+            for index in allocation_order[:remainder]:
                 allocations[index] += 1
 
         checkout_id = uuid4()
@@ -228,6 +249,21 @@ class OrderService:
                 "payment_expires_at": (
                     order.payment_expires_at.isoformat() if order.payment_expires_at else None
                 ),
+                "receipt_snapshot": {
+                    "currency": order.currency,
+                    "total_amount": int(final),
+                    "items": [
+                        {
+                            "description": order.product_name[:128],
+                            "quantity": "1",
+                            "unit_amount": int(final),
+                            "vat_code": 1,
+                            "payment_subject": "commodity",
+                            "payment_mode": "full_payment",
+                            "measure": "piece",
+                        }
+                    ],
+                },
             }
             await self._outbox_repo.add(
                 OrderEventType.ORDER_CREATED,

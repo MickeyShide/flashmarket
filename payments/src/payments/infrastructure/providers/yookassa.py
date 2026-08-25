@@ -299,9 +299,7 @@ class YooKassaPaymentProvider:
                 ),
             )
         except (KeyError, TypeError, AttributeError) as exc:
-            raise PaymentProviderRejected(
-                "Payment provider returned an invalid payment object"
-            ) from exc
+            raise PaymentProviderMalformedResponse from exc
 
     @staticmethod
     def _refund(payload: dict[str, Any]) -> ProviderRefund:
@@ -319,9 +317,7 @@ class YooKassaPaymentProvider:
                 ),
             )
         except (KeyError, TypeError, AttributeError) as exc:
-            raise PaymentProviderRejected(
-                "Payment provider returned an invalid refund object"
-            ) from exc
+            raise PaymentProviderMalformedResponse from exc
 
     async def create_payment(
         self,

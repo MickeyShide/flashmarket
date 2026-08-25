@@ -91,13 +91,13 @@ Live payments must remain disabled. An item is marked complete only after its re
 
 ## 9. Ledger, receipts, and reports
 
-- [ ] Append-only `financial_ledger` migration and idempotent posting.
-- [ ] Successful payment and refund transitions create ledger entries atomically.
-- [ ] Receipt contracts use immutable order-line snapshots and exact totals.
-- [ ] Validate item limits, VAT code, subject, mode, measure, and customer contact.
-- [ ] Persist simulated test-mode receipt state.
-- [ ] Daily report import model, content-hash idempotency, and Moscow business date.
-- [ ] Deterministic report fixtures and discrepancy quarantine.
+- [x] Append-only `financial_ledger` migration and idempotent posting.
+- [x] Successful payment and refund transitions create ledger entries atomically.
+- [x] Receipt contracts use immutable order-line snapshots and exact totals.
+- [x] Validate item limits, VAT code, subject, mode, measure, and customer contact.
+- [x] Persist `NEEDS_CONTACT` or simulated test-mode receipt state without enabling fiscal writes.
+- [x] Daily report import model, content-hash idempotency, and Moscow business date.
+- [x] Deterministic report fixtures and discrepancy quarantine without mutating payment state.
 - [!] Actual production fiscal register connection requires merchant/legal setup.
 - [!] Actual YooKassa daily report retrieval requires a production merchant account.
 
@@ -127,3 +127,4 @@ Live payments must remain disabled. An item is marked complete only after its re
 | 2026-08-25 | Multiple payment attempts | Payments `36 passed`; strict mypy; scoped Ruff/format; concurrent file-backed SQLite test | Pass |
 | 2026-08-25 | Normalized refunds | Payments `42 passed`; strict mypy; scoped Ruff/format; partial/over-refund, reason-policy, and unknown-result recovery tests | Pass |
 | 2026-08-25 | Frontend payment flow | Frontend `25 passed`; Vite production build; Payments `42 passed`; strict mypy; scoped Ruff/format | Pass |
+| 2026-08-25 | Ledger, receipts, and reports | Payments `46 passed`; full Payments Ruff; strict mypy; deterministic Moscow-time CSV reconciliation | Pass |

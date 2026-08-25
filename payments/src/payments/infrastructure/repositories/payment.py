@@ -18,13 +18,95 @@ from payments.domain.entities import (
 )
 from payments.infrastructure.database import utc_now
 from payments.infrastructure.models import (
+    DailyReportImportModel,
+    DailyReportLineModel,
+    FinancialLedgerModel,
     OutboxEventModel,
     PaymentAttemptModel,
     PaymentModel,
+    PaymentReceiptModel,
     ProviderOperationModel,
     RefundModel,
     WebhookInboxModel,
 )
+
+
+class FinancialLedgerRepository:
+    """Idempotent posting and read-only reconciliation for accounting facts."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def post(self, entry: FinancialLedgerModel) -> FinancialLedgerModel:
+        existing = await self.get_by_event_key(entry.event_key)
+        if existing is not None:
+            return existing
+        self._session.add(entry)
+        await self._session.flush()
+        return entry
+
+    async def get_by_event_key(self, event_key: str) -> FinancialLedgerModel | None:
+        result = await self._session.scalars(
+            select(FinancialLedgerModel).where(FinancialLedgerModel.event_key == event_key)
+        )
+        return result.first()
+
+    async def get_by_provider_object(
+        self, entry_type: str, provider_object_id: str
+    ) -> FinancialLedgerModel | None:
+        result = await self._session.scalars(
+            select(FinancialLedgerModel).where(
+                FinancialLedgerModel.entry_type == entry_type,
+                FinancialLedgerModel.provider_object_id == provider_object_id,
+            )
+        )
+        return result.first()
+
+
+class PaymentReceiptRepository:
+    """Persistence for one immutable receipt snapshot per payment."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(self, receipt: PaymentReceiptModel) -> PaymentReceiptModel:
+        existing = await self.get_by_payment_id(receipt.payment_id)
+        if existing is not None:
+            return existing
+        self._session.add(receipt)
+        await self._session.flush()
+        return receipt
+
+    async def get_by_payment_id(self, payment_id: UUID) -> PaymentReceiptModel | None:
+        result = await self._session.scalars(
+            select(PaymentReceiptModel).where(PaymentReceiptModel.payment_id == payment_id)
+        )
+        return result.first()
+
+
+class DailyReportRepository:
+    """Persistence for idempotent, non-mutating daily report imports."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_content_hash(self, content_hash: str) -> DailyReportImportModel | None:
+        result = await self._session.scalars(
+            select(DailyReportImportModel).where(
+                DailyReportImportModel.content_hash == content_hash
+            )
+        )
+        return result.first()
+
+    async def create(
+        self,
+        report: DailyReportImportModel,
+        lines: Sequence[DailyReportLineModel],
+    ) -> DailyReportImportModel:
+        self._session.add(report)
+        self._session.add_all(lines)
+        await self._session.flush()
+        return report
 
 
 class PaymentRepository:

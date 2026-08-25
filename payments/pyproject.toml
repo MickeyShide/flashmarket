@@ -12,6 +12,7 @@ dependencies = [
     "prometheus-client>=0.26,<1",
     "pydantic-settings>=2.14,<3",
     "sqlalchemy>=2.0,<3",
+    "tzdata>=2025.2,<2027",
     "uvicorn[standard]>=0.51,<1",
     "aio-pika>=9.5,<10",
     "jwt_verifier",

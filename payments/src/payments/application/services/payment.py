@@ -26,6 +26,7 @@ from payments.domain.exceptions import (
     InvalidPaymentState,
     PaymentNotFound,
     PaymentNotReady,
+    PaymentProviderMalformedResponse,
     PaymentProviderRejected,
     PaymentProviderResultUnknown,
     PaymentProviderUnavailable,
@@ -33,6 +34,7 @@ from payments.domain.exceptions import (
 )
 from payments.infrastructure.database import utc_now
 from payments.infrastructure.models import (
+    FinancialLedgerModel,
     PaymentAttemptModel,
     PaymentModel,
     ProviderOperationModel,
@@ -40,6 +42,7 @@ from payments.infrastructure.models import (
     WebhookInboxModel,
 )
 from payments.infrastructure.repositories.payment import (
+    FinancialLedgerRepository,
     OutboxRepository,
     PaymentAttemptRepository,
     PaymentRepository,
@@ -61,6 +64,7 @@ class PaymentService:
         attempt_repo: PaymentAttemptRepository | None = None,
         webhook_repo: WebhookInboxRepository | None = None,
         refund_repo: RefundRepository | None = None,
+        ledger_repo: FinancialLedgerRepository | None = None,
         provider: PaymentProvider | None = None,
         *,
         provider_name: str = "mock",
@@ -76,6 +80,7 @@ class PaymentService:
         self._attempt_repo = attempt_repo or PaymentAttemptRepository(session)
         self._webhook_repo = webhook_repo or WebhookInboxRepository(session)
         self._refund_repo = refund_repo or RefundRepository(session)
+        self._ledger_repo = ledger_repo or FinancialLedgerRepository(session)
         if provider is None:
             from payments.infrastructure.providers.mock import MockPaymentProvider
 
@@ -275,6 +280,14 @@ class PaymentService:
                 return_url=return_url,
                 idempotency_key=idempotency_key,
             )
+        except PaymentProviderMalformedResponse as exc:
+            await self._finish_provider_operation(
+                operation_id,
+                status=ProviderOperationStatus.UNKNOWN,
+                error_code=exc.code,
+            )
+            await self._mark_attempt_status(attempt_id, PaymentAttemptStatus.UNKNOWN)
+            raise PaymentProviderResultUnknown from exc
         except PaymentProviderUnavailable as exc:
             await self._finish_provider_operation(
                 operation_id,
@@ -593,6 +606,20 @@ class PaymentService:
                 await self._session.commit()
 
     async def _emit_succeeded(self, payment: PaymentModel) -> None:
+        if payment.external_id is None:
+            raise PaymentVerificationFailed("Successful payment has no provider identifier")
+        await self._ledger_repo.post(
+            FinancialLedgerModel(
+                payment_id=payment.id,
+                entry_type="PAYMENT_CAPTURE",
+                direction="CREDIT",
+                amount=payment.amount,
+                currency=payment.currency,
+                provider_object_id=payment.external_id,
+                event_key=f"payment_capture:{payment.external_id}",
+                occurred_at=utc_now(),
+            )
+        )
         payload = {
             "payment_id": str(payment.id),
             "order_id": str(payment.order_id),
@@ -914,6 +941,19 @@ class PaymentService:
         if local_refund.status == RefundStatus.SUCCEEDED:
             return
         local_refund.status = RefundStatus.SUCCEEDED
+        await self._ledger_repo.post(
+            FinancialLedgerModel(
+                payment_id=payment.id,
+                refund_id=local_refund.id,
+                entry_type="REFUND",
+                direction="DEBIT",
+                amount=local_refund.amount,
+                currency=local_refund.currency,
+                provider_object_id=remote_refund.id,
+                event_key=f"refund:{remote_refund.id}",
+                occurred_at=utc_now(),
+            )
+        )
         total_refunded = await self._refund_repo.succeeded_amount(payment.id)
         if total_refunded >= payment.amount:
             payment.status = PaymentStatus.REFUNDED
@@ -1095,6 +1135,19 @@ class PaymentService:
                 idempotency_key=locked_operation.idempotency_key,
                 reason=reason,
             )
+        except PaymentProviderMalformedResponse as exc:
+            await self._finish_provider_operation(
+                operation_id,
+                status=ProviderOperationStatus.UNKNOWN,
+                error_code=exc.code,
+            )
+            uncertain_refund = await self._refund_repo.get_by_id_for_update(refund_id)
+            if uncertain_refund is not None:
+                uncertain_refund.status = RefundStatus.UNKNOWN
+                uncertain_refund.claim_token = None
+                uncertain_refund.claimed_until = None
+                await self._session.commit()
+            raise PaymentProviderResultUnknown from exc
         except PaymentProviderUnavailable as exc:
             await self._finish_provider_operation(
                 operation_id,
