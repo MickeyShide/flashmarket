@@ -144,7 +144,7 @@ worker request sent a historical `mock-*` ID to YooKassa after the provider swit
 - [x] Add receipt, retry, concurrency, refund, and provider-switch regressions.
 - [x] Apply the receipt-state migration and regenerate OpenAPI artifacts.
 - [x] Pass all affected service, frontend, deployment, migration, lint, and type checks.
-- [~] Commit the implementation in reviewable units; push to `origin/main` is pending.
+- [x] Commit and push the implementation to `origin/main` through `51983ca`.
 - [ ] Verify a new test-shop payment reaches the hosted confirmation page.
 - [ ] Verify YooKassa receives no further `mock-*` identifiers.
 
