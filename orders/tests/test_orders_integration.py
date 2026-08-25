@@ -1,10 +1,12 @@
 """Comprehensive integration tests for Orders microservice (ORD-001 through ORD-018)."""
 
+import json
 import uuid
 from datetime import UTC
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from orders.event_consumer import (
@@ -34,12 +36,21 @@ async def test_ord_001_create_order_from_reservation(
             "currency": "RUB",
             "quantity": 1,
             "reservation_id": str(reservation_id),
+            "receipt_email": " Buyer@Example.Test ",
         },
     )
     assert resp.status_code == 201
     data = resp.json()
     assert data["status"] == "AWAITING_PAYMENT"
     assert float(data["final_price"]) == 5000.0
+    payment_event = (
+        await db_session.scalars(
+            select(OutboxEventModel).where(OutboxEventModel.event_type == "PaymentRequested")
+        )
+    ).one()
+    assert json.loads(payment_event.payload)["receipt_snapshot"]["customer"] == {
+        "email": "buyer@example.test"
+    }
 
     # Duplicate reservation_id should be rejected with 409
     dup_resp = await client.post(
@@ -52,6 +63,7 @@ async def test_ord_001_create_order_from_reservation(
             "currency": "RUB",
             "quantity": 1,
             "reservation_id": str(reservation_id),
+            "receipt_email": "buyer@example.test",
         },
     )
     assert dup_resp.status_code == 409
