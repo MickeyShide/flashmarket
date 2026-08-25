@@ -80,7 +80,15 @@ class Settings(BaseSettings):
     session_touch_interval_minutes: int = Field(default=5, ge=1, le=60)
 
     cors_origins: list[str] = Field(default_factory=list)
-    trusted_proxy_ips: list[str] = Field(default_factory=list)
+    trusted_proxy_ips: list[str] = Field(
+        default_factory=lambda: [
+            "127.0.0.1",
+            "::1",
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+        ]
+    )
     trusted_hosts: list[str] = Field(
         default_factory=lambda: ["localhost", "127.0.0.1", "test", "postgres-test"]
     )
