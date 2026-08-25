@@ -25,6 +25,8 @@ from rabbitmq_reliability import (
     process_with_retries,
     run_forever,
 )
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from payments.application.receipts import snapshot_from_order_event
@@ -157,17 +159,23 @@ async def process_message(
     handler = HANDLERS.get(routing_key)
     if handler is None:
         raise PermanentMessageError(f"unsupported routing key: {routing_key}")
+    event_id = delivery_identity(message, routing_key)
     try:
         async with session_factory() as session:
-            if not await begin_event_once(
-                session,
-                ProcessedEventModel,
-                event_id=delivery_identity(message, routing_key),
-                routing_key=routing_key,
-            ):
-                logger.info("Skipping duplicate event %s", delivery_identity(message, routing_key))
+            stmt = select(ProcessedEventModel).where(
+                ProcessedEventModel.event_id == event_id,
+                ProcessedEventModel.routing_key == routing_key,
+            )
+            res = await session.execute(stmt)
+            if res.scalar_one_or_none() is not None:
+                logger.info("Skipping duplicate event %s", event_id)
                 return
             await handler(session, body)
+            try:
+                async with session.begin_nested():
+                    session.add(ProcessedEventModel(event_id=event_id, routing_key=routing_key))
+            except IntegrityError:
+                pass
             if session.in_transaction():
                 await session.commit()
     except (KeyError, TypeError, ValueError) as exc:
