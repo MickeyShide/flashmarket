@@ -89,7 +89,7 @@ def create_access_token(user: User, session_id: uuid.UUID) -> tuple[str, int]:
     return token, expires_in
 
 
-def decode_access_token(token: str) -> AccessTokenClaims:
+def decode_access_token(token: str, *, verify_exp: bool = True) -> AccessTokenClaims:
     """Validate and decode an access token."""
     settings = get_settings()
     key_ring = get_signing_key_ring()
@@ -105,7 +105,10 @@ def decode_access_token(token: str) -> AccessTokenClaims:
         algorithms=[settings.jwt_algorithm],
         issuer=settings.jwt_issuer,
         audience=settings.jwt_audience,
-        options={"require": ["sub", "sid", "role", "type", "jti", "iat", "exp"]},
+        options={
+            "require": ["sub", "sid", "role", "type", "jti", "iat", "exp"],
+            "verify_exp": verify_exp,
+        },
     )
     if payload["type"] != "access":
         raise jwt.InvalidTokenError("Unexpected token type")

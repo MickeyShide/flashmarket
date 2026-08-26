@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Request, Response, status
+from typing import Annotated
+
+import jwt
+from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi.security import HTTPAuthorizationCredentials
 
 from auth_service.api.context import request_context, request_metadata
-from auth_service.api.dependencies import CurrentPrincipal, SessionStoreDep, Uow
+from auth_service.api.dependencies import SessionStoreDep, Uow, bearer_scheme
 from auth_service.api.token_transport import (
     clear_refresh_cookies,
     deliver_tokens,
@@ -34,6 +38,7 @@ from auth_service.schemas import (
     RegisterRequest,
     TokenRefreshResponse,
 )
+from auth_service.security import decode_access_token, digest_refresh_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -198,21 +203,47 @@ async def introspect(
 async def logout(
     request: Request,
     response: Response,
-    principal: CurrentPrincipal,
     uow: Uow,
     session_store: SessionStoreDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)] = None,
 ) -> MessageResponse:
     """Revoke the current session and clear its cookies."""
-    await logout_user.execute(
-        LogoutCommand(
-            identity=AuthenticatedIdentity(
-                user_id=principal.user_id,
-                session_id=principal.session_id,
+    user_id = None
+    session_id = None
+
+    if credentials and credentials.scheme.lower() == "bearer":
+        try:
+            claims = decode_access_token(credentials.credentials, verify_exp=False)
+            user_id = claims.user_id
+            session_id = claims.session_id
+        except (jwt.PyJWTError, Exception):
+            pass
+
+    if user_id is None or session_id is None:
+        try:
+            raw_refresh = resolve_refresh_token(None, request)
+        except Exception:
+            raw_refresh = None
+        if raw_refresh:
+            token_hash = digest_refresh_token(raw_refresh)
+            token_record = await uow.sessions.get_refresh_token(token_hash)
+            if token_record:
+                session_id = token_record.session_id
+                login_session = await uow.sessions.get_session(session_id)
+                if login_session:
+                    user_id = login_session.user_id
+
+    if user_id is not None and session_id is not None:
+        await logout_user.execute(
+            LogoutCommand(
+                identity=AuthenticatedIdentity(
+                    user_id=user_id,
+                    session_id=session_id,
+                ),
+                context=request_context(request),
             ),
-            context=request_context(request),
-        ),
-        uow=uow,
-        session_store=session_store,
-    )
+            uow=uow,
+            session_store=session_store,
+        )
     clear_refresh_cookies(response)
     return MessageResponse(message="Session closed")
