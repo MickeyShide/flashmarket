@@ -31,7 +31,12 @@ class JWTAuth:
             )
         try:
             verifier = self._verifier_getter()
-            return verifier.decode_and_verify(credentials.credentials)
+            principal = verifier.decode_and_verify(credentials.credentials)
+            if verifier.revocation_checker is not None:
+                is_revoked = await verifier.revocation_checker(principal.session_id)
+                if is_revoked:
+                    raise InvalidTokenError("Session has been revoked")
+            return principal
         except (InvalidTokenError, ExpiredTokenError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

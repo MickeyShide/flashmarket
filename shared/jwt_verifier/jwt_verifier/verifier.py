@@ -8,6 +8,8 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from collections.abc import Awaitable, Callable
+
 from jwt_verifier.exceptions import ExpiredTokenError, InvalidTokenError, KeyStoreError
 from jwt_verifier.models import Principal
 
@@ -22,12 +24,14 @@ class JWTVerifier:
         issuer: str = "flashmarket-auth",
         audience: str = "flashmarket-api",
         min_reload_interval_seconds: float = 10.0,
+        revocation_checker: Callable[[uuid.UUID], Awaitable[bool]] | None = None,
     ) -> None:
         self.public_key_dir = Path(public_key_dir)
         self.algorithm = algorithm
         self.issuer = issuer
         self.audience = audience
         self.min_reload_interval_seconds = min_reload_interval_seconds
+        self.revocation_checker = revocation_checker
         self._keys_cache: dict[str, Ed25519PublicKey] = {}
         self._loaded = False
         self._last_loaded_at: float = 0.0
