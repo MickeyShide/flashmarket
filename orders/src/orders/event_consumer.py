@@ -204,6 +204,7 @@ async def handle_reservation_released(
 HANDLERS: dict[str, Handler] = {
     "payments.PaymentSucceeded": handle_payment_succeeded,
     "payments.PaymentFailed": handle_payment_failed,
+    "payments.PaymentCancelled": handle_payment_failed,
     "inventory.ReservationReleased": handle_reservation_released,
 }
 

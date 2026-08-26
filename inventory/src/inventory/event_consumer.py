@@ -274,6 +274,7 @@ HANDLERS: dict[str, Handler] = {
     "orders.OrderCreated": handle_order_created,
     "payments.PaymentSucceeded": handle_payment_succeeded,
     "payments.PaymentFailed": handle_payment_failed,
+    "payments.PaymentCancelled": handle_payment_failed,
     "orders.OrderCancelled": handle_order_cancelled,
 }
 
