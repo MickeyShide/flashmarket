@@ -201,7 +201,7 @@ class DropService:
 
     async def add_item(self, drop_id: UUID, data: AddDropItemRequest) -> DropItemModel:
         """Add a product item to a drop."""
-        drop = await self._repo.get_by_id(drop_id)
+        drop = await self._repo.get_by_id_for_update(drop_id)
         if not drop:
             raise DropNotFound()
 
@@ -225,7 +225,7 @@ class DropService:
 
     async def remove_item(self, drop_id: UUID, product_id: UUID) -> None:
         """Remove a product item from a drop."""
-        drop = await self._repo.get_by_id(drop_id)
+        drop = await self._repo.get_by_id_for_update(drop_id)
         if not drop:
             raise DropNotFound()
 
