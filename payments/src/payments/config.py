@@ -87,6 +87,20 @@ class Settings(BaseSettings):
     webhook_batch_size: int = Field(default=50, ge=1, le=500)
     webhook_max_attempts: int = Field(default=12, ge=1, le=100)
     yookassa_webhook_require_https: bool = False
+    yookassa_webhook_ip_filter_enabled: bool = False
+    yookassa_trusted_ips: list[str] = Field(
+        default_factory=lambda: [
+            "185.71.76.0/27",
+            "185.71.77.0/27",
+            "77.75.153.0/25",
+            "77.75.156.11",
+            "77.75.156.35",
+            "77.75.154.128/25",
+            "2a02:5180::/32",
+            "127.0.0.1",
+            "::1",
+        ]
+    )
     payment_attempt_ttl_seconds: int = Field(default=1800, ge=60, le=86_400)
     outbox_batch_size: int = Field(default=100, ge=1, le=1000)
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)

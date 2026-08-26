@@ -1,4 +1,4 @@
-"""Public callbacks from payment providers."""
+import ipaddress
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
@@ -8,6 +8,22 @@ from payments.config import get_settings
 from payments.observability import WEBHOOK_EVENTS
 
 router = APIRouter(prefix="/api/v1/payments/webhooks", tags=["payment-webhooks"])
+
+
+def _is_trusted_webhook_ip(ip_str: str | None, trusted_networks: list[str]) -> bool:
+    if not ip_str:
+        return False
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        for net in trusted_networks:
+            try:
+                if ip in ipaddress.ip_network(net, strict=False):
+                    return True
+            except ValueError:
+                continue
+    except ValueError:
+        return False
+    return False
 
 
 @router.post(
@@ -40,6 +56,13 @@ async def yookassa_webhook(
 ) -> dict[str, str]:
     """Durably accept a bounded notification without provider network I/O."""
     settings = get_settings()
+    source_ip = request.client.host if request.client is not None else None
+    if settings.yookassa_webhook_ip_filter_enabled:
+        if not _is_trusted_webhook_ip(source_ip, settings.yookassa_trusted_ips):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Untrusted webhook source IP",
+            )
     forwarded_proto = request.headers.get("x-forwarded-proto")
     if settings.yookassa_webhook_require_https and not (
         request.url.scheme == "https" or forwarded_proto == "https"
@@ -55,7 +78,6 @@ async def yookassa_webhook(
     raw_body = await request.body()
     if len(raw_body) > settings.webhook_max_body_bytes:
         raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE)
-    source_ip = request.client.host if request.client is not None else None
     result = await service.ingest_webhook(raw_body, source_ip=source_ip)
     WEBHOOK_EVENTS.labels(event="notification", result=result).inc()
     return {"status": result}
