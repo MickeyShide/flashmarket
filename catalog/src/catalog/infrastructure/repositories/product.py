@@ -7,12 +7,13 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import aliased, joinedload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from catalog.domain.entities import ProductStatus
 from catalog.infrastructure.models import (
     BrandModel,
+    CategoryModel,
     ProductImageModel,
     ProductModel,
     ProductVariantModel,
@@ -134,7 +135,16 @@ class ProductRepository:
         rank: ColumnElement[float] | None = None
 
         if query.category_id is not None:
-            filters.append(ProductModel.category_id == query.category_id)
+            cat_hierarchy = (
+                select(CategoryModel.id)
+                .where(CategoryModel.id == query.category_id)
+                .cte(name="cat_hierarchy", recursive=True)
+            )
+            cat_alias = aliased(CategoryModel)
+            cat_hierarchy = cat_hierarchy.union_all(
+                select(cat_alias.id).where(cat_alias.parent_id == cat_hierarchy.c.id)
+            )
+            filters.append(ProductModel.category_id.in_(select(cat_hierarchy.c.id)))
         if query.brand_id is not None:
             filters.append(ProductModel.brand_id == query.brand_id)
         if query.brand_slug is not None:
