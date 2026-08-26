@@ -221,6 +221,10 @@ class ProductVariantModel(Base):
             name="uq_variant_product_size_color",
             postgresql_nulls_not_distinct=True,
         ),
+        CheckConstraint(
+            "price_override IS NULL OR price_override > 0",
+            name="ck_product_variants_price_override_positive",
+        ),
         Index("ix_variants_product_active", "product_id", "is_active"),
     )
 
