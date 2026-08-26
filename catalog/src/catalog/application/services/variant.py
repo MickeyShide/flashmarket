@@ -134,6 +134,13 @@ class VariantService:
                 raise DuplicateSKU()
             variant.sku = new_sku
 
+        if data.size is not None or data.color is not None:
+            new_size = data.size if data.size is not None else variant.size
+            new_color = data.color if data.color is not None else variant.color
+            if (new_size != variant.size or new_color != variant.color) and (new_size or new_color):
+                if await self._repo.exists_by_options(variant.product_id, new_size, new_color):
+                    raise DuplicateVariantOptions()
+
         if data.size is not None:
             variant.size = data.size
         if data.color is not None:
@@ -156,7 +163,12 @@ class VariantService:
             await self._session.commit()
         except IntegrityError as exc:
             await self._session.rollback()
-            raise DuplicateSKU() from exc
+            msg = str(exc).lower()
+            if "uq_variant_product_size_color" in msg:
+                raise DuplicateVariantOptions() from exc
+            if "sku" in msg or "uq_variants_sku" in msg:
+                raise DuplicateSKU() from exc
+            raise
 
         persisted = await self._repo.get_by_id(variant.id)
         if persisted is None:
