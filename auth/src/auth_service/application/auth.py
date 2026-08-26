@@ -293,6 +293,9 @@ class RefreshAccess:
         user = refresh_context.user
         now = utc_now()
         if refresh_token.consumed_at is not None:
+            consumed = as_utc(refresh_token.consumed_at)
+            if (now - consumed).total_seconds() <= 15.0:
+                raise InvalidRefreshToken
             await uow.sessions.revoke(
                 login_session,
                 reason="refresh_token_reuse",
