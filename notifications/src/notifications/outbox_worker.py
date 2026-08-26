@@ -18,10 +18,15 @@ from rabbitmq_reliability import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from notifications.application.services.notification import NotificationService
 from notifications.config import get_settings, utc_now
 from notifications.domain.entities import NotificationEventType
 from notifications.infrastructure.database import SessionFactory, engine
 from notifications.infrastructure.models import OutboxEventModel
+from notifications.infrastructure.repositories.notification import (
+    NotificationRepository,
+    OutboxRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +109,13 @@ async def run_connected_worker() -> None:
         )
         while True:
             try:
+                async with SessionFactory() as session:
+                    service = NotificationService(
+                        session=session,
+                        notification_repo=NotificationRepository(session),
+                        outbox_repo=OutboxRepository(session),
+                    )
+                    await service.deliver_pending_notifications()
                 processed = await publish_outbox_batch(exchange)
             except asyncio.CancelledError:
                 raise
