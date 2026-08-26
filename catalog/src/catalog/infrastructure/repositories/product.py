@@ -166,11 +166,16 @@ class ProductRepository:
                     ProductModel.name, ProductModel.description, tokens
                 ) + product_similarity_rank(ProductModel.name, query.search)
             else:
-                pattern = f"%{query.search}%"
+                escaped = (
+                    query.search.replace("\\", "\\\\")
+                    .replace("%", "\\%")
+                    .replace("_", "\\_")
+                )
+                pattern = f"%{escaped}%"
                 filters.append(
                     or_(
-                        ProductModel.name.ilike(pattern),
-                        ProductModel.description.ilike(pattern),
+                        ProductModel.name.ilike(pattern, escape="\\"),
+                        ProductModel.description.ilike(pattern, escape="\\"),
                     )
                 )
 
