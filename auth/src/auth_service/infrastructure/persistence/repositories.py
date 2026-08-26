@@ -134,7 +134,7 @@ class SqlAlchemySessionRepository:
                 .join(LoginSession, LoginSession.id == RefreshToken.session_id)
                 .join(User, User.id == LoginSession.user_id)
                 .where(RefreshToken.token_hash == token_hash)
-                .with_for_update()
+                .with_for_update(of=(RefreshToken, LoginSession))
             )
         ).one_or_none()
         if row is None:
