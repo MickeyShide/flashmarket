@@ -16,7 +16,6 @@ from aio_pika.abc import AbstractIncomingMessage
 from rabbitmq_reliability import (
     PermanentMessageError,
     ReliabilityConfig,
-    begin_event_once,
     declare_consumer_topology,
     decode_json_object,
     delivery_identity,
@@ -254,11 +253,15 @@ async def run_reconciliation_loop() -> None:
                 attempts_processed = await service.reconcile_active_attempts(
                     limit=settings.reconciliation_batch_size
                 )
+                expired_payments_processed = await service.expire_overdue_payments(
+                    limit=settings.reconciliation_batch_size
+                )
                 for kind, count in (
                     ("provider_operation", operations_processed),
                     ("webhook", webhooks_processed),
                     ("refund", refunds_processed),
                     ("attempt", attempts_processed),
+                    ("expired_payment", expired_payments_processed),
                 ):
                     if count:
                         RECONCILIATION_ITEMS.labels(kind=kind).inc(count)
@@ -270,14 +273,16 @@ async def run_reconciliation_loop() -> None:
                     or webhooks_processed
                     or refunds_processed
                     or attempts_processed
+                    or expired_payments_processed
                 ):
                     logger.info(
                         "Reconciliation batch completed: operations=%s webhooks=%s "
-                        "refunds=%s attempts=%s",
+                        "refunds=%s attempts=%s expired_payments=%s",
                         operations_processed,
                         webhooks_processed,
                         refunds_processed,
                         attempts_processed,
+                        expired_payments_processed,
                     )
         except asyncio.CancelledError:
             raise

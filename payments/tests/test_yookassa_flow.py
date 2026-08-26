@@ -623,6 +623,60 @@ async def test_canceled_attempt_can_be_retried_without_new_order(
 
 
 @pytest.mark.asyncio
+async def test_canceled_attempt_fails_after_payment_deadline(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = FakeProvider()
+    app.dependency_overrides[get_payment_provider] = lambda: provider
+    order_id, _ = await _authoritative_payment(session_factory)
+    await client.post(f"/api/v1/payments/orders/{order_id}/checkout")
+    external_id = next(iter(provider.payments))
+    provider.payments[external_id] = replace(
+        provider.payments[external_id],
+        status="canceled",
+        cancellation_reason="payment_method_restricted",
+    )
+    await client.post(
+        "/api/v1/payments/webhooks/yookassa",
+        json={
+            "type": "notification",
+            "event": "payment.canceled",
+            "object": {"id": external_id, "status": "canceled"},
+        },
+    )
+    assert await _process_webhooks(session_factory, provider) == 1
+
+    async with session_factory() as session:
+        payment = await PaymentRepository(session).get_by_order_id(order_id)
+        assert payment is not None
+        payment.expires_at = utc_now() - timedelta(seconds=1)
+        await session.commit()
+
+    async with session_factory() as session:
+        service = PaymentService(
+            session=session,
+            payment_repo=PaymentRepository(session),
+            outbox_repo=OutboxRepository(session),
+            provider=provider,
+            provider_name="yookassa",
+        )
+        assert await service.expire_overdue_payments(limit=10) == 1
+
+    async with session_factory() as session:
+        payment = await PaymentRepository(session).get_by_order_id(order_id)
+        failed_events = (
+            await session.scalars(
+                select(OutboxEventModel).where(OutboxEventModel.event_type == "PaymentFailed")
+            )
+        ).all()
+        assert payment is not None
+        assert payment.status == PaymentStatus.FAILED
+        assert payment.cancellation_reason == "payment_deadline_expired"
+        assert len(failed_events) == 1
+
+
+@pytest.mark.asyncio
 async def test_unknown_checkout_is_durable_and_never_blindly_reposted(
     client: AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],

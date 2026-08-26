@@ -24,7 +24,7 @@ def main() -> None:
     try:
         payload = json.loads(HEARTBEAT_PATH.read_text(encoding="utf-8"))
         fresh = time.time() - float(payload["timestamp"]) <= max_age
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError, OSError):
+    except KeyError, TypeError, ValueError, json.JSONDecodeError, OSError:
         fresh = False
     raise SystemExit(0 if fresh else 1)
 

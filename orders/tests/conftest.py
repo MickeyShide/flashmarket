@@ -1,7 +1,7 @@
 """Shared test fixtures for the orders service."""
 
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -18,19 +18,26 @@ from pathlib import Path
 
 from jwt_verifier.testing import TestKeyStore
 
-from orders.api.dependencies import get_verifier
+from orders.api.dependencies import get_catalog_client, get_verifier
 from orders.config import get_settings
 from orders.infrastructure.database import Base, get_db  # noqa: E402
 from orders.main import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def jwt_keystore(tmp_path: Path) -> TestKeyStore:
+def jwt_keystore(tmp_path: Path) -> Iterator[TestKeyStore]:
     keystore = TestKeyStore(tmp_path / "keys" / "public")
     settings = get_settings()
+    previous_catalog_base_url = settings.catalog_base_url
     settings.jwt_public_key_dir = keystore.key_dir
+    settings.catalog_base_url = None
     get_verifier.cache_clear()
-    return keystore
+    get_catalog_client.cache_clear()
+    try:
+        yield keystore
+    finally:
+        settings.catalog_base_url = previous_catalog_base_url
+        get_catalog_client.cache_clear()
 
 
 @pytest.fixture

@@ -59,7 +59,7 @@ def test_receipt_status_migration_upgrade_and_downgrade(tmp_path: Path) -> None:
         ).fetchall()
         revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()
         assert statuses == [("NEEDS_CONTACT",), ("READY",)]
-        assert revision == ("20260825_0015",)
+        assert revision == ("20260826_0016",)
         connection.execute(
             "UPDATE payment_receipts SET status = 'SUBMITTED' WHERE status = 'READY'"
         )

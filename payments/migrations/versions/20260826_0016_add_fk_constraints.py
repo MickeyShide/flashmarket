@@ -15,33 +15,36 @@ branch_labels = depends_on = None
 
 
 def upgrade() -> None:
-    op.create_foreign_key(
-        "fk_payment_receipts_payment_id",
-        "payment_receipts",
-        "payments",
-        ["payment_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
-    op.create_foreign_key(
-        "fk_daily_report_lines_report_id",
-        "daily_report_lines",
-        "daily_report_imports",
-        ["report_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
-    op.create_foreign_key(
-        "fk_financial_ledger_payment_id",
-        "financial_ledger",
-        "payments",
-        ["payment_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
+    with op.batch_alter_table("payment_receipts") as batch_op:
+        batch_op.create_foreign_key(
+            "fk_payment_receipts_payment_id",
+            "payments",
+            ["payment_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
+    with op.batch_alter_table("daily_report_lines") as batch_op:
+        batch_op.create_foreign_key(
+            "fk_daily_report_lines_report_id",
+            "daily_report_imports",
+            ["report_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
+    with op.batch_alter_table("financial_ledger") as batch_op:
+        batch_op.create_foreign_key(
+            "fk_financial_ledger_payment_id",
+            "payments",
+            ["payment_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_financial_ledger_payment_id", "financial_ledger", type_="foreignkey")
-    op.drop_constraint("fk_daily_report_lines_report_id", "daily_report_lines", type_="foreignkey")
-    op.drop_constraint("fk_payment_receipts_payment_id", "payment_receipts", type_="foreignkey")
+    with op.batch_alter_table("financial_ledger") as batch_op:
+        batch_op.drop_constraint("fk_financial_ledger_payment_id", type_="foreignkey")
+    with op.batch_alter_table("daily_report_lines") as batch_op:
+        batch_op.drop_constraint("fk_daily_report_lines_report_id", type_="foreignkey")
+    with op.batch_alter_table("payment_receipts") as batch_op:
+        batch_op.drop_constraint("fk_payment_receipts_payment_id", type_="foreignkey")

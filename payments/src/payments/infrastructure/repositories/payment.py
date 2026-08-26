@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from payments.domain.entities import (
     PaymentAttemptStatus,
+    PaymentStatus,
     ProviderOperationStatus,
     RefundStatus,
     WebhookInboxStatus,
@@ -190,6 +191,34 @@ class PaymentRepository:
         )
         return result or 0
 
+    async def claim_expired_without_active_attempts(
+        self,
+        *,
+        limit: int,
+    ) -> Sequence[PaymentModel]:
+        """Lock overdue pending payments that no provider attempt can still settle."""
+        active_attempt_exists = (
+            select(PaymentAttemptModel.id)
+            .where(
+                PaymentAttemptModel.payment_id == PaymentModel.id,
+                PaymentAttemptModel.status.in_(PaymentAttemptRepository.ACTIVE_STATUSES),
+            )
+            .exists()
+        )
+        result = await self._session.scalars(
+            select(PaymentModel)
+            .where(
+                PaymentModel.status == PaymentStatus.PENDING,
+                PaymentModel.expires_at.is_not(None),
+                PaymentModel.expires_at <= utc_now(),
+                ~active_attempt_exists,
+            )
+            .order_by(PaymentModel.expires_at, PaymentModel.id)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        return result.all()
+
     async def list_by_user(
         self,
         user_id: UUID,
@@ -228,6 +257,11 @@ class PaymentAttemptRepository:
 
     async def create(self, attempt: PaymentAttemptModel) -> PaymentAttemptModel:
         self._session.add(attempt)
+        await self._session.flush()
+        return attempt
+
+    async def update(self, attempt: PaymentAttemptModel) -> PaymentAttemptModel:
+        """Flush pending changes to a provider payment attempt."""
         await self._session.flush()
         return attempt
 

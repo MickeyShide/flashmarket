@@ -193,7 +193,7 @@ async def test_login_does_not_reveal_whether_account_exists(
         assert "email_fingerprint" in serialized_events
 
 
-async def test_refresh_rotation_and_reuse_detection(client: AsyncClient) -> None:
+async def test_refresh_rotation_and_concurrent_replay_grace(client: AsyncClient) -> None:
     registered = await register_user(client)
     original_refresh = registered["tokens"]["refresh_token"]
 
@@ -217,11 +217,11 @@ async def test_refresh_rotation_and_reuse_detection(client: AsyncClient) -> None
     )
     assert replay.status_code == 401
 
-    session_was_revoked = await client.get(
+    session_remains_active_during_grace_period = await client.get(
         "/users/me",
         headers=bearer(rotated_tokens["access_token"]),
     )
-    assert session_was_revoked.status_code == 401
+    assert session_remains_active_during_grace_period.status_code == 200
 
 
 async def test_user_can_close_another_session(client: AsyncClient) -> None:

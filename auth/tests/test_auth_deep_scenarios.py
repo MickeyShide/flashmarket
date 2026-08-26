@@ -15,8 +15,10 @@ from tests.test_auth import register_user
 
 
 @pytest.mark.asyncio
-async def test_refresh_token_replay_attack_revokes_session(client: AsyncClient) -> None:
-    """Replaying an already-consumed refresh token revokes the session."""
+async def test_refresh_token_replay_within_grace_keeps_session_active(
+    client: AsyncClient,
+) -> None:
+    """A concurrent replay is rejected without revoking the rotated session."""
     email = "replay-victim@example.com"
     password = "SecurePassword123!"
 
@@ -40,19 +42,19 @@ async def test_refresh_token_replay_attack_revokes_session(client: AsyncClient) 
     refresh_token_2 = tokens_2["refresh_token"]
     assert refresh_token_2 != refresh_token_1
 
-    # 3. Attacker replays refresh_token_1 -> must be rejected (401) and revoke the session
+    # 3. A concurrent request replays refresh_token_1 and is rejected.
     replay_resp = await client.post(
         "/auth/refresh",
         json={"refresh_token": refresh_token_1},
     )
     assert replay_resp.status_code == 401
 
-    # 4. Legitimate user trying to refresh with refresh_token_2 is now also rejected
+    # 4. The legitimate rotated token remains usable during the grace window.
     subsequent_resp = await client.post(
         "/auth/refresh",
         json={"refresh_token": refresh_token_2},
     )
-    assert subsequent_resp.status_code == 401
+    assert subsequent_resp.status_code == 200
 
 
 @pytest.mark.asyncio

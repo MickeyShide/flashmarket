@@ -65,6 +65,22 @@ def test_production_deployments_are_serialized() -> None:
         assert "timeout --signal=TERM --kill-after=30s 900" not in contents, workflow
 
 
+def test_deployments_isolate_registry_credentials() -> None:
+    workflows = [
+        workflow
+        for workflow in _deployment_workflows()
+        if "Log server in to GHCR" in workflow.read_text(encoding="utf-8")
+    ]
+    assert workflows
+    for workflow in workflows:
+        contents = workflow.read_text(encoding="utf-8")
+        assert 'docker_config="${DEPLOY_PATH}/.docker-' in contents, workflow
+        assert "install -d -m 700 '$docker_config'" in contents, workflow
+        assert "DOCKER_CONFIG='$docker_config' docker login" in contents, workflow
+        assert 'export DOCKER_CONFIG="$DEPLOY_PATH/.docker-' in contents, workflow
+        assert 'rm -f -- "$DOCKER_CONFIG/config.json"' in contents, workflow
+
+
 def test_deployment_readiness_tolerates_transient_unhealthy_state() -> None:
     for workflow in _deployment_workflows():
         contents = workflow.read_text(encoding="utf-8")

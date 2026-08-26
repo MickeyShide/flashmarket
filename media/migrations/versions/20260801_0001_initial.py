@@ -43,7 +43,10 @@ def upgrade() -> None:
         sa.Column("failure_code", sa.String(length=64), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("actual_size IS NULL OR actual_size > 0", name="ck_media_actual_size_positive"),
+        sa.CheckConstraint(
+            "actual_size IS NULL OR actual_size > 0",
+            name="ck_media_actual_size_positive",
+        ),
         sa.CheckConstraint("expected_size > 0", name="ck_media_expected_size_positive"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("object_key"),

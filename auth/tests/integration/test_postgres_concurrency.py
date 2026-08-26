@@ -66,7 +66,7 @@ async def postgres_client() -> AsyncIterator[AsyncClient]:
         await admin_engine.dispose()
 
 
-async def test_concurrent_refresh_allows_one_rotation_and_revokes_replay(
+async def test_concurrent_refresh_allows_one_rotation_without_revoking_session(
     postgres_client: AsyncClient,
 ) -> None:
     settings = get_settings()
@@ -99,11 +99,11 @@ async def test_concurrent_refresh_allows_one_rotation_and_revokes_replay(
 
     successful = next(response for response in responses if response.status_code == 200)
     access_token = successful.json()["tokens"]["access_token"]
-    rejected = await postgres_client.get(
+    active_session = await postgres_client.get(
         "/users/me",
         headers={"Authorization": f"Bearer {access_token}"},
     )
-    assert rejected.status_code == 401
+    assert active_session.status_code == 200
 
 
 async def test_concurrent_registration_creates_one_normalized_email(

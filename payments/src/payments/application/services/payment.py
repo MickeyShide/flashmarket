@@ -1050,7 +1050,14 @@ class PaymentService:
                 attempt.claimed_until = None
                 if payment.current_attempt_id == attempt.id:
                     self._sync_attempt_summary(payment, attempt)
-            if payment.status == PaymentStatus.PENDING:
+            expires_at = payment.expires_at
+            if expires_at is not None and expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if (
+                payment.status == PaymentStatus.PENDING
+                and expires_at is not None
+                and utc_now() >= expires_at
+            ):
                 payment.status = PaymentStatus.FAILED
                 await self._emit_failed(
                     payment,
@@ -1096,9 +1103,20 @@ class PaymentService:
                 await self.reconcile_payment(remote)
             except PaymentProviderUnavailable as exc:
                 await self._reschedule_attempt(attempt_id, claim_token, exc.code)
-            except (PaymentProviderRejected, PaymentVerificationFailed):
+            except PaymentProviderRejected, PaymentVerificationFailed:
                 await self._quarantine_attempt(attempt_id, claim_token)
         return len(snapshots)
+
+    async def expire_overdue_payments(self, *, limit: int = 20) -> int:
+        """Fail overdue payments after all provider attempts become terminal."""
+        payments = await self._payment_repo.claim_expired_without_active_attempts(limit=limit)
+        for payment in payments:
+            payment.status = PaymentStatus.FAILED
+            payment.cancellation_reason = "payment_deadline_expired"
+            await self._payment_repo.update(payment)
+            await self._emit_failed(payment, "payment_deadline_expired")
+        await self._session.commit()
+        return len(payments)
 
     async def _reschedule_attempt(
         self,

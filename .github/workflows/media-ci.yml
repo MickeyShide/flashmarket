@@ -259,9 +259,11 @@ jobs:
         shell: bash
         run: |
           target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          docker_config="${DEPLOY_PATH}/.docker-media"
+          ssh -p "$DEPLOY_PORT" "$target" "install -d -m 700 '$docker_config'"
           printf '%s' "$GHCR_TOKEN" |
             ssh -p "$DEPLOY_PORT" "$target" \
-              "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
+              "DOCKER_CONFIG='$docker_config' docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
 
       - name: Deploy exact image digest
         shell: bash
@@ -273,7 +275,8 @@ jobs:
           exec 9>/tmp/flashmarket-production-deploy.lock
           flock -w 1800 9
           cd "$DEPLOY_PATH"
-          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          export DOCKER_CONFIG="$DEPLOY_PATH/.docker-media"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -f -- "$DOCKER_CONFIG/config.json"; rmdir -- "$DOCKER_CONFIG" 2>/dev/null || true' EXIT
 
           if [[ ! -f .env ]]; then
             echo "Missing $DEPLOY_PATH/.env"

@@ -20,6 +20,7 @@ async def _setup_category_and_product(client: AsyncClient):
             "name": "Sneakers",
             "price": 10000,
             "category_id": cat_id,
+            "status": "ACTIVE",
         },
     )
     assert prod_res.status_code == 201

@@ -10,6 +10,7 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
+    ForeignKey,
     Index,
     Integer,
     String,
@@ -229,7 +230,11 @@ class FinancialLedgerModel(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
-    payment_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    payment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("payments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     refund_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
     entry_type: Mapped[str] = mapped_column(String(32), nullable=False)
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
@@ -250,7 +255,11 @@ class PaymentReceiptModel(Base):
     __table_args__ = (UniqueConstraint("payment_id", name="uq_payment_receipts_payment_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
-    payment_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    payment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("payments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     snapshot: Mapped[str] = mapped_column(Text, nullable=False)
     snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[ReceiptStatus] = mapped_column(
@@ -293,7 +302,11 @@ class DailyReportLineModel(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
-    report_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("daily_report_imports.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     line_number: Mapped[int] = mapped_column(Integer, nullable=False)
     provider_object_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     operation_type: Mapped[str] = mapped_column(String(16), nullable=False)
