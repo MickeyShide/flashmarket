@@ -210,11 +210,19 @@ class ProductRepository:
         await self._session.flush()
         return product
 
-    async def replace_images(self, product_id: UUID, images: list[ProductImageModel]) -> None:
-        """Delete existing images for a product and insert replacements."""
+    async def replace_images(
+        self, product_id: UUID, images: list[ProductImageModel]
+    ) -> list[str]:
+        """Delete existing images for a product and insert replacements, returning old URLs."""
+        old_images = (
+            await self._session.scalars(
+                select(ProductImageModel.url).where(ProductImageModel.product_id == product_id)
+            )
+        ).all()
         await self._session.execute(
             delete(ProductImageModel).where(ProductImageModel.product_id == product_id)
         )
         if images:
             self._session.add_all(images)
         await self._session.flush()
+        return list(old_images)
