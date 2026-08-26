@@ -1050,14 +1050,7 @@ class PaymentService:
                 attempt.claimed_until = None
                 if payment.current_attempt_id == attempt.id:
                     self._sync_attempt_summary(payment, attempt)
-            expires_at = payment.expires_at
-            if expires_at is not None and expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=UTC)
-            if (
-                payment.status == PaymentStatus.PENDING
-                and expires_at is not None
-                and utc_now() >= expires_at
-            ):
+            if payment.status == PaymentStatus.PENDING:
                 payment.status = PaymentStatus.FAILED
                 await self._emit_failed(
                     payment,
