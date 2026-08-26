@@ -54,6 +54,17 @@ class NotificationRepository:
         )
         return result.all()
 
+    async def list_pending(self, limit: int = 50) -> Sequence[NotificationModel]:
+        """Return pending notifications for delivery."""
+        result = await self._session.scalars(
+            select(NotificationModel)
+            .where(NotificationModel.status == "PENDING")
+            .order_by(NotificationModel.created_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        return result.all()
+
     async def update(self, notification: NotificationModel) -> NotificationModel:
         """Flush pending attribute changes on a notification."""
         await self._session.flush()

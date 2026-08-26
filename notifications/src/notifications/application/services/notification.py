@@ -126,3 +126,28 @@ class NotificationService:
         items = await self._notification_repo.list_by_user(user_id, limit=limit, offset=offset)
         total = await self._notification_repo.count_by_user(user_id)
         return list(items), total
+
+    async def deliver_pending_notifications(self, limit: int = 50) -> int:
+        """Process and deliver pending notifications in batch."""
+        pending = await self._notification_repo.list_pending(limit=limit)
+        delivered = 0
+        for notification in pending:
+            notification.status = NotificationStatus.SENT
+            notification.sent_at = utc_now()
+            await self._notification_repo.update(notification)
+            payload = {
+                "notification_id": str(notification.id),
+                "user_id": str(notification.user_id),
+                "channel": str(notification.channel),
+                "recipient": notification.recipient,
+                "subject": notification.subject,
+                "sent_at": notification.sent_at.isoformat(),
+            }
+            await self._outbox_repo.add(
+                NotificationEventType.NOTIFICATION_SENT,
+                json.dumps(payload, separators=(",", ":")),
+            )
+            delivered += 1
+        if delivered:
+            await self._session.commit()
+        return delivered
