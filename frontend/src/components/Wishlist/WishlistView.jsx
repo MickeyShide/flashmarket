@@ -27,15 +27,22 @@ export const WishlistView = ({ onOpenProduct, onGoToCatalog }) => {
           return;
         }
 
-        // Hydrate product IDs through Catalog batch endpoint
-        const hydrated = await apiJson('/api/v1/products/batch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ product_ids: ids })
-        });
+        // Hydrate product IDs in chunks through Catalog batch endpoint
+        const chunkSize = 50;
+        let allHydrated = [];
+        for (let i = 0; i < ids.length; i += chunkSize) {
+          const chunk = ids.slice(i, i + chunkSize);
+          const chunkRes = await apiJson('/api/v1/products/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ product_ids: chunk })
+          });
+          const list = Array.isArray(chunkRes) ? chunkRes : (chunkRes.items || []);
+          allHydrated = [...allHydrated, ...list];
+        }
 
         if (isMounted) {
-          setProducts(Array.isArray(hydrated) ? hydrated : (hydrated.items || []));
+          setProducts(allHydrated);
           setLoading(false);
         }
       } catch (err) {

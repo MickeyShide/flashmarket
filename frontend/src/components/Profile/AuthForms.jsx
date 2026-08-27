@@ -14,6 +14,7 @@ export const AuthForms = () => {
   // Register form state
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regName, setRegName] = useState('');
   const [regError, setRegError] = useState('');
   const [regSubmitting, setRegSubmitting] = useState(false);
@@ -21,9 +22,14 @@ export const AuthForms = () => {
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setLoginError('');
+    const email = loginEmail.trim();
+    if (!email) {
+      setLoginError('Введите адрес электронной почты');
+      return;
+    }
     setLoginSubmitting(true);
     try {
-      await login(loginEmail, loginPassword);
+      await login(email, loginPassword);
     } catch (err) {
       setLoginError(err.message);
     } finally {
@@ -34,9 +40,22 @@ export const AuthForms = () => {
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setRegError('');
+    const email = regEmail.trim();
+    if (!email) {
+      setRegError('Введите адрес электронной почты');
+      return;
+    }
+    if (regPassword.length < 8) {
+      setRegError('Пароль должен содержать не менее 8 символов');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setRegError('Пароли не совпадают');
+      return;
+    }
     setRegSubmitting(true);
     try {
-      await register(regEmail, regPassword, regName || undefined);
+      await register(email, regPassword, regName.trim() || undefined);
     } catch (err) {
       setRegError(err.message);
     } finally {
@@ -138,15 +157,31 @@ export const AuthForms = () => {
 
           <div>
             <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-gray-700 mb-1">
-              Пароль *
+              Пароль * (минимум 8 символов)
             </label>
             <input
               type="password"
               required
+              minLength={8}
               className="w-full border border-border-color rounded px-3 py-2 text-xs outline-none focus:border-black font-sans"
               placeholder="••••••••"
               value={regPassword}
               onChange={(e) => setRegPassword(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-gray-700 mb-1">
+              Подтверждение пароля *
+            </label>
+            <input
+              type="password"
+              required
+              minLength={8}
+              className="w-full border border-border-color rounded px-3 py-2 text-xs outline-none focus:border-black font-sans"
+              placeholder="••••••••"
+              value={regConfirmPassword}
+              onChange={(e) => setRegConfirmPassword(e.target.value)}
             />
           </div>
 

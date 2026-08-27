@@ -18,13 +18,20 @@ export const WishlistProvider = ({ children }) => {
     }
     setLoadingWishlist(true);
     try {
-      const data = await apiJson(`/api/v1/wishlist/users/${user.id}/items?limit=100`);
-      let items = Array.isArray(data) ? data : (data.items || []);
-      if (data.total > items.length) {
-        const next = await apiJson(`/api/v1/wishlist/users/${user.id}/items?limit=100&offset=100`);
-        items = [...items, ...(next.items || [])];
-      }
-      const ids = new Set(items.map(item => item.product_id || item.id));
+      let allItems = [];
+      let offset = 0;
+      const limit = 100;
+      let total = 0;
+
+      do {
+        const data = await apiJson(`/api/v1/wishlist/users/${user.id}/items?limit=${limit}&offset=${offset}`);
+        const items = Array.isArray(data) ? data : (data.items || []);
+        total = data.total || items.length;
+        allItems = [...allItems, ...items];
+        offset += limit;
+      } while (allItems.length < total && offset < 500);
+
+      const ids = new Set(allItems.map(item => item.product_id || item.id));
       setWishedProductIds(ids);
     } catch (err) {
       console.warn('Failed to load wishlist:', err);
@@ -37,12 +44,28 @@ export const WishlistProvider = ({ children }) => {
     loadWishlist();
   }, [loadWishlist]);
 
+  // Handle pending wishlist addition after login
+  useEffect(() => {
+    if (user) {
+      try {
+        const pendingId = sessionStorage.getItem('flashmarket:pendingWishlistProductId');
+        if (pendingId) {
+          sessionStorage.removeItem('flashmarket:pendingWishlistProductId');
+          addToWishlist(pendingId);
+        }
+      } catch (e) { }
+    }
+  }, [user]);
+
   const isWished = (productId) => {
     return wishedProductIds.has(productId);
   };
 
   const addToWishlist = async (productId) => {
     if (!user) {
+      try {
+        sessionStorage.setItem('flashmarket:pendingWishlistProductId', productId);
+      } catch (e) { }
       triggerToast('Войдите, чтобы добавить товар в избранное', true);
       window.dispatchEvent(new CustomEvent('flashmarket:auth-required', { detail: { tab: 'wishlist' } }));
       return false;

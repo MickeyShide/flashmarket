@@ -76,9 +76,9 @@ export const DropDetail = ({ dropIdentifier, onOpenProductWithDrop, onBack }) =>
     );
   }
 
-  const isScheduled = drop.status === 'SCHEDULED' || (drop.starts_at && new Date(drop.starts_at) > new Date());
-  const isActive = drop.status === 'ACTIVE' || (!isScheduled && drop.status !== 'ENDED' && drop.status !== 'CANCELLED');
-  const targetDate = isScheduled ? drop.starts_at : (drop.ends_at || null);
+  const isScheduled = drop.status === 'SCHEDULED' || (drop.status !== 'DRAFT' && drop.status !== 'ENDED' && drop.status !== 'CANCELLED' && drop.starts_at && new Date(drop.starts_at) > new Date());
+  const isActive = drop.status === 'ACTIVE';
+  const targetDate = isScheduled ? drop.starts_at : (isActive ? drop.ends_at : null);
   const countdownLabel = isScheduled ? 'До старта:' : 'До окончания:';
 
   return (

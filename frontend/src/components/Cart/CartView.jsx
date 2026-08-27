@@ -19,10 +19,7 @@ export const CartView = ({ onBack, onGoToCheckout, onGoToCatalog }) => {
       const map = {};
       await Promise.all(cart.map(async (item) => {
         const cacheKey = item.variant_id ? `${item.id}_${item.variant_id}` : item.id;
-        let stock = stockCache[cacheKey];
-        if (!stock) {
-          stock = await fetchStock(item.id, item.variant_id);
-        }
+        const stock = await fetchStock(item.id, item.variant_id);
         map[cacheKey] = stock;
       }));
       if (isMounted) {
@@ -31,7 +28,8 @@ export const CartView = ({ onBack, onGoToCheckout, onGoToCatalog }) => {
       }
     }
     validateCartStock();
-  }, [cart, fetchStock, stockCache]);
+    return () => { isMounted = false; };
+  }, [cart, fetchStock]);
 
   if (cart.length === 0) {
     return (

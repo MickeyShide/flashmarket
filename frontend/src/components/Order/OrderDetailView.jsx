@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../services/api';
+import { invalidatePrefetch } from '../../services/prefetch';
 import {
   abortableDelay,
   isAbortError,
@@ -22,16 +23,16 @@ export const OrderDetailView = ({ orderId, onBack }) => {
   const [paymentPreparation, setPaymentPreparation] = useState('');
   const paymentAbortRef = useRef(null);
 
-  const fetchOrderDetails = async () => {
-    setLoading(true);
+  const fetchOrderDetails = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     setError(null);
     try {
-      const data = await apiJson('/api/v1/orders/' + orderId);
+      const data = await apiJson('/api/v1/orders/' + orderId, { skipCache: true });
       setOrder(data);
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     } catch (err) {
       setError(err.message);
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
@@ -69,6 +70,7 @@ export const OrderDetailView = ({ orderId, onBack }) => {
           await abortableDelay(paymentPollingDelay(attempt), controller.signal);
         }
       }
+      invalidatePrefetch(/^\/api\/v1\/orders/);
       window.sessionStorage.setItem('flashmarket:lastPaymentOrderId', orderId);
       if (checkout?.confirmation_url) {
         window.location.assign(checkout.confirmation_url);
@@ -152,9 +154,18 @@ export const OrderDetailView = ({ orderId, onBack }) => {
               </div>
             )}
           </div>
-          <span className={`order-status ${getOrderStatusClass(order.status)} text-xs font-black px-3 py-1 rounded uppercase self-start sm:self-center`}>
-            {getOrderStatusLabel(order.status)}
-          </span>
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <span className={`order-status ${getOrderStatusClass(order.status)} text-xs font-black px-3 py-1 rounded uppercase`}>
+              {getOrderStatusLabel(order.status)}
+            </span>
+            <button
+              className="text-[10px] bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-2 py-1 rounded uppercase cursor-pointer"
+              onClick={() => fetchOrderDetails(false)}
+              title="Обновить статус заказа"
+            >
+              ↻
+            </button>
+          </div>
         </div>
 
         {/* Info Grid */}

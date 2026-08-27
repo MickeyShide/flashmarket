@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { apiJson } from '../../../services/api';
+import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { formatDate } from '../../../utils/formatters';
 import { usePaginatedResource } from '../../../hooks/usePaginatedResource';
@@ -9,6 +10,7 @@ import { AdminTableSkeleton } from '../AdminTableSkeleton';
 const PAGE_SIZE = 25;
 
 export const UsersTab = () => {
+  const { user: currentUser } = useAuth();
   const { triggerToast } = useToast();
   const fetchUsersPage = useCallback(({ limit, offset, signal }) => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
@@ -98,8 +100,10 @@ export const UsersTab = () => {
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-gray-500 font-bold uppercase">Роль:</span>
                   <select
-                    className="border p-1 rounded font-mono font-bold text-[10px] uppercase bg-gray-50 cursor-pointer"
+                    className="border p-1 rounded font-mono font-bold text-[10px] uppercase bg-gray-50 cursor-pointer disabled:opacity-50"
                     value={u.role || 'CUSTOMER'}
+                    disabled={u.id === currentUser?.id}
+                    title={u.id === currentUser?.id ? 'Нельзя изменить собственную роль' : ''}
                     onChange={(e) => handleChangeRole(u.id, e.target.value)}
                   >
                     <option value="CUSTOMER">CUSTOMER</option>
@@ -110,12 +114,14 @@ export const UsersTab = () => {
               </div>
 
               <button
-                className={`w-full py-2 text-[11px] font-bold rounded uppercase cursor-pointer ${
+                className={`w-full py-2 text-[11px] font-bold rounded uppercase cursor-pointer disabled:opacity-50 ${
                   u.is_active ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                 }`}
+                disabled={u.id === currentUser?.id}
+                title={u.id === currentUser?.id ? 'Нельзя заблокировать самого себя' : ''}
                 onClick={() => handleToggleActive(u)}
               >
-                {u.is_active ? 'Заблокировать' : 'Активировать'}
+                {u.id === currentUser?.id ? 'ТЕКУЩИЙ АККАУНТ' : (u.is_active ? 'Заблокировать' : 'Активировать')}
               </button>
             </div>
           ))
@@ -138,13 +144,15 @@ export const UsersTab = () => {
             {users.map(u => (
               <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                 <td className="p-3 font-extrabold uppercase">
-                  <div>{u.full_name || u.email}</div>
+                  <div>{u.full_name || u.email} {u.id === currentUser?.id && <span className="text-[9px] text-blue-600 font-mono">(Вы)</span>}</div>
                   <div className="text-[10px] text-gray-400 font-mono">{u.email}</div>
                 </td>
                 <td className="p-3">
                   <select
-                    className="border p-1 rounded font-mono font-bold text-[10px] uppercase cursor-pointer"
+                    className="border p-1 rounded font-mono font-bold text-[10px] uppercase cursor-pointer disabled:opacity-50"
                     value={u.role || 'CUSTOMER'}
+                    disabled={u.id === currentUser?.id}
+                    title={u.id === currentUser?.id ? 'Нельзя изменить собственную роль' : ''}
                     onChange={(e) => handleChangeRole(u.id, e.target.value)}
                   >
                     <option value="CUSTOMER">CUSTOMER</option>
@@ -161,12 +169,14 @@ export const UsersTab = () => {
                 <td className="p-3 font-mono text-[10.5px]">{formatDate(u.created_at)}</td>
                 <td className="p-3 text-right">
                   <button
-                    className={`px-2.5 py-1 text-[10px] font-bold rounded uppercase cursor-pointer ${
+                    className={`px-2.5 py-1 text-[10px] font-bold rounded uppercase cursor-pointer disabled:opacity-50 ${
                       u.is_active ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                     }`}
+                    disabled={u.id === currentUser?.id}
+                    title={u.id === currentUser?.id ? 'Нельзя заблокировать самого себя' : ''}
                     onClick={() => handleToggleActive(u)}
                   >
-                    {u.is_active ? 'Заблокировать' : 'Активировать'}
+                    {u.id === currentUser?.id ? 'ТЕКУЩИЙ' : (u.is_active ? 'Заблокировать' : 'Активировать')}
                   </button>
                 </td>
               </tr>

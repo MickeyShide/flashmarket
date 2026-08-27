@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from scripts.test_runner import E2ERunner
+from scripts.test_runner import API_SERVICES, CRITICAL_SERVICES, E2ERunner
 
 WORKFLOW = Path(__file__).parents[1] / ".github" / "workflows" / "saga-e2e.yml"
 
@@ -28,3 +28,27 @@ def test_ci_uses_the_isolated_e2e_runner() -> None:
     assert "uv run python scripts/test_runner.py test-e2e" in workflow
     assert "docker compose up -d --build" not in workflow
     assert "docker rm -f shide-postgres" not in workflow
+
+
+def test_e2e_starts_migrating_apis_before_workers(monkeypatch) -> None:
+    runner = E2ERunner()
+    compose_calls: list[tuple[str, ...]] = []
+    health_checks: list[str] = []
+
+    def fake_compose(*arguments: str, **_kwargs):
+        compose_calls.append(arguments)
+
+    def fake_service_health(service: str) -> str:
+        health_checks.append(service)
+        return "healthy"
+
+    monkeypatch.setattr(runner, "compose", fake_compose)
+    monkeypatch.setattr(runner, "service_health", fake_service_health)
+
+    runner.start_stack()
+
+    api_up = ("up", "-d", "--no-build", *API_SERVICES)
+    full_up = ("up", "-d", "--no-build")
+    assert compose_calls.index(api_up) < compose_calls.index(full_up)
+    assert health_checks[: len(API_SERVICES)] == list(API_SERVICES)
+    assert health_checks[len(API_SERVICES) :] == list(CRITICAL_SERVICES)

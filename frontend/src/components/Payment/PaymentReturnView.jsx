@@ -17,6 +17,8 @@ export const PaymentReturnView = ({ orderId, onOpenOrder, onGoToOrders }) => {
   const [state, setState] = useState('checking');
   const [message, setMessage] = useState('Проверяем статус платежа…');
 
+  const [retryKey, setRetryKey] = useState(0);
+
   useEffect(() => {
     if (!resolvedOrderId) {
       setState('error');
@@ -24,6 +26,8 @@ export const PaymentReturnView = ({ orderId, onOpenOrder, onGoToOrders }) => {
       return undefined;
     }
 
+    setState('checking');
+    setMessage('Проверяем статус платежа…');
     const controller = new AbortController();
 
     const poll = async (attempt = 0) => {
@@ -31,6 +35,7 @@ export const PaymentReturnView = ({ orderId, onOpenOrder, onGoToOrders }) => {
         await waitForVisible(controller.signal);
         const payment = await apiJson(`/api/v1/payments/orders/${resolvedOrderId}`, {
           signal: controller.signal,
+          skipCache: true
         });
         if (payment.status === 'SUCCESS') {
           window.sessionStorage.removeItem('flashmarket:lastPaymentOrderId');
@@ -73,7 +78,7 @@ export const PaymentReturnView = ({ orderId, onOpenOrder, onGoToOrders }) => {
 
     poll();
     return () => controller.abort();
-  }, [resolvedOrderId]);
+  }, [resolvedOrderId, retryKey]);
 
   const tones = {
     checking: 'border-amber-200 bg-amber-50 text-amber-900',
@@ -98,6 +103,14 @@ export const PaymentReturnView = ({ orderId, onOpenOrder, onGoToOrders }) => {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mt-5">
+        {(state === 'delayed' || state === 'error') && resolvedOrderId && (
+          <button
+            className="bg-black text-white py-3 px-5 text-xs font-black uppercase rounded hover:bg-gray-800"
+            onClick={() => setRetryKey(k => k + 1)}
+          >
+            Проверить снова
+          </button>
+        )}
         {resolvedOrderId && (
           <button
             className="bg-black text-white py-3 px-5 text-xs font-black uppercase rounded"

@@ -17,6 +17,15 @@ export const CategoryNav = ({
 }) => {
   const { user, unreadNotifCount } = useAuth();
 
+  React.useEffect(() => {
+    if (!mobileNavOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') closeMobileNav();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileNavOpen, closeMobileNav]);
+
   return (
     <nav className={`border-t border-border-color bg-white w-full transition-all duration-250 ${mobileNavOpen ? 'max-h-[500px] border-t' : 'max-h-0 md:max-h-none overflow-hidden md:overflow-visible border-t-0 md:border-t'}`}>
       <div className="max-w-[1280px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-center gap-3.5 md:gap-8 px-4 md:px-6 py-3.5 md:py-3 whitespace-nowrap">
@@ -52,6 +61,18 @@ export const CategoryNav = ({
         </button>
 
         {/* ДРОПЫ */}
+        <button
+          className={`text-[12px] md:text-[11.5px] font-extrabold tracking-[1.5px] uppercase cursor-pointer py-1 relative w-full md:w-auto text-left md:text-center ${currentView === 'drops' || currentView === 'drop-detail' ? 'text-black' : 'text-text-main'}`}
+          onClick={() => {
+            setCurrentView('drops');
+            closeMobileNav();
+          }}
+        >
+          ДРОПЫ
+          {(currentView === 'drops' || currentView === 'drop-detail') && (
+            <span className="hidden md:block absolute -bottom-[2px] left-0 right-0 h-[2px] bg-black"></span>
+          )}
+        </button>
 
         {/* ИЗБРАННОЕ */}
         <button

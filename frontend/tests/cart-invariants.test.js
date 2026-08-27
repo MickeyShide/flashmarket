@@ -119,3 +119,14 @@ test('validateCartStockLimit prevents overselling when available stock is exhaus
   assert.equal(res3.allowed, true);
   assert.equal(res3.maxAddable, 2);
 });
+
+test('formatPrice correctly formats large ruble prices without unintended kopecks division', async () => {
+  const { formatPrice } = await import('../src/utils/formatters.js');
+  // 120,000 RUB as rubles (isKopecks = false)
+  const formattedRub = formatPrice(120000, 'RUB', false);
+  assert.match(formattedRub, /120[\s\u00A0\u202F]?000[\s\u00A0\u202F]?₽/);
+
+  // 120,000 RUB as kopecks (12,000,000 kopecks, isKopecks = true)
+  const formattedKop = formatPrice(12000000, 'RUB', true);
+  assert.match(formattedKop, /120[\s\u00A0\u202F]?000[\s\u00A0\u202F]?₽/);
+});

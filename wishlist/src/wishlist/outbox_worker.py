@@ -11,10 +11,10 @@ from aio_pika.abc import AbstractExchange
 from rabbitmq_reliability import (
     claim_outbox_event,
     observe_outbox_age,
+    periodic_heartbeat,
     publish_confirmed,
     record_outbox_result,
     run_forever,
-    touch_heartbeat,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -84,18 +84,24 @@ async def run_connected_worker() -> None:
         exchange = await channel.declare_exchange(
             settings.rabbitmq_exchange, ExchangeType.TOPIC, durable=True
         )
-        while True:
-            try:
-                processed = await publish_outbox_batch(exchange)
-                if processed:
-                    logger.info("Processed %d Wishlist outbox event(s)", processed)
-                await observe_outbox_age(SessionFactory, OutboxEventModel, utc_now(), "wishlist")
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.exception("Unexpected error in Wishlist outbox polling loop: %s", exc)
-            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "wishlist_outbox")
-            await asyncio.sleep(settings.outbox_poll_interval_seconds)
+        async with periodic_heartbeat(
+            "/tmp/flashmarket-heartbeat.json",
+            interval_seconds=settings.worker_heartbeat_interval_seconds,
+            phase="wishlist_outbox",
+        ):
+            while True:
+                try:
+                    processed = await publish_outbox_batch(exchange)
+                    if processed:
+                        logger.info("Processed %d Wishlist outbox event(s)", processed)
+                    await observe_outbox_age(
+                        SessionFactory, OutboxEventModel, utc_now(), "wishlist"
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    logger.exception("Unexpected error in Wishlist outbox polling loop: %s", exc)
+                await asyncio.sleep(settings.outbox_poll_interval_seconds)
 
 
 async def run() -> None:

@@ -384,9 +384,30 @@ jobs:
           docker compose -f docker-compose.yml --env-file .env config --quiet
           docker compose -f docker-compose.yml --env-file .env pull
 
+          diagnose_service() {
+            service="$1"
+            container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q "$service")"
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 "$service" || true
+            if [[ -z "$container" ]]; then
+              printf '::error title=Missing deployment container::Service %s has no container\n' "$service"
+              docker compose -f docker-compose.yml --env-file .env ps -a
+              return
+            fi
+            docker inspect \
+              --format 'status={{.State.Status}},exit={{.State.ExitCode}},restarts={{.RestartCount}},error={{.State.Error}}' \
+              "$container" || true
+            docker inspect \
+              --format '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{printf "%q" .Output}}{{println}}{{end}}' \
+              "$container" || true
+          }
+
           wait_for_healthy() {
             service="$1"
-            container="$(docker compose -f docker-compose.yml --env-file .env ps -q "$service")"
+            container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q "$service")"
+            if [[ -z "$container" ]]; then
+              diagnose_service "$service"
+              return 1
+            fi
             for attempt in $(seq 1 60); do
               health="$(
                 docker inspect \
@@ -398,7 +419,7 @@ jobs:
               fi
               sleep 2
             done
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 "$service"
+            diagnose_service "$service"
             return 1
           }
 
@@ -407,12 +428,17 @@ jobs:
           echo 'Database migrations complete.'
 
           echo 'Starting Catalog runtime containers...'
-          docker compose -f docker-compose.yml --env-file .env up \
-            -d \
-            --no-build \
-            --force-recreate \
-            --remove-orphans \
-            api nginx
+          if ! docker compose -f docker-compose.yml --env-file .env up \
+              -d \
+              --no-build \
+              --force-recreate \
+              --remove-orphans \
+              api nginx; then
+            for service in api nginx; do
+              diagnose_service "$service"
+            done
+            exit 1
+          fi
           echo 'Catalog runtime containers started.'
 
           echo 'Waiting for Catalog API...'

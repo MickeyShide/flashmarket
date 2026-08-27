@@ -25,6 +25,7 @@ SERVICE_NAMES = (
     "drops",
     "media",
 )
+API_SERVICES = SERVICE_NAMES
 SPECIAL_SUITES = ("jwt", "gateway", "celery")
 CRITICAL_SERVICES = (
     "gateway",
@@ -475,22 +476,45 @@ volumes:
         announce("Building and starting the isolated application stack")
         self.compose("config", "--quiet", timeout=30)
         self.compose("build", "--quiet", timeout=900)
-        self.compose("up", "-d", "--no-build", capture=True, timeout=300)
 
-        deadline = time.monotonic() + 300
-        pending = set(CRITICAL_SERVICES)
+        announce("Starting API services and applying database migrations")
+        self.compose(
+            "up",
+            "-d",
+            "--no-build",
+            *API_SERVICES,
+            capture=True,
+            timeout=300,
+        )
+        self.wait_for_services(API_SERVICES, phase="API migration", timeout=300)
+
+        announce("Starting workers, Gateway, and Frontend")
+        self.compose("up", "-d", "--no-build", capture=True, timeout=300)
+        self.wait_for_services(CRITICAL_SERVICES, phase="application", timeout=300)
+
+    def wait_for_services(
+        self,
+        services: Sequence[str],
+        *,
+        phase: str,
+        timeout: float,
+    ) -> None:
+        """Wait until every named Compose service reports healthy."""
+        deadline = time.monotonic() + timeout
+        pending = set(services)
         while time.monotonic() < deadline:
             pending = {
                 service
-                for service in CRITICAL_SERVICES
+                for service in services
                 if self.service_health(service) != "healthy"
             }
             if not pending:
-                announce("All critical services are healthy")
+                announce(f"All {phase} services are healthy")
                 return
             time.sleep(3)
         raise TimeoutError(
-            "Services did not become healthy within 300s: " + ", ".join(sorted(pending))
+            f"{phase.title()} services did not become healthy within {timeout:.0f}s: "
+            + ", ".join(sorted(pending))
         )
 
     def service_health(self, service: str) -> str:

@@ -20,7 +20,13 @@ export const observeInfiniteScroll = ({
   const observer = new globalThis.IntersectionObserver((entries) => {
     if (entries.some(entry => entry.isIntersecting) && !requested) {
       requested = true;
-      onLoadMore();
+      try {
+        Promise.resolve(onLoadMore()).finally(() => {
+          requested = false;
+        });
+      } catch (e) {
+        requested = false;
+      }
     }
   }, { rootMargin });
 

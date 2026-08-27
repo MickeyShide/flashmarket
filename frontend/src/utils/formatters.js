@@ -15,7 +15,7 @@ export function escapeHtml(str) {
 export function formatPrice(value, currency = 'RUB', isKopecks = false) {
   let num = Number(value);
   if (isNaN(num)) return '0 ₽';
-  if (isKopecks || (Number.isInteger(num) && num > 100000)) {
+  if (isKopecks) {
     num = num / 100;
   }
   const formatted = num.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -59,7 +59,7 @@ export function getOrderStatusLabel(status) {
 }
 
 export function getNotificationStatusLabel(status) {
-  const map = { 'PENDING': 'Новое', 'SENT': 'Прочитано', 'FAILED': 'Ошибка' };
+  const map = { 'PENDING': 'Новое', 'SENT': 'Отправлено', 'READ': 'Прочитано', 'FAILED': 'Ошибка' };
   return map[status] || status;
 }
 

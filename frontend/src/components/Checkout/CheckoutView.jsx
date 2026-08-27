@@ -44,10 +44,20 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
   const rawTotalRub = cartTotal();
   const rawTotalMinor = Math.round(rawTotalRub * 100);
 
-  const discountMinor = appliedPromo ? Number(appliedPromo.discount_amount || 0) : 0;
-  const finalTotalMinor = appliedPromo
-    ? Number(appliedPromo.final_amount)
-    : rawTotalMinor;
+  let discountMinor = 0;
+  if (appliedPromo) {
+    if (appliedPromo.discount_type === 'PERCENTAGE') {
+      const pct = Math.min(100, Math.max(0, Number(appliedPromo.discount_value) || 0));
+      discountMinor = Math.round((rawTotalMinor * pct) / 100);
+      if (appliedPromo.max_discount_amount) {
+        discountMinor = Math.min(discountMinor, Number(appliedPromo.max_discount_amount));
+      }
+    } else if (appliedPromo.discount_type === 'FIXED') {
+      discountMinor = Math.round(Number(appliedPromo.discount_amount) || (Number(appliedPromo.discount_value) * 100) || 0);
+    }
+    discountMinor = Math.min(discountMinor, rawTotalMinor);
+  }
+  const finalTotalMinor = Math.max(0, rawTotalMinor - discountMinor);
   const finalTotalRub = finalTotalMinor / 100;
   const discountRub = discountMinor / 100;
 
@@ -86,6 +96,7 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setErrorMsg('');
 
     if (!recipientName.trim() || recipientName.trim().length < 3) {
@@ -173,7 +184,26 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
       clearCart();
       const firstOrderId = createdOrdersResponse.orders?.[0]?.id || createdOrdersResponse[0]?.id || '';
       triggerToast(`Заказ успешно оформлен!${firstOrderId ? ' ID: ' + firstOrderId : ''}`);
-      onCheckoutSuccess();
+
+      // Try starting hosted payment checkout automatically
+      if (firstOrderId) {
+        try {
+          const checkout = await apiJson(`/api/v1/payments/orders/${firstOrderId}/checkout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receipt_email: user.email || null })
+          });
+          window.sessionStorage.setItem('flashmarket:lastPaymentOrderId', firstOrderId);
+          if (checkout?.confirmation_url) {
+            window.location.assign(checkout.confirmation_url);
+            return;
+          }
+        } catch (payErr) {
+          console.warn('Auto-checkout deferred to order page:', payErr);
+        }
+      }
+
+      onCheckoutSuccess(firstOrderId);
 
     } catch (err) {
       // ROLLBACK: Release all reservations created during this attempt
@@ -344,7 +374,7 @@ export const CheckoutView = ({ onBack, onCheckoutSuccess, onGoToAuth }) => {
             disabled={submitting}
             className="w-full bg-black text-white py-4 px-6 text-xs font-black tracking-[1.5px] uppercase cursor-pointer rounded hover:bg-gray-900 disabled:opacity-50 transition-colors mt-4"
           >
-            {submitting ? 'ОБРАБОТКА И РЕЗЕРВИРОВАНИЕ...' : `ОПЛАТИТЬ ${formatPrice(finalTotalRub, 'RUB', false)}`}
+            {submitting ? 'ОБРАБОТКА И РЕЗЕРВИРОВАНИЕ...' : `ОФОРМИТЬ И ОПЛАТИТЬ ${formatPrice(finalTotalRub, 'RUB', false)}`}
           </button>
         </form>
       </div>

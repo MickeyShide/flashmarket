@@ -147,17 +147,35 @@ export const DropsTab = () => {
         triggerToast('Дроп создан!');
       }
 
+      const existingItemIds = new Set((savedDrop.items || []).map(i => i.product_id));
+      const newItemIds = new Set(dropItems.map(i => i.product_id));
+
+      // Remove only items that were actually removed by the admin
       for (const item of (savedDrop.items || [])) {
-        await apiJson(`/api/v1/admin/drops/${savedDrop.id}/items/${item.product_id}`, {
-          method: 'DELETE'
-        });
+        if (!newItemIds.has(item.product_id)) {
+          try {
+            await apiJson(`/api/v1/admin/drops/${savedDrop.id}/items/${item.product_id}`, {
+              method: 'DELETE'
+            });
+          } catch (delErr) {
+            console.warn('Delete drop item warning:', delErr);
+          }
+        }
       }
+
+      // Add only newly attached items
       for (const [index, item] of dropItems.entries()) {
-        await apiJson(`/api/v1/admin/drops/${savedDrop.id}/items`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ product_id: item.product_id, sort_order: item.order ?? index })
-        });
+        if (!existingItemIds.has(item.product_id)) {
+          try {
+            await apiJson(`/api/v1/admin/drops/${savedDrop.id}/items`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ product_id: item.product_id, sort_order: item.order ?? index })
+            });
+          } catch (addErr) {
+            console.warn('Add drop item warning:', addErr);
+          }
+        }
       }
 
       setEditingDrop(null);

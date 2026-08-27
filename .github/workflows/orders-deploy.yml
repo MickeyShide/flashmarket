@@ -170,6 +170,13 @@ jobs:
           ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@localhost:5435/orders
         run: uv run pytest
 
+      - name: Verify runtime-only application import
+        env:
+          ORDERS_DATABASE_URL: postgresql+asyncpg://flashmarket:flashmarket@localhost:5435/orders
+        run: |
+          uv sync --locked --no-dev
+          uv run --no-dev python -c "import orders.main"
+
   image:
     name: Build image
     needs:
@@ -375,9 +382,33 @@ jobs:
             exit 1
           fi
 
+          diagnose_service() {
+            service="$1"
+            container="$(docker compose --env-file .env ps -a -q "$service")"
+            docker compose --env-file .env logs --tail 100 "$service" || true
+            if [[ -z "$container" ]]; then
+              printf '::error title=Missing deployment container::Service %s has no container\n' "$service"
+              docker compose --env-file .env ps -a
+              return
+            fi
+            state="$(
+              docker inspect \
+                --format 'status={{.State.Status}},exit={{.State.ExitCode}},restarts={{.RestartCount}},error={{.State.Error}}' \
+                "$container"
+            )"
+            printf '::error title=Orders %s health details::%s\n' "$service" "$state"
+            docker inspect \
+              --format '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{printf "%q" .Output}}{{println}}{{end}}' \
+              "$container" || true
+          }
+
           wait_for_healthy() {
             service="$1"
-            container="$(docker compose --env-file .env ps -q "$service")"
+            container="$(docker compose --env-file .env ps -a -q "$service")"
+            if [[ -z "$container" ]]; then
+              diagnose_service "$service"
+              return 1
+            fi
             for attempt in $(seq 1 60); do
               health="$(
                 docker inspect \
@@ -389,13 +420,7 @@ jobs:
               fi
               sleep 2
             done
-            docker compose --env-file .env logs --tail 100 "$service"
-            state="$(
-              docker inspect \
-                --format 'status={{.State.Status}},exit={{.State.ExitCode}},restarts={{.RestartCount}},error={{.State.Error}}' \
-                "$container"
-            )"
-            printf '::error title=Orders %s health details::%s\n' "$service" "$state"
+            diagnose_service "$service"
             if [[ "$service" == "consumer" || "$service" == "outbox" ]]; then
               if docker compose --env-file .env exec -T "$service" python -c \
                 "import socket; socket.create_connection(('shide-rabbitmq', 5672), 5).close()"; then
@@ -422,6 +447,9 @@ jobs:
               --remove-orphans \
               api consumer outbox nginx; then
             echo '::error title=Orders container start failed::docker compose up failed'
+            for service in api consumer outbox nginx; do
+              diagnose_service "$service"
+            done
             exit 1
           fi
           echo 'Orders runtime containers started.'

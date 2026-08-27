@@ -19,6 +19,16 @@ BACKGROUND: dict[str, set[str]] = {
     "media/docker-compose.deploy.yml": {"maintenance"},
 }
 
+OUTBOX_WORKERS = (
+    "auth/src/auth_service/outbox_worker.py",
+    "inventory/src/inventory/outbox_worker.py",
+    "orders/src/orders/outbox_worker.py",
+    "payments/src/payments/outbox_worker.py",
+    "notifications/src/notifications/outbox_worker.py",
+    "wishlist/src/wishlist/outbox_worker.py",
+    "drops/src/drops/outbox_worker.py",
+)
+
 
 def _load(path: str) -> dict:
     return yaml.safe_load((PROJECT_ROOT / path).read_text(encoding="utf-8"))
@@ -34,6 +44,14 @@ def test_production_background_services_are_healthy_and_watchdog_opted_in() -> N
             assert service.get("labels", {}).get("flashmarket.autoheal") == "true", (
                 label
             )
+
+
+def test_outbox_workers_keep_heartbeat_alive_while_connected() -> None:
+    for path in OUTBOX_WORKERS:
+        source = (PROJECT_ROOT / path).read_text(encoding="utf-8")
+        assert "async with periodic_heartbeat(" in source, path
+        assert "interval_seconds=settings.worker_heartbeat_interval_seconds" in source, path
+        assert "touch_heartbeat(" not in source, path
 
 
 def test_reliability_alert_rules_have_unique_names_and_runbooks() -> None:

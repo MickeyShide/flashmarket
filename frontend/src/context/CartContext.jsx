@@ -1,33 +1,47 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { CART_KEY } from '../config/constants';
 import { apiJson } from '../services/api';
+import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 
 const CartContext = createContext(null);
 
 export const CartProvider = ({ children }) => {
+  const { user } = useAuth();
   const { triggerToast } = useToast();
   const [stockCache, setStockCache] = useState({});
 
+  const storageKey = user?.id ? `${CART_KEY}_${user.id}` : `${CART_KEY}_guest`;
+
   const [cart, setCart] = useState(() => {
     try {
-      const raw = localStorage.getItem(CART_KEY);
+      const raw = localStorage.getItem(storageKey) || localStorage.getItem(CART_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
       console.warn('Corrupt cart in localStorage, resetting cart');
-      localStorage.removeItem(CART_KEY);
       return [];
     }
   });
 
+  // Switch cart when user logs in or out
   useEffect(() => {
     try {
-      localStorage.setItem(CART_KEY, JSON.stringify(cart));
+      const raw = localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setCart(Array.isArray(parsed) ? parsed : []);
+    } catch (e) {
+      setCart([]);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(cart));
     } catch (e) {
       console.error('saveCart error', e);
     }
-  }, [cart]);
+  }, [cart, storageKey]);
 
   const fetchStock = useCallback(async (productId, variantId = null) => {
     try {
@@ -35,7 +49,7 @@ export const CartProvider = ({ children }) => {
       const url = variantId
         ? `/api/v1/stocks/${productId}?variant_id=${variantId}`
         : `/api/v1/stocks/${productId}`;
-      const stock = await apiJson(url);
+      const stock = await apiJson(url, { skipCache: true });
       setStockCache(prev => ({ ...prev, [cacheKey]: stock }));
       return stock;
     } catch (err) {
@@ -50,19 +64,25 @@ export const CartProvider = ({ children }) => {
     if (!product) return;
 
     const variantId = selectedVariant?.id || null;
-    const cacheKey = variantId ? `${product.id}_${variantId}` : product.id;
 
     try {
       const stock = await fetchStock(product.id, variantId);
       const available = stock.available || 0;
 
       const dropId = dropInfo?.id || dropInfo?.drop_id || null;
+      const maxPerUser = dropInfo?.max_per_user ? Number(dropInfo.max_per_user) : null;
+
       const existingIndex = cart.findIndex(i =>
         i.id === product.id &&
         (i.variant_id || null) === variantId &&
         (i.drop_id || null) === dropId
       );
       const currentCartQty = existingIndex > -1 ? cart[existingIndex].qty : 0;
+
+      if (maxPerUser && currentCartQty + requestedQty > maxPerUser) {
+        triggerToast(`Превышен лимит на пользователя для этого дропа (макс. ${maxPerUser} шт.)`, true);
+        return;
+      }
 
       if (currentCartQty + requestedQty > available) {
         triggerToast(`Недостаточно товара на складе (доступно: ${available} шт.)`, true);
@@ -123,8 +143,6 @@ export const CartProvider = ({ children }) => {
     const item = cart[index];
     if (!item) return;
 
-    const previousCart = cart;
-
     // Optimistic UI update: instantly apply delta
     setCart(prev => {
       if (!prev[index]) return prev;
@@ -138,11 +156,10 @@ export const CartProvider = ({ children }) => {
       }
     });
 
-    // If increasing quantity, verify with stock cache/backend
+    // If increasing quantity, verify with fresh stock from backend
     if (delta > 0) {
       try {
-        const cacheKey = item.variant_id ? `${item.id}_${item.variant_id}` : item.id;
-        const stock = stockCache[cacheKey] || await fetchStock(item.id, item.variant_id);
+        const stock = await fetchStock(item.id, item.variant_id);
         const available = stock.available ?? 0;
 
         if (item.qty + delta > available) {
@@ -163,7 +180,7 @@ export const CartProvider = ({ children }) => {
           });
         }
       } catch (e) {
-        // In case of error, we can either keep or rollback
+        // Handled silently
       }
     }
   };
@@ -171,6 +188,9 @@ export const CartProvider = ({ children }) => {
   const clearCart = () => {
     setCart([]);
     setStockCache({});
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (e) { }
   };
 
   const cartTotal = () => {

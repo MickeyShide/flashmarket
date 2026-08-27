@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 
 export const Countdown = ({ targetDate, onExpire }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, expired: false });
+  const hasExpiredRef = React.useRef(false);
 
   useEffect(() => {
+    hasExpiredRef.current = false;
+    let interval = null;
+
     function calculate() {
       if (!targetDate) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, expired: true });
@@ -16,7 +20,11 @@ export const Countdown = ({ targetDate, onExpire }) => {
 
       if (diff <= 0) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, expired: true });
-        if (onExpire) onExpire();
+        if (interval) clearInterval(interval);
+        if (!hasExpiredRef.current) {
+          hasExpiredRef.current = true;
+          if (onExpire) onExpire();
+        }
         return;
       }
 
@@ -29,8 +37,10 @@ export const Countdown = ({ targetDate, onExpire }) => {
     }
 
     calculate();
-    const interval = setInterval(calculate, 1000);
-    return () => clearInterval(interval);
+    interval = setInterval(calculate, 1000);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [targetDate, onExpire]);
 
   if (timeLeft.expired) {

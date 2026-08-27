@@ -11,10 +11,10 @@ from aio_pika.abc import AbstractExchange
 from rabbitmq_reliability import (
     claim_outbox_event,
     observe_outbox_age,
+    periodic_heartbeat,
     publish_confirmed,
     record_outbox_result,
     run_forever,
-    touch_heartbeat,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -105,20 +105,24 @@ async def run_connected_worker() -> None:
             ExchangeType.TOPIC,
             durable=True,
         )
-        while True:
-            try:
-                processed = await publish_outbox_batch(exchange)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("Outbox batch failed")
+        async with periodic_heartbeat(
+            "/tmp/flashmarket-heartbeat.json",
+            interval_seconds=settings.worker_heartbeat_interval_seconds,
+            phase="orders_outbox",
+        ):
+            while True:
+                try:
+                    processed = await publish_outbox_batch(exchange)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception("Outbox batch failed")
+                    await asyncio.sleep(settings.outbox_poll_interval_seconds)
+                    continue
+                if processed:
+                    logger.info("Processed %d outbox event(s)", processed)
+                await observe_outbox_age(SessionFactory, OutboxEventModel, utc_now(), "orders")
                 await asyncio.sleep(settings.outbox_poll_interval_seconds)
-                continue
-            if processed:
-                logger.info("Processed %d outbox event(s)", processed)
-            await observe_outbox_age(SessionFactory, OutboxEventModel, utc_now(), "orders")
-            touch_heartbeat("/tmp/flashmarket-heartbeat.json", "orders_outbox")
-            await asyncio.sleep(settings.outbox_poll_interval_seconds)
 
 
 async def run_worker() -> None:

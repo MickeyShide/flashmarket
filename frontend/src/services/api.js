@@ -61,7 +61,14 @@ export async function api(path, options = {}, tokenOverride = null) {
 
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`;
-      return await fetch(path, { ...options, headers, credentials: 'include' });
+      const retryRes = await fetch(path, { ...options, headers, credentials: 'include' });
+      if (retryRes.status === 401) {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        if (onSessionExpiredCallback) {
+          onSessionExpiredCallback();
+        }
+      }
+      return retryRes;
     }
 
     localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -91,7 +98,11 @@ export async function apiJson(path, options = {}, tokenOverride = null) {
 
   if (!res.ok) {
     let msg;
-    if (res.status === 429) {
+    if (res.status === 401) {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      if (onSessionExpiredCallback) onSessionExpiredCallback();
+      msg = data.detail || 'Сессия истекла. Войдите снова.';
+    } else if (res.status === 429) {
       msg = 'Слишком много запросов. Попробуйте позже.';
     } else if (res.status === 403) {
       if (data.detail === "Valid refresh cookie and CSRF token required") {
