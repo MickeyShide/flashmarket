@@ -293,22 +293,55 @@ jobs:
           export FRONTEND_IMAGE
           docker compose -f docker-compose.yml --env-file .env config --quiet
           docker compose -f docker-compose.yml --env-file .env pull
-          docker compose -f docker-compose.yml --env-file .env up -d --no-build --force-recreate gateway frontend
+
+          diagnose_service() {
+            service="$1"
+            container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q "$service")"
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 "$service" || true
+            if [[ -z "$container" ]]; then
+              printf '::error title=Missing deployment container::Service %s has no container\n' "$service"
+              docker compose -f docker-compose.yml --env-file .env ps -a
+              return
+            fi
+            docker inspect \
+              --format 'status={{.State.Status}},exit={{.State.ExitCode}},restarts={{.RestartCount}},error={{.State.Error}}' \
+              "$container" || true
+            docker inspect \
+              --format '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{printf "%q" .Output}}{{println}}{{end}}' \
+              "$container" || true
+          }
+
+          if ! docker compose -f docker-compose.yml --env-file .env up \
+              -d --no-build --force-recreate gateway frontend; then
+            diagnose_service gateway
+            diagnose_service frontend
+            exit 1
+          fi
 
           echo 'Waiting for gateway...'
+          gateway_healthy=false
           for attempt in $(seq 1 30); do
             if docker compose -f docker-compose.yml --env-file .env exec -T gateway wget -q -O /dev/null http://localhost/health; then
               echo 'Gateway is healthy'
+              gateway_healthy=true
               break
             fi
             sleep 2
           done
+          if [[ "$gateway_healthy" != "true" ]]; then
+            diagnose_service gateway
+            diagnose_service frontend
+            exit 1
+          fi
 
           docker compose -f docker-compose.yml --env-file .env ps -a
           echo 'Checking gateway upstream...'
-          curl --fail --silent --show-error \
-            -H "Host: ${GATEWAY_DOMAIN}" \
-            "http://127.0.0.1:${GATEWAY_PORT}/health"
+          if ! curl --fail --silent --show-error \
+              -H "Host: ${GATEWAY_DOMAIN}" \
+              "http://127.0.0.1:${GATEWAY_PORT}/health"; then
+            diagnose_service gateway
+            exit 1
+          fi
           REMOTE
 
       - name: Verify public HTTPS endpoint

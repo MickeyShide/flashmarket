@@ -294,19 +294,45 @@ jobs:
           docker compose -f docker-compose.yml --env-file .env config --quiet
           docker compose -f docker-compose.yml --env-file .env pull
 
+          diagnose_service() {
+            service="$1"
+            container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q "$service")"
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 "$service" || true
+            if [[ -z "$container" ]]; then
+              printf '::error title=Missing deployment container::Service %s has no container\n' "$service"
+              docker compose -f docker-compose.yml --env-file .env ps -a
+              return
+            fi
+            docker inspect \
+              --format 'status={{.State.Status}},exit={{.State.ExitCode}},restarts={{.RestartCount}},error={{.State.Error}}' \
+              "$container" || true
+            docker inspect \
+              --format '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{printf "%q" .Output}}{{println}}{{end}}' \
+              "$container" || true
+          }
+
           echo 'Applying Drops database migrations...'
           timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps api migrate </dev/null
           echo 'Database migrations complete.'
 
           echo 'Starting Drops API, maintenance, and outbox worker...'
-          docker compose -f docker-compose.yml --env-file .env up \
-            -d \
-            --no-build \
-            --force-recreate \
-            --remove-orphans \
-            api maintenance outbox
+          if ! docker compose -f docker-compose.yml --env-file .env up \
+              -d \
+              --no-build \
+              --force-recreate \
+              --remove-orphans \
+              api maintenance outbox; then
+            for service in api maintenance outbox; do
+              diagnose_service "$service"
+            done
+            exit 1
+          fi
 
-          api_container="$(docker compose -f docker-compose.yml --env-file .env ps -q api)"
+          api_container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q api)"
+          if [[ -z "$api_container" ]]; then
+            diagnose_service api
+            exit 1
+          fi
           for attempt in $(seq 1 60); do
             health="$(
               docker inspect \
@@ -320,14 +346,14 @@ jobs:
           done
           final_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$api_container")"
           if [[ "$final_health" != "healthy" ]]; then
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 api
+            diagnose_service api
             exit 1
           fi
 
           for service in maintenance outbox; do
-            container="$(docker compose -f docker-compose.yml --env-file .env ps -q "$service")"
+            container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q "$service")"
             if [[ -z "$container" ]]; then
-              docker compose -f docker-compose.yml --env-file .env logs --tail 100 "$service"
+              diagnose_service "$service"
               exit 1
             fi
             # The healthcheck has a 45s start period and a 15s interval. Keep
@@ -338,10 +364,7 @@ jobs:
               sleep 2
             done
             if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$container")" != "healthy" ]]; then
-              docker inspect \
-                --format '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{printf "%q" .Output}}{{println}}{{end}}' \
-                "$container"
-              docker compose -f docker-compose.yml --env-file .env logs --tail 100 "$service"
+              diagnose_service "$service"
               exit 1
             fi
           done

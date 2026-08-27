@@ -334,19 +334,45 @@ jobs:
           docker compose -f docker-compose.yml --env-file .env config --quiet
           docker compose -f docker-compose.yml --env-file .env pull
 
+          diagnose_service() {
+            service="$1"
+            container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q "$service")"
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 "$service" || true
+            if [[ -z "$container" ]]; then
+              printf '::error title=Missing deployment container::Service %s has no container\n' "$service"
+              docker compose -f docker-compose.yml --env-file .env ps -a
+              return
+            fi
+            docker inspect \
+              --format 'status={{.State.Status}},exit={{.State.ExitCode}},restarts={{.RestartCount}},error={{.State.Error}}' \
+              "$container" || true
+            docker inspect \
+              --format '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{printf "%q" .Output}}{{println}}{{end}}' \
+              "$container" || true
+          }
+
           echo 'Applying Media database migrations...'
           timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps api migrate </dev/null
           echo 'Database migrations complete.'
 
           echo 'Starting Media API and maintenance worker...'
-          docker compose -f docker-compose.yml --env-file .env up \
-            -d \
-            --no-build \
-            --force-recreate \
-            --remove-orphans \
-            api maintenance
+          if ! docker compose -f docker-compose.yml --env-file .env up \
+              -d \
+              --no-build \
+              --force-recreate \
+              --remove-orphans \
+              api maintenance; then
+            for service in api maintenance; do
+              diagnose_service "$service"
+            done
+            exit 1
+          fi
 
-          container="$(docker compose -f docker-compose.yml --env-file .env ps -q api)"
+          container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q api)"
+          if [[ -z "$container" ]]; then
+            diagnose_service api
+            exit 1
+          fi
           for attempt in $(seq 1 60); do
             health="$(
               docker inspect \
@@ -360,12 +386,12 @@ jobs:
           done
           final_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container")"
           [[ "$final_health" == "healthy" ]] || {
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 api
+            diagnose_service api
             exit 1
           }
-          maintenance_container="$(docker compose -f docker-compose.yml --env-file .env ps -q maintenance)"
+          maintenance_container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q maintenance)"
           if [[ -z "$maintenance_container" ]]; then
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 maintenance
+            diagnose_service maintenance
             exit 1
           fi
           for attempt in $(seq 1 60); do
@@ -374,7 +400,7 @@ jobs:
             sleep 2
           done
           [[ -n "$maintenance_container" ]] && [[ "$(docker inspect --format '{{.State.Health.Status}}' "$maintenance_container")" == "healthy" ]] || {
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 maintenance
+            diagnose_service maintenance
             exit 1
           }
           docker compose -f docker-compose.yml --env-file .env ps -a

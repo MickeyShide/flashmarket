@@ -293,23 +293,47 @@ jobs:
           docker compose -f docker-compose.yml --env-file .env config --quiet
           docker compose -f docker-compose.yml --env-file .env pull
 
+          diagnose_service() {
+            service="$1"
+            container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q "$service")"
+            docker compose -f docker-compose.yml --env-file .env logs --tail 100 "$service" || true
+            if [[ -z "$container" ]]; then
+              printf '::error title=Missing deployment container::Service %s has no container\n' "$service"
+              docker compose -f docker-compose.yml --env-file .env ps -a
+              return
+            fi
+            docker inspect \
+              --format 'status={{.State.Status}},exit={{.State.ExitCode}},restarts={{.RestartCount}},error={{.State.Error}}' \
+              "$container" || true
+            docker inspect \
+              --format '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{printf "%q" .Output}}{{println}}{{end}}' \
+              "$container" || true
+          }
+
           echo 'Applying Wishlist database migrations...'
           timeout 120 docker compose -f docker-compose.yml --env-file .env run --rm --no-deps api migrate </dev/null
           echo 'Database migrations complete.'
 
           echo 'Starting Wishlist API, consumer, and outbox worker...'
-          docker compose -f docker-compose.yml --env-file .env up \
-            -d \
-            --no-build \
-            --force-recreate \
-            --remove-orphans \
-            api consumer outbox
+          if ! docker compose -f docker-compose.yml --env-file .env up \
+              -d \
+              --no-build \
+              --force-recreate \
+              --remove-orphans \
+              api consumer outbox; then
+            for service in api consumer outbox; do
+              diagnose_service "$service"
+            done
+            exit 1
+          fi
 
-          api_container="$(docker compose -f docker-compose.yml --env-file .env ps -q api)"
-          consumer_container="$(docker compose -f docker-compose.yml --env-file .env ps -q consumer)"
-          outbox_container="$(docker compose -f docker-compose.yml --env-file .env ps -q outbox)"
-          if [[ -z "$consumer_container" || -z "$outbox_container" ]]; then
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 consumer outbox
+          api_container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q api)"
+          consumer_container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q consumer)"
+          outbox_container="$(docker compose -f docker-compose.yml --env-file .env ps -a -q outbox)"
+          if [[ -z "$api_container" || -z "$consumer_container" || -z "$outbox_container" ]]; then
+            for service in api consumer outbox; do
+              diagnose_service "$service"
+            done
             exit 1
           fi
           initial_consumer_restarts="$(docker inspect --format '{{.RestartCount}}' "$consumer_container")"
@@ -327,18 +351,18 @@ jobs:
           done
           final_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$api_container")"
           if [[ "$final_health" != "healthy" ]]; then
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 api
+            diagnose_service api
             exit 1
           fi
 
           if [[ -z "$consumer_container" ]] || [[ "$(docker inspect --format '{{.State.Running}}' "$consumer_container")" != "true" ]]; then
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 consumer
+            diagnose_service consumer
             exit 1
           fi
           final_consumer_restarts="$(docker inspect --format '{{.RestartCount}}' "$consumer_container")"
           if [[ "$final_consumer_restarts" != "$initial_consumer_restarts" ]]; then
             echo "Wishlist consumer restarted during deployment verification"
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 consumer
+            diagnose_service consumer
             exit 1
           fi
           for attempt in $(seq 1 30); do
@@ -347,13 +371,13 @@ jobs:
             sleep 2
           done
           if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$outbox_container")" != "healthy" ]]; then
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 outbox
+            diagnose_service outbox
             exit 1
           fi
           final_outbox_restarts="$(docker inspect --format '{{.RestartCount}}' "$outbox_container")"
           if [[ "$final_outbox_restarts" != "$initial_outbox_restarts" ]]; then
             echo "Wishlist outbox restarted during deployment verification"
-            docker compose -f docker-compose.yml --env-file .env logs --tail 100 outbox
+            diagnose_service outbox
             exit 1
           fi
           docker compose -f docker-compose.yml --env-file .env ps -a
