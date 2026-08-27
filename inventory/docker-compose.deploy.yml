@@ -79,7 +79,7 @@ services:
     healthcheck: &worker-health
       test: ["CMD-SHELL", "python -m rabbitmq_reliability.heartbeat /tmp/flashmarket-heartbeat.json $${INVENTORY_WORKER_HEARTBEAT_STALE_SECONDS:-45}"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
       start_period: 15s
 

@@ -50,8 +50,21 @@ def test_outbox_workers_keep_heartbeat_alive_while_connected() -> None:
     for path in OUTBOX_WORKERS:
         source = (PROJECT_ROOT / path).read_text(encoding="utf-8")
         assert "async with periodic_heartbeat(" in source, path
-        assert "interval_seconds=settings.worker_heartbeat_interval_seconds" in source, path
+        assert (
+            "interval_seconds=settings.worker_heartbeat_interval_seconds" in source
+        ), path
         assert "touch_heartbeat(" not in source, path
+
+
+def test_deployed_worker_heartbeat_probes_allow_python_startup_time() -> None:
+    for worker_path in OUTBOX_WORKERS:
+        service = worker_path.split("/", maxsplit=1)[0]
+        compose_path = PROJECT_ROOT / service / "docker-compose.deploy.yml"
+        compose = compose_path.read_text(encoding="utf-8")
+        heartbeat = compose.index("rabbitmq_reliability.heartbeat")
+        worker_healthcheck = compose[heartbeat : heartbeat + 300]
+
+        assert "timeout: 10s" in worker_healthcheck, compose_path
 
 
 def test_reliability_alert_rules_have_unique_names_and_runbooks() -> None:

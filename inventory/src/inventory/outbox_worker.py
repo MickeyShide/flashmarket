@@ -121,9 +121,7 @@ async def run_connected_worker() -> None:
                     continue
                 if processed:
                     logger.info("Processed %d outbox event(s)", processed)
-                await observe_outbox_age(
-                    SessionFactory, OutboxEventModel, utc_now(), "inventory"
-                )
+                await observe_outbox_age(SessionFactory, OutboxEventModel, utc_now(), "inventory")
                 await asyncio.sleep(settings.outbox_poll_interval_seconds)
 
 

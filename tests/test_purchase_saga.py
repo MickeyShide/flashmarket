@@ -129,7 +129,7 @@ async def test_purchase_saga_happy_path(
     payment_id = payment_items[0]["id"]
 
     # 6. Confirm payment; this triggers PaymentSucceeded event.
-    confirm_resp = await api_client.post(f"/api/v1/payments/{payment_id}/confirm")
+    confirm_resp = await admin_api_client.post(f"/api/v1/payments/{payment_id}/confirm")
     assert confirm_resp.status_code == 200, confirm_resp.text
 
     # 7. Wait for order to become CONFIRMED.
@@ -252,7 +252,7 @@ async def test_purchase_saga_payment_failure_cancels_order(
     payment_id = payments_resp.json()["items"][0]["id"]
 
     # Fail payment.
-    fail_resp = await api_client.post(f"/api/v1/payments/{payment_id}/fail")
+    fail_resp = await admin_api_client.post(f"/api/v1/payments/{payment_id}/fail")
     assert fail_resp.status_code == 200
 
     async def _order_cancelled() -> bool:
